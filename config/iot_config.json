@@ -1,0 +1,23 @@
+{
+  "serial_port": "COM2",
+  "baud_rate": 9600,
+  "devices": {
+    "led_1": {
+      "name": "LED 1",
+      "cmd_on": "LED1_ON",
+      "cmd_off": "LED1_OFF"
+    },
+    "led_2": {
+      "name": "LED 2",
+      "cmd_on": "LED2_ON",
+      "cmd_off": "LED2_OFF"
+    },
+    "led_3": {
+      "name": "LED 3",
+      "cmd_on": "LED3_ON",
+      "cmd_off": "LED3_OFF"
+    }
+  },
+  "cmd_all_on": "TODOS_ON",
+  "cmd_all_off": "TODOS_OFF"
+}
