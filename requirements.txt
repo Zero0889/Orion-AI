@@ -23,3 +23,6 @@ pywinauto
 python-pptx
 pyqt6
 pyserial
+google-auth
+google-auth-oauthlib
+google-api-python-client

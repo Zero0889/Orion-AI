@@ -3,3 +3,4 @@ __pycache__/
 *.pyo
 .verify*.py
 .test*.py
+.venv/
