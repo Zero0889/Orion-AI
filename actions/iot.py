@@ -1,8 +1,8 @@
-# iot.py — Control IoT (Arduino / LEDs) para O.R.I.O.N
+# iot.py — Control IoT (Arduino / Focos) para O.R.I.O.N
 # ═══════════════════════════════════════════════════════════════
-# Controla dispositivos IoT (LEDs/focos) conectados por serial
-# a un Arduino. Soporta encender/apagar individual o todos,
-# operaciones temporizadas y detección de intención por IA.
+# Controla dispositivos IoT (focos) conectados por serial a un
+# Arduino. Soporta encender/apagar individual o todos, opera-
+# ciones temporizadas y detección de intención por IA o reglas.
 # ═══════════════════════════════════════════════════════════════
 
 import json
@@ -18,6 +18,7 @@ try:
 except ImportError:
     _SERIAL_OK = False
 
+
 # ── Rutas ────────────────────────────────────────────────────
 
 def _get_base_dir() -> Path:
@@ -25,23 +26,25 @@ def _get_base_dir() -> Path:
         return Path(sys.executable).parent
     return Path(__file__).resolve().parent.parent
 
-_BASE_DIR       = _get_base_dir()
-_API_CONFIG     = _BASE_DIR / "config" / "api_keys.json"
-_IOT_CONFIG     = _BASE_DIR / "config" / "iot_config.json"
+
+_BASE_DIR   = _get_base_dir()
+_API_CONFIG = _BASE_DIR / "config" / "api_keys.json"
+_IOT_CONFIG = _BASE_DIR / "config" / "iot_config.json"
+
 
 # ── Configuración por defecto ────────────────────────────────
 
 _DEFAULT_IOT_CONFIG = {
-    "serial_port":  "COM2",
-    "baud_rate":    9600,
+    "serial_port": "COM1",
+    "baud_rate":   9600,
     "devices": {
-        "led_1": {"name": "LED 1", "cmd_on": "LED1_ON", "cmd_off": "LED1_OFF"},
-        "led_2": {"name": "LED 2", "cmd_on": "LED2_ON", "cmd_off": "LED2_OFF"},
-        "led_3": {"name": "LED 3", "cmd_on": "LED3_ON", "cmd_off": "LED3_OFF"},
+        "foco_1": {"name": "foco 1", "cmd_on": "FOCO1_ON", "cmd_off": "FOCO1_OFF"},
+        "foco_2": {"name": "foco 2", "cmd_on": "FOCO2_ON", "cmd_off": "FOCO2_OFF"},
     },
     "cmd_all_on":  "TODOS_ON",
     "cmd_all_off": "TODOS_OFF",
 }
+
 
 # ── Conexión serial (singleton) ──────────────────────────────
 
@@ -56,7 +59,6 @@ def _load_iot_config() -> dict:
             return json.loads(_IOT_CONFIG.read_text(encoding="utf-8"))
         except Exception:
             pass
-    # Crear config por defecto
     _IOT_CONFIG.parent.mkdir(parents=True, exist_ok=True)
     _IOT_CONFIG.write_text(
         json.dumps(_DEFAULT_IOT_CONFIG, indent=2, ensure_ascii=False),
@@ -82,8 +84,8 @@ def _get_serial() -> "serial.Serial | None":
         if _serial_conn is not None and _serial_conn.is_open:
             return _serial_conn
 
-        cfg = _load_iot_config()
-        port = cfg.get("serial_port", "COM2")
+        cfg  = _load_iot_config()
+        port = cfg.get("serial_port", "COM1")
         baud = cfg.get("baud_rate", 9600)
 
         try:
@@ -127,6 +129,112 @@ def _device_name_map(cfg: dict) -> dict:
     return names
 
 
+# ── Normalización de texto ───────────────────────────────────
+
+def _normalize_text(text: str) -> str:
+    """Normaliza el texto del usuario: corrige fonética, números, referencias."""
+    text = text.lower().strip()
+
+    # Correcciones fonéticas comunes del reconocimiento de voz
+    text = text.replace("segun2",    "segundos")
+    text = text.replace("segun dos", "segundos")
+    text = text.replace("segun2s",   "segundos")
+    text = text.replace("*",         "y")
+
+    # Números escritos en español → dígitos
+    num_words = {
+        r"\bun\b": "1",    r"\buno\b": "1",      r"\buna\b": "1",
+        r"\bdos\b": "2",   r"\btres\b": "3",     r"\bcuatro\b": "4",
+        r"\bcinco\b": "5", r"\bseis\b": "6",     r"\bsiete\b": "7",
+        r"\bocho\b": "8",  r"\bnueve\b": "9",    r"\bdiez\b": "10",
+        r"\bonce\b": "11", r"\bdoce\b": "12",    r"\bquince\b": "15",
+        r"\bveinte\b": "20", r"\btreinta\b": "30",
+        r"\bcuarenta\b": "40", r"\bcincuenta\b": "50",
+    }
+    for pattern, digit in num_words.items():
+        text = re.sub(pattern, digit, text)
+
+    # Normalizar referencias a focos
+    text = text.replace("foco uno",  "foco 1")
+    text = text.replace("foco dos",  "foco 2")
+    text = text.replace("foco tres", "foco 3")
+    text = text.replace("foco foco", "foco")
+    text = text.replace("1 y 2",     "foco 1 y foco 2")
+    text = text.replace("1 y 3",     "foco 1 y foco 3")
+    text = text.replace("2 y 3",     "foco 2 y foco 3")
+
+    # Espacios múltiples
+    text = re.sub(r"\s+", " ", text).strip()
+
+    return text
+
+
+# ── Reglas manuales (evita llamar a Gemini si es obvio) ──────
+
+_RULES_OFF_ALL = [
+    "mucha luz", "demasiada luz", "mucho brillo",
+    "ya hay luz", "no necesito luz", "suficiente luz",
+    "apaga todo", "apaga todos", "apaga los focos",
+    "apagame todo", "apagame los focos",
+    "apaga la luz", "apaga las luces",
+]
+
+_RULES_ON_ALL = [
+    "esta oscuro", "está oscuro", "falta luz", "necesito luz",
+    "hay poca luz", "poca luz", "muy oscuro",
+    "no veo nada", "no se ve", "no se ve nada",
+    "prende todo", "prende todos", "prende los focos",
+    "enciende todo", "enciende todos", "enciende los focos",
+    "prendeme todo", "prendeme todos", "prendeme los focos",
+    "enciendeme todo", "enciendeme todos",
+    "prende la luz", "prende las luces",
+    "enciende la luz", "enciende las luces",
+]
+
+
+def _manual_rules(text: str, cfg: dict) -> list[str] | None:
+    """
+    Intenta resolver el comando con reglas directas antes de usar IA.
+    Retorna la lista de comandos si hay match, None si necesita IA.
+    """
+    all_on  = cfg.get("cmd_all_on",  "TODOS_ON")
+    all_off = cfg.get("cmd_all_off", "TODOS_OFF")
+
+    for phrase in _RULES_OFF_ALL:
+        if phrase in text:
+            return [all_off]
+
+    for phrase in _RULES_ON_ALL:
+        if phrase in text:
+            return [all_on]
+
+    # Reglas para focos individuales
+    devices = cfg.get("devices", {})
+    commands = []
+
+    for key, dev in devices.items():
+        name = dev["name"]  # e.g. "foco 1"
+        num  = name.split()[-1] if " " in name else key
+
+        on_patterns  = [f"prende el {name}", f"enciende el {name}",
+                        f"prende {name}", f"enciende {name}",
+                        f"prendeme el {name}", f"enciendeme el {name}"]
+        off_patterns = [f"apaga el {name}", f"apaga {name}",
+                        f"apagame el {name}"]
+
+        for p in on_patterns:
+            if p in text:
+                commands.append(dev["cmd_on"])
+                break
+
+        for p in off_patterns:
+            if p in text:
+                commands.append(dev["cmd_off"])
+                break
+
+    return commands if commands else None
+
+
 # ── Enviar comandos al Arduino ───────────────────────────────
 
 def _send_commands(commands: list[str], cfg: dict) -> tuple[list[str], list[str]]:
@@ -138,9 +246,9 @@ def _send_commands(commands: list[str], cfg: dict) -> tuple[list[str], list[str]
     if conn is None:
         return [], ["No se pudo conectar al Arduino."]
 
-    valid = _get_valid_commands(cfg)
+    valid    = _get_valid_commands(cfg)
     executed = []
-    errs = []
+    errs     = []
 
     for cmd in commands:
         cmd = cmd.strip().upper()
@@ -162,7 +270,7 @@ def _send_commands(commands: list[str], cfg: dict) -> tuple[list[str], list[str]
 def _auto_off(commands_on: list[str], cfg: dict):
     """Apaga automáticamente los dispositivos que se encendieron."""
     off_cmds = []
-    all_on = cfg.get("cmd_all_on", "TODOS_ON")
+    all_on  = cfg.get("cmd_all_on", "TODOS_ON")
     all_off = cfg.get("cmd_all_off", "TODOS_OFF")
 
     for cmd in commands_on:
@@ -182,7 +290,7 @@ def _build_response(executed: list[str], cfg: dict) -> str:
     if not executed:
         return "No se ejecutó ningún comando."
 
-    names = _device_name_map(cfg)
+    names   = _device_name_map(cfg)
     all_on  = cfg.get("cmd_all_on",  "TODOS_ON")
     all_off = cfg.get("cmd_all_off", "TODOS_OFF")
 
@@ -191,10 +299,10 @@ def _build_response(executed: list[str], cfg: dict) -> str:
 
     for cmd in executed:
         if cmd == all_on:
-            encendidos = ["todos los dispositivos"]
+            encendidos = ["todos los focos"]
             break
         elif cmd == all_off:
-            apagados = ["todos los dispositivos"]
+            apagados = ["todos los focos"]
             break
         elif cmd.endswith("_ON"):
             encendidos.append(names.get(cmd, cmd))
@@ -204,24 +312,62 @@ def _build_response(executed: list[str], cfg: dict) -> str:
     frases = []
 
     if encendidos:
-        if len(encendidos) == 1:
-            sujeto = encendidos[0]
-            verbo  = "ha sido encendido" if sujeto != "todos los dispositivos" else "han sido encendidos"
+        if encendidos == ["todos los focos"]:
+            sujeto, verbo = "todos los focos", "han sido encendidos"
+        elif len(encendidos) == 1:
+            sujeto, verbo = encendidos[0], "ha sido encendido"
         else:
             sujeto = ", ".join(encendidos[:-1]) + " y " + encendidos[-1]
             verbo  = "han sido encendidos"
         frases.append(f"{sujeto.capitalize()} {verbo} correctamente.")
 
     if apagados:
-        if len(apagados) == 1:
-            sujeto = apagados[0]
-            verbo  = "ha sido apagado" if sujeto != "todos los dispositivos" else "han sido apagados"
+        if apagados == ["todos los focos"]:
+            sujeto, verbo = "todos los focos", "han sido apagados"
+        elif len(apagados) == 1:
+            sujeto, verbo = apagados[0], "ha sido apagado"
         else:
             sujeto = ", ".join(apagados[:-1]) + " y " + apagados[-1]
             verbo  = "han sido apagados"
         frases.append(f"{sujeto.capitalize()} {verbo} correctamente.")
 
     return " ".join(frases) if frases else "Comando ejecutado correctamente."
+
+
+# ── Parseo de tiempo ─────────────────────────────────────────
+
+def _parse_duration(text: str) -> tuple[int | None, str]:
+    """
+    Extrae duración en segundos del texto y retorna (segundos, texto_limpio).
+    El texto limpio es el texto sin la expresión de tiempo.
+    """
+    pattern = re.compile(
+        r"(?:durante|por|en)?\s*(\d+)\s*(segundo|segundos|seg|minuto|minutos|min)\b",
+        re.IGNORECASE,
+    )
+
+    match = pattern.search(text)
+    if match:
+        value = int(match.group(1))
+        unit  = match.group(2).lower()
+        if "minuto" in unit or unit == "min":
+            value *= 60
+
+        # Eliminar la expresión de tiempo del texto
+        clean = pattern.sub("", text).strip()
+        clean = re.sub(r"\s+", " ", clean).strip()
+
+        print(f"[IoT] Tiempo detectado: {value} segundos")
+        return value, clean
+
+    # Buscar "por X" sin unidad (asume segundos)
+    match2 = re.search(r"por\s+(\d+)\b", text)
+    if match2:
+        val = int(match2.group(1))
+        clean = re.sub(r"por\s+\d+", "", text).strip()
+        return val, clean
+
+    return None, text
 
 
 # ── Detección de intención con Gemini ────────────────────────
@@ -237,38 +383,43 @@ def _detect_iot_intent(description: str, cfg: dict) -> list[str]:
     model = genai.GenerativeModel("gemini-2.5-flash-lite")
 
     # Build device list for prompt
-    device_list = []
-    for key, dev in cfg.get("devices", {}).items():
-        device_list.append(f"  {dev['cmd_on']} / {dev['cmd_off']} — controls {dev['name']}")
-    device_str = "\n".join(device_list)
+    device_lines = []
+    for dev in cfg.get("devices", {}).values():
+        device_lines.append(
+            f"  {dev['cmd_on']}  -> turn on {dev['name']}\n"
+            f"  {dev['cmd_off']} -> turn off {dev['name']}"
+        )
+    device_str = "\n".join(device_lines)
 
     all_on  = cfg.get("cmd_all_on",  "TODOS_ON")
     all_off = cfg.get("cmd_all_off", "TODOS_OFF")
 
     prompt = f"""You are an IoT command interpreter for a home automation system.
-The user controls LED lights / devices connected to an Arduino.
+The user controls electrical lights (focos) connected to an Arduino.
 
 Available commands:
 {device_str}
-  {all_on} / {all_off} — controls all devices at once
+  {all_on}   -> turn on all lights
+  {all_off}  -> turn off all lights
 
-The user said (possibly in Spanish or any language): "{description}"
+The user said (in Spanish): "{description}"
 
 Rules:
 - Return ONLY the Arduino commands to execute, separated by commas.
-- If the user wants to turn on a device, use the _ON command.
-- If the user wants to turn off a device, use the _OFF command.
-- If the user says "all", "todos", or refers to all devices, use {all_on} or {all_off}.
+- If the user wants to turn on a light, use the _ON command.
+- If the user wants to turn off a light, use the _OFF command.
+- If the user says "all", "todos", or refers to all lights, use {all_on} or {all_off}.
 - If the context implies needing light (e.g. "it's dark", "I can't see"), use {all_on}.
-- If the context implies too much light (e.g. "too bright", "turn off"), use {all_off}.
-- Return ONLY the commands, no explanation, no markdown.
+- If the context implies too much light (e.g. "too bright"), use {all_off}.
+- Return ONLY the commands. No explanation, no markdown, no extra text.
 - If you cannot determine the intent, return: UNKNOWN
 
 Examples:
-  "enciende el led 1" -> LED1_ON
-  "apaga todo" -> {all_off}
-  "prende el 1 y el 3" -> LED1_ON, LED3_ON
-  "está muy oscuro" -> {all_on}
+  "enciende el foco 1"          -> FOCO1_ON
+  "apaga todo"                  -> {all_off}
+  "prende el foco 1 y el foco 2" -> FOCO1_ON, FOCO2_ON
+  "está muy oscuro"             -> {all_on}
+  "apaga el foco 2"             -> FOCO2_OFF
 """
 
     try:
@@ -276,46 +427,16 @@ Examples:
         text = response.text.strip().upper()
         text = re.sub(r"```(?:\w+)?", "", text).strip().rstrip("`").strip()
 
-        if "UNKNOWN" in text:
+        if "UNKNOWN" in text or "DESCONOCIDO" in text:
             return []
 
         commands = [c.strip() for c in text.replace("\n", ",").split(",") if c.strip()]
-        valid = _get_valid_commands(cfg)
+        valid    = _get_valid_commands(cfg)
         return [c for c in commands if c in valid]
 
     except Exception as e:
         print(f"[IoT] Error en detección de intención: {e}")
         return []
-
-
-# ── Parseo de tiempo ─────────────────────────────────────────
-
-def _parse_duration(text: str) -> int | None:
-    """Extrae duración en segundos del texto del usuario."""
-    # Normalizar números escritos en español
-    num_words = {
-        "un": 1, "uno": 1, "una": 1, "dos": 2, "tres": 3, "cuatro": 4,
-        "cinco": 5, "seis": 6, "siete": 7, "ocho": 8, "nueve": 9,
-        "diez": 10, "quince": 15, "veinte": 20, "treinta": 30,
-    }
-    normalized = text.lower()
-    for word, num in num_words.items():
-        normalized = re.sub(rf"\b{word}\b", str(num), normalized)
-
-    match = re.search(r"(\d+)\s*(segundo|segundos|seg|s|minuto|minutos|min|m)\b", normalized)
-    if match:
-        value = int(match.group(1))
-        unit  = match.group(2)
-        if unit.startswith("min") or unit == "m":
-            value *= 60
-        return value
-
-    # Buscar pattern "por X" sin unidad (asume segundos)
-    match2 = re.search(r"por\s+(\d+)\b", normalized)
-    if match2:
-        return int(match2.group(1))
-
-    return None
 
 
 # ── Operación temporizada (hilo separado) ────────────────────
@@ -326,17 +447,18 @@ def _timed_operation(commands_on: list[str], duration: int, cfg: dict,
     def _worker():
         if speak:
             if duration >= 60:
-            	mins = duration // 60
-            	speak(f"Los dispositivos se apagarán en {mins} minuto{'s' if mins > 1 else ''}.")
+                mins = duration // 60
+                speak(f"Se apagarán automáticamente en {mins} minuto{'s' if mins > 1 else ''}.")
             else:
-            	speak(f"Los dispositivos se apagarán en {duration} segundos.")
+                unit = "segundo" if duration == 1 else "segundos"
+                speak(f"Se apagarán automáticamente en {duration} {unit}.")
 
         time.sleep(duration)
         _auto_off(commands_on, cfg)
         print(f"[IoT] Apagado automático completado ({duration}s)")
 
         if speak:
-            speak("Los dispositivos fueron apagados automáticamente, señor.")
+            speak("Focos apagados automáticamente, señor.")
 
     thread = threading.Thread(target=_worker, daemon=True, name="IoT-AutoOff")
     thread.start()
@@ -351,9 +473,9 @@ def iot_control(parameters: dict, player=None, speak=None) -> str:
     Controla dispositivos IoT conectados al Arduino.
 
     Parámetros:
-        action      : "on" | "off" | "all_on" | "all_off" | "toggle"
-                      | "status" | "timed" | "auto" (default: "auto")
-        device      : "led_1" | "led_2" | "led_3" | "all"
+        action      : "on" | "off" | "all_on" | "all_off"
+                      | "timed" | "status" | "auto" (default: "auto")
+        device      : "foco_1" | "foco_2" | "all"
         duration    : int (segundos, para operación temporizada)
         description : str (comando en lenguaje natural para modo "auto")
     """
@@ -377,26 +499,34 @@ def iot_control(parameters: dict, player=None, speak=None) -> str:
     if action == "status":
         conn = _get_serial()
         if conn and conn.is_open:
-            port = cfg.get("serial_port", "?")
+            port      = cfg.get("serial_port", "?")
             n_devices = len(cfg.get("devices", {}))
             return (f"Arduino conectado en {port}. "
                     f"{n_devices} dispositivo(s) configurados.")
         return "Arduino no conectado. Verifica el puerto y la conexión."
 
-    # ── Acción: auto (IA interpreta) ──────────────────────────
+    # ── Acción: auto (reglas manuales → IA) ───────────────────
     if action == "auto":
         if not description:
             return "No se proporcionó descripción del comando IoT."
 
-        # Detectar duración en el texto
-        parsed_duration = _parse_duration(description)
+        # Normalizar texto
+        normalized = _normalize_text(description)
 
-        # Detectar comandos con IA
-        commands = _detect_iot_intent(description, cfg)
+        # Detectar duración y limpiar texto
+        parsed_duration, clean_text = _parse_duration(normalized)
+
+        # Intentar con reglas manuales primero (más rápido, sin API)
+        commands = _manual_rules(clean_text, cfg)
+
+        # Si no hubo match, usar Gemini
+        if commands is None:
+            print("[IoT] Sin regla manual, consultando Gemini...")
+            commands = _detect_iot_intent(clean_text, cfg)
 
         if not commands:
             return ("No pude interpretar la orden IoT. "
-                    "Intente especificar qué dispositivo encender o apagar.")
+                    "Intente especificar qué foco encender o apagar.")
 
         executed, errs = _send_commands(commands, cfg)
 
@@ -406,13 +536,17 @@ def iot_control(parameters: dict, player=None, speak=None) -> str:
         response = _build_response(executed, cfg)
 
         # Operación temporizada si se detectó duración
-        if parsed_duration and any(c.endswith("_ON") or c in (cfg["cmd_all_on"],) for c in executed):
-            _timed_operation(executed, parsed_duration, cfg, speak=speak)
-            response += f" Se apagarán automáticamente en {parsed_duration} segundos."
+        use_duration = parsed_duration or (int(duration) if duration else None)
+        if use_duration and any(
+            c.endswith("_ON") or c == cfg.get("cmd_all_on") for c in executed
+        ):
+            _timed_operation(executed, use_duration, cfg, speak=speak)
+            unit = "segundo" if use_duration == 1 else "segundos"
+            response += f" Se apagarán automáticamente en {use_duration} {unit}."
 
         return response
 
-    # ── Acción: on / off / all_on / all_off ───────────────────
+    # ── Acción: on / off ──────────────────────────────────────
     commands_to_send = []
 
     if action in ("on", "off"):
@@ -451,7 +585,8 @@ def iot_control(parameters: dict, player=None, speak=None) -> str:
             commands_to_send.append(dev_cfg["cmd_on"])
 
     else:
-        return f"Acción IoT desconocida: '{action}'. Use: on, off, all_on, all_off, timed, auto, status"
+        return (f"Acción IoT desconocida: '{action}'. "
+                "Use: on, off, all_on, all_off, timed, auto, status")
 
     # ── Ejecutar ──────────────────────────────────────────────
     executed, errs = _send_commands(commands_to_send, cfg)
@@ -465,11 +600,13 @@ def iot_control(parameters: dict, player=None, speak=None) -> str:
     if action == "timed" and executed:
         dur = int(duration) if duration else 30
         _timed_operation(executed, dur, cfg, speak=speak)
-        response += f" Se apagarán automáticamente en {dur} segundos."
+        unit = "segundo" if dur == 1 else "segundos"
+        response += f" Se apagarán automáticamente en {dur} {unit}."
 
     elif duration and executed:
         dur = int(duration)
         _timed_operation(executed, dur, cfg, speak=speak)
-        response += f" Se apagarán automáticamente en {dur} segundos."
+        unit = "segundo" if dur == 1 else "segundos"
+        response += f" Se apagarán automáticamente en {dur} {unit}."
 
     return response

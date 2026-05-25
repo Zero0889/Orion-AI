@@ -1,6 +1,11 @@
 {
   "identity": {},
-  "preferences": {},
+  "preferences": {
+    "zona_horaria": {
+      "value": "Lima, Perú",
+      "updated": "2026-05-24"
+    }
+  },
   "projects": {},
   "relationships": {},
   "wishes": {},

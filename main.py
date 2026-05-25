@@ -510,10 +510,11 @@ TOOL_DECLARATIONS = [
     {
         "name": "iot_control",
         "description": (
-            "Controls IoT devices (LEDs, lights, smart devices) connected to an Arduino. "
-            "Use this for ANY request about turning on/off lights, LEDs, or home automation devices. "
+            "Controls IoT devices (focos/lights) connected to an Arduino via serial. "
+            "Use this for ANY request about turning on/off lights, focos, or home automation devices. "
             "Supports individual device control, turning all on/off, and timed operations "
-            "(e.g. 'turn on for 30 seconds'). ALWAYS use this tool for light/LED/IoT requests."
+            "(e.g. 'turn on for 30 seconds then auto-off'). "
+            "ALWAYS use this tool for light/foco/IoT requests. NEVER use agent_task for these."
         ),
         "parameters": {
             "type": "OBJECT",
@@ -530,9 +531,9 @@ TOOL_DECLARATIONS = [
                         "auto — (default) let AI interpret the natural language command"
                     )
                 },
-                "device":      {"type": "STRING",  "description": "Device ID: led_1, led_2, led_3, or all"},
+                "device":      {"type": "STRING",  "description": "Device ID: foco_1, foco_2, or all"},
                 "duration":    {"type": "INTEGER", "description": "Duration in seconds for timed operation"},
-                "description": {"type": "STRING",  "description": "Natural language description of the IoT command"},
+                "description": {"type": "STRING",  "description": "Natural language description of the IoT command (for auto mode)"},
             },
             "required": []
         }
