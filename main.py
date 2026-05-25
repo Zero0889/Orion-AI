@@ -43,6 +43,7 @@ from actions.web_search       import web_search as web_search_action
 from actions.computer_control import computer_control
 from actions.game_updater     import game_updater
 from actions.iot              import iot_control
+from actions.google_drive     import google_drive
 
 
 # ============================================================================
@@ -538,6 +539,86 @@ TOOL_DECLARATIONS = [
             "required": []
         }
     },
+    {
+        "name": "google_drive",
+        "description": (
+            "Manages files in Google Drive. Use this for ANY request involving Google Drive: "
+            "uploading files, creating documents/sheets/presentations/folders, listing files, "
+            "searching, moving, renaming, editing document content, downloading, or deleting. "
+            "The user can provide a local file path to upload, or refer to files already in Drive by name or ID. "
+            "When the user says 'upload this file to Drive' or 'save this to my Drive', use action=upload. "
+            "When creating documents, the user can specify type: document (Google Docs), "
+            "sheet/spreadsheet (Google Sheets), presentation/slides (Google Slides). "
+            "For files already uploaded to the assistant, use the current_file path with action=upload. "
+            "ALWAYS use this tool for any Google Drive request. NEVER use browser_control or agent_task for Drive."
+        ),
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {
+                "action": {
+                    "type": "STRING",
+                    "description": (
+                        "upload — upload a local file to Drive | "
+                        "create — create a new Google Doc/Sheet/Slides | "
+                        "create_folder — create a new folder | "
+                        "list — list files (optionally in a folder) | "
+                        "search — search files by name or content | "
+                        "move — move a file to a different folder | "
+                        "rename — rename a file | "
+                        "edit — update/replace the content of an existing file | "
+                        "delete — send a file to trash | "
+                        "download — download a file to local storage | "
+                        "info — get detailed file information"
+                    )
+                },
+                "file_path": {
+                    "type": "STRING",
+                    "description": "Local file path for upload or edit actions. Leave empty to use the currently uploaded file in the UI."
+                },
+                "file_id": {
+                    "type": "STRING",
+                    "description": "Google Drive file ID for move/rename/delete/download/info/edit actions."
+                },
+                "name": {
+                    "type": "STRING",
+                    "description": "Name for new documents, folders, or search query."
+                },
+                "doc_type": {
+                    "type": "STRING",
+                    "description": "Type of document to create: document | spreadsheet | presentation (default: document)"
+                },
+                "folder_id": {
+                    "type": "STRING",
+                    "description": "Target folder ID for upload/create/create_folder/list actions."
+                },
+                "destination_folder_id": {
+                    "type": "STRING",
+                    "description": "Destination folder ID for move action."
+                },
+                "new_name": {
+                    "type": "STRING",
+                    "description": "New name for rename action."
+                },
+                "content": {
+                    "type": "STRING",
+                    "description": "Text content for creating or editing documents."
+                },
+                "query": {
+                    "type": "STRING",
+                    "description": "Search query for search/list actions."
+                },
+                "destination": {
+                    "type": "STRING",
+                    "description": "Local destination path for download action."
+                },
+                "max_results": {
+                    "type": "INTEGER",
+                    "description": "Maximum number of results for list/search (default: 20)."
+                },
+            },
+            "required": ["action"]
+        }
+    },
 ]
 
 
@@ -823,6 +904,16 @@ class OrionLive:
                 r = await loop.run_in_executor(
                     None,
                     lambda: iot_control(parameters=args, player=self.ui, speak=self.speak)
+                )
+                result = r or "Listo."
+
+            elif name == "google_drive":
+                if not args.get("file_path") and self.ui.current_file:
+                    if args.get("action") in ("upload", "edit", "update"):
+                        args["file_path"] = self.ui.current_file
+                r = await loop.run_in_executor(
+                    None,
+                    lambda: google_drive(parameters=args, player=self.ui)
                 )
                 result = r or "Listo."
 
