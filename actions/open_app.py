@@ -1,7 +1,9 @@
+import json
 import time
 import subprocess
 import platform
 import shutil
+from pathlib import Path
 
 try:
     import psutil
@@ -10,6 +12,69 @@ except ImportError:
     _PSUTIL = False
 
 _SYSTEM = platform.system()
+_BASE_DIR = Path(__file__).resolve().parent.parent
+_BROWSER_CONFIG_PATH = _BASE_DIR / "config" / "browser.json"
+
+
+def _get_chrome_path() -> str | None:
+    """Obtiene la ruta de Chrome desde browser.json."""
+    try:
+        with open(_BROWSER_CONFIG_PATH, "r", encoding="utf-8") as f:
+            cfg = json.load(f)
+        chrome = cfg.get("chrome_path", "")
+        if chrome and Path(chrome).exists():
+            return chrome
+    except Exception:
+        pass
+    fallbacks = [
+        r"C:\Program Files\Google\Chrome\Application\chrome.exe",
+        r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
+    ]
+    for p in fallbacks:
+        if Path(p).exists():
+            return p
+    return shutil.which("chrome") or shutil.which("google-chrome")
+
+
+# URLs directas para apps web — se abren en Chrome sin perfiles nuevos
+_WEB_APPS: dict[str, str] = {
+    "drive":            "https://drive.google.com",
+    "google drive":     "https://drive.google.com",
+    "gmail":            "https://mail.google.com",
+    "youtube":          "https://youtube.com",
+    "maps":             "https://maps.google.com",
+    "google maps":      "https://maps.google.com",
+    "calendar":         "https://calendar.google.com",
+    "google calendar":  "https://calendar.google.com",
+    "docs":             "https://docs.google.com",
+    "google docs":      "https://docs.google.com",
+    "sheets":           "https://sheets.google.com",
+    "google sheets":    "https://sheets.google.com",
+    "slides":           "https://slides.google.com",
+    "google slides":    "https://slides.google.com",
+    "meet":             "https://meet.google.com",
+    "google meet":      "https://meet.google.com",
+    "photos":           "https://photos.google.com",
+    "google photos":    "https://photos.google.com",
+    "keep":             "https://keep.google.com",
+    "google keep":      "https://keep.google.com",
+    "translate":        "https://translate.google.com",
+    "google translate": "https://translate.google.com",
+    "contacts":         "https://contacts.google.com",
+    "twitter":          "https://x.com",
+    "x":                "https://x.com",
+    "facebook":         "https://facebook.com",
+    "reddit":           "https://reddit.com",
+    "github":           "https://github.com",
+    "chatgpt":          "https://chat.openai.com",
+    "claude":           "https://claude.ai",
+    "netflix":          "https://netflix.com",
+    "amazon":           "https://amazon.com",
+    "twitch":           "https://twitch.tv",
+    "linkedin":         "https://linkedin.com",
+    "pinterest":        "https://pinterest.com",
+    "canva":            "https://canva.com",
+}
 
 _APP_ALIASES: dict[str, dict[str, str]] = {
 
@@ -221,6 +286,33 @@ _OS_LAUNCHERS = {
     "Linux":   _launch_linux,
 }
 
+def _open_web_app(app_name: str, player=None) -> str | None:
+    """Si app_name es una app web conocida, la abre en Chrome y devuelve resultado.
+    Devuelve None si no es una app web."""
+    key = app_name.lower().strip()
+    url = _WEB_APPS.get(key)
+    if not url:
+        return None
+
+    chrome = _get_chrome_path()
+    if not chrome:
+        return None
+
+    try:
+        subprocess.Popen(
+            [chrome, url],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        print(f"[open_app] Web app abierta en Chrome: {key} → {url}")
+        if player:
+            player.write_log(f"[open_app] {key} → Chrome")
+        return f"{app_name} abierto en Chrome."
+    except Exception as e:
+        print(f"[open_app] Error abriendo web app: {e}")
+        return None
+
+
 def open_app(
     parameters=None,
     response=None,
@@ -231,6 +323,11 @@ def open_app(
 
     if not app_name:
         return "No se proporcionó nombre de aplicación."
+
+    # Primero intentar como app web (Drive, Gmail, YouTube, etc.)
+    web_result = _open_web_app(app_name, player)
+    if web_result:
+        return web_result
 
     launcher = _OS_LAUNCHERS.get(_SYSTEM)
     if launcher is None:

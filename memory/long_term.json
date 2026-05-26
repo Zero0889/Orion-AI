@@ -4,6 +4,10 @@
     "zona_horaria": {
       "value": "Lima, Perú",
       "updated": "2026-05-24"
+    },
+    "navegador_principal": {
+      "value": "Usar el navegador principal del usuario para todas las acciones web.",
+      "updated": "2026-05-24"
     }
   },
   "projects": {},
@@ -17,6 +21,10 @@
     "nuevo_escritorio_path": {
       "value": "C:\\Users\\zahir\\OneDrive\\Desktop\\123",
       "updated": "2026-05-20"
+    },
+    "google_classroom_behavior": {
+      "value": "Abrir directamente classroom.google.com cuando se solicite acceder a Google Classroom.",
+      "updated": "2026-05-24"
     }
   }
 }

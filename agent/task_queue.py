@@ -70,6 +70,23 @@ class TaskQueue:
             self._condition.notify_all()
         print("[TaskQueue] 🔴 Stopped")
 
+    # Máximo de tareas terminadas a recordar (evita fuga de memoria)
+    _MAX_FINISHED_TASKS = 100
+
+    def _cleanup_old_tasks(self) -> None:
+        """Elimina tareas terminadas viejas para evitar fuga de memoria.
+        Conserva las últimas _MAX_FINISHED_TASKS terminadas y todas las activas.
+        """
+        finished_states = (TaskStatus.COMPLETED, TaskStatus.FAILED, TaskStatus.CANCELLED)
+        finished = [(tid, t) for tid, t in self._tasks.items() if t.status in finished_states]
+        if len(finished) <= self._MAX_FINISHED_TASKS:
+            return
+        # Ordenar por más viejas primero
+        finished.sort(key=lambda kv: kv[1].created_at)
+        excess = len(finished) - self._MAX_FINISHED_TASKS
+        for tid, _ in finished[:excess]:
+            self._tasks.pop(tid, None)
+
     def submit(
         self,
         goal:        str,
@@ -92,6 +109,7 @@ class TaskQueue:
             self._queue.append(task)
             self._queue.sort(key=lambda t: (t.priority, t.created_at))
             self._tasks[task_id] = task
+            self._cleanup_old_tasks()
             self._condition.notify()
 
         print(f"[TaskQueue] 📥 Task queued: [{task_id}] {goal[:60]}")

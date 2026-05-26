@@ -44,6 +44,7 @@ from actions.computer_control import computer_control
 from actions.game_updater     import game_updater
 from actions.iot              import iot_control
 from actions.google_drive     import google_drive
+from actions.classroom        import classroom
 
 
 # ============================================================================
@@ -68,8 +69,25 @@ CHUNK_SIZE          = 1024
 
 def _get_api_key() -> str:
     """Lee la clave API de Gemini desde el archivo de configuración."""
-    with open(API_CONFIG_PATH, "r", encoding="utf-8") as f:
-        return json.load(f)["gemini_api_key"]
+    try:
+        with open(API_CONFIG_PATH, "r", encoding="utf-8") as f:
+            cfg = json.load(f)
+    except FileNotFoundError:
+        raise RuntimeError(
+            f"No se encontró el archivo de configuración: {API_CONFIG_PATH}. "
+            "Crea el archivo con tu clave de Gemini."
+        )
+    except json.JSONDecodeError as e:
+        raise RuntimeError(
+            f"El archivo {API_CONFIG_PATH} contiene JSON inválido: {e}"
+        )
+
+    key = cfg.get("gemini_api_key", "").strip()
+    if not key:
+        raise RuntimeError(
+            "La clave 'gemini_api_key' está vacía en api_keys.json."
+        )
+    return key
 
 
 def _load_system_prompt() -> str:
@@ -619,6 +637,33 @@ TOOL_DECLARATIONS = [
             "required": ["action"]
         }
     },
+    {
+        "name": "classroom",
+        "description": (
+            "Opens Google Classroom in Chrome with the correct account. "
+            "Use this ALWAYS when the user mentions 'classroom', 'Google Classroom', or 'clase'. "
+            "NEVER use browser_control or open_app for Classroom. "
+            "Two accounts available: "
+            "'personal' (default, /u/0/) for the user's main Google account, "
+            "'institucional' (/u/1/) for the university/UNMSM account. "
+            "If the user says 'classroom institucional', 'classroom de la uni', or 'classroom unmsm', "
+            "set account to 'institucional'. Otherwise use 'personal'."
+        ),
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {
+                "account": {
+                    "type": "STRING",
+                    "description": "Which account: personal (default, main account /u/0/) | institucional (university account /u/1/)"
+                },
+                "url": {
+                    "type": "STRING",
+                    "description": "Custom Classroom URL. Leave empty to auto-resolve from account type."
+                },
+            },
+            "required": []
+        }
+    },
 ]
 
 
@@ -639,19 +684,28 @@ class OrionLive:
         self._speaking_lock = threading.Lock()
         self.ui.on_text_command = self._on_text_command
         self._turn_done_event: asyncio.Event | None = None
+        # Tabla de despacho de herramientas (lazy init en _execute_tool)
+        self._tool_handlers: dict | None = None
 
     # ── Callbacks de UI ──────────────────────────────────────────────────
     def _on_text_command(self, text: str):
-        """Recibe texto desde la UI (input manual o eventos como archivo cargado)."""
-        if not self._loop or not self.session:
+        """Recibe texto desde la UI (input manual o eventos como archivo cargado).
+        Captura locales para evitar race conditions con la reconexión.
+        """
+        loop = self._loop
+        session = self.session
+        if not loop or not session:
             return
-        asyncio.run_coroutine_threadsafe(
-            self.session.send_client_content(
-                turns={"parts": [{"text": text}]},
-                turn_complete=True
-            ),
-            self._loop
-        )
+        try:
+            asyncio.run_coroutine_threadsafe(
+                session.send_client_content(
+                    turns={"parts": [{"text": text}]},
+                    turn_complete=True
+                ),
+                loop
+            )
+        except Exception as e:
+            print(f"[ORION] ⚠️  on_text_command falló: {e}")
 
     def set_speaking(self, value: bool):
         with self._speaking_lock:
@@ -663,15 +717,20 @@ class OrionLive:
 
     def speak(self, text: str):
         """Hace que ORION diga algo (enviando el texto al modelo Live)."""
-        if not self._loop or not self.session:
+        loop = self._loop
+        session = self.session
+        if not loop or not session:
             return
-        asyncio.run_coroutine_threadsafe(
-            self.session.send_client_content(
-                turns={"parts": [{"text": text}]},
-                turn_complete=True
-            ),
-            self._loop
-        )
+        try:
+            asyncio.run_coroutine_threadsafe(
+                session.send_client_content(
+                    turns={"parts": [{"text": text}]},
+                    turn_complete=True
+                ),
+                loop
+            )
+        except Exception as e:
+            print(f"[ORION] ⚠️  speak falló: {e}")
 
     def speak_error(self, tool_name: str, error: str):
         """Informa al usuario de un error en una herramienta."""
@@ -726,6 +785,238 @@ class OrionLive:
         )
 
     # ── Ejecución de herramientas ────────────────────────────────────────
+    # Timeout por defecto (segundos) para evitar que ORION quede congelado
+    # esperando una herramienta que no responde.
+    _DEFAULT_TOOL_TIMEOUT = 60
+    # Timeouts especiales por herramienta (operaciones que pueden tardar más)
+    _TOOL_TIMEOUTS: dict[str, int] = {
+        "dev_agent":      300,
+        "game_updater":   300,
+        "agent_task":     30,
+        "code_helper":    180,
+        "file_processor": 180,
+        "google_drive":   120,
+        "flight_finder":  90,
+    }
+
+    def _build_tool_handlers(self) -> dict:
+        """Construye el diccionario de handlers. Cada handler recibe args y
+        devuelve un coroutine que produce el string resultado.
+
+        Usar un diccionario es O(1) en vez del antiguo if/elif que era O(n).
+        Mantiene comportamiento idéntico al original.
+        """
+        loop = asyncio.get_event_loop()
+
+        def _run(func, **extra):
+            return loop.run_in_executor(None, lambda: func(parameters=extra.pop("parameters"), **extra))
+
+        async def h_open_app(args):
+            r = await loop.run_in_executor(
+                None,
+                lambda: open_app(parameters=args, response=None, player=self.ui)
+            )
+            return r or f"Aplicación abierta: {args.get('app_name')}."
+
+        async def h_weather(args):
+            r = await loop.run_in_executor(
+                None,
+                lambda: weather_action(parameters=args, player=self.ui)
+            )
+            return r or "Reporte del clima entregado."
+
+        async def h_browser(args):
+            r = await loop.run_in_executor(
+                None,
+                lambda: browser_control(parameters=args, player=self.ui)
+            )
+            return r or "Listo."
+
+        async def h_file_ctrl(args):
+            r = await loop.run_in_executor(
+                None,
+                lambda: file_controller(parameters=args, player=self.ui)
+            )
+            return r or "Listo."
+
+        async def h_send_msg(args):
+            r = await loop.run_in_executor(
+                None,
+                lambda: send_message(parameters=args, response=None, player=self.ui, session_memory=None)
+            )
+            return r or f"Mensaje enviado a {args.get('receiver')}."
+
+        async def h_reminder(args):
+            r = await loop.run_in_executor(
+                None,
+                lambda: reminder(parameters=args, response=None, player=self.ui)
+            )
+            return r or "Recordatorio creado."
+
+        async def h_youtube(args):
+            r = await loop.run_in_executor(
+                None,
+                lambda: youtube_video(parameters=args, response=None, player=self.ui)
+            )
+            return r or "Listo."
+
+        async def h_screen(args):
+            # Vision corre en su propio hilo y habla por sí mismo
+            threading.Thread(
+                target=screen_process,
+                kwargs={
+                    "parameters": args, "response": None,
+                    "player": self.ui, "session_memory": None
+                },
+                daemon=True
+            ).start()
+            return (
+                "Vision module activated. Stay silent — "
+                "the vision module will speak directly to the user."
+            )
+
+        async def h_settings(args):
+            r = await loop.run_in_executor(
+                None,
+                lambda: computer_settings(parameters=args, response=None, player=self.ui)
+            )
+            return r or "Listo."
+
+        async def h_desktop(args):
+            r = await loop.run_in_executor(
+                None,
+                lambda: desktop_control(parameters=args, player=self.ui)
+            )
+            return r or "Listo."
+
+        async def h_code(args):
+            r = await loop.run_in_executor(
+                None,
+                lambda: code_helper(parameters=args, player=self.ui, speak=self.speak)
+            )
+            return r or "Listo."
+
+        async def h_dev(args):
+            r = await loop.run_in_executor(
+                None,
+                lambda: dev_agent(parameters=args, player=self.ui, speak=self.speak)
+            )
+            return r or "Listo."
+
+        async def h_agent_task(args):
+            from agent.task_queue import get_queue, TaskPriority
+            priority_map = {
+                "low":    TaskPriority.LOW,
+                "normal": TaskPriority.NORMAL,
+                "high":   TaskPriority.HIGH,
+            }
+            priority = priority_map.get(
+                args.get("priority", "normal").lower(),
+                TaskPriority.NORMAL
+            )
+            task_id = get_queue().submit(
+                goal=args.get("goal", ""),
+                priority=priority,
+                speak=self.speak
+            )
+            return f"Tarea iniciada (ID: {task_id})."
+
+        async def h_web_search(args):
+            r = await loop.run_in_executor(
+                None,
+                lambda: web_search_action(parameters=args, player=self.ui)
+            )
+            return r or "Listo."
+
+        async def h_file_proc(args):
+            if not args.get("file_path") and self.ui.current_file:
+                args["file_path"] = self.ui.current_file
+            r = await loop.run_in_executor(
+                None,
+                lambda: file_processor(parameters=args, player=self.ui, speak=self.speak)
+            )
+            return r or "Listo."
+
+        async def h_comp_ctrl(args):
+            r = await loop.run_in_executor(
+                None,
+                lambda: computer_control(parameters=args, player=self.ui)
+            )
+            return r or "Listo."
+
+        async def h_game(args):
+            r = await loop.run_in_executor(
+                None,
+                lambda: game_updater(parameters=args, player=self.ui, speak=self.speak)
+            )
+            return r or "Listo."
+
+        async def h_flight(args):
+            r = await loop.run_in_executor(
+                None,
+                lambda: flight_finder(parameters=args, player=self.ui)
+            )
+            return r or "Listo."
+
+        async def h_iot(args):
+            r = await loop.run_in_executor(
+                None,
+                lambda: iot_control(parameters=args, player=self.ui, speak=self.speak)
+            )
+            return r or "Listo."
+
+        async def h_drive(args):
+            if not args.get("file_path") and self.ui.current_file:
+                if args.get("action") in ("upload", "edit", "update"):
+                    args["file_path"] = self.ui.current_file
+            r = await loop.run_in_executor(
+                None,
+                lambda: google_drive(parameters=args, player=self.ui)
+            )
+            return r or "Listo."
+
+        async def h_classroom(args):
+            r = await loop.run_in_executor(
+                None,
+                lambda: classroom(parameters=args, player=self.ui)
+            )
+            return r or "Listo."
+
+        async def h_shutdown(args):
+            self.ui.write_log("SISTEMA: Apagado solicitado.")
+            self.speak("Hasta luego.")
+            def _shutdown():
+                import os, time
+                time.sleep(1.5)
+                os._exit(0)
+            threading.Thread(target=_shutdown, daemon=True).start()
+            return "Apagando ORION."
+
+        return {
+            "open_app":          h_open_app,
+            "weather_report":    h_weather,
+            "browser_control":   h_browser,
+            "file_controller":   h_file_ctrl,
+            "send_message":      h_send_msg,
+            "reminder":          h_reminder,
+            "youtube_video":     h_youtube,
+            "screen_process":    h_screen,
+            "computer_settings": h_settings,
+            "desktop_control":   h_desktop,
+            "code_helper":       h_code,
+            "dev_agent":         h_dev,
+            "agent_task":        h_agent_task,
+            "web_search":        h_web_search,
+            "file_processor":    h_file_proc,
+            "computer_control":  h_comp_ctrl,
+            "game_updater":      h_game,
+            "flight_finder":     h_flight,
+            "iot_control":       h_iot,
+            "google_drive":      h_drive,
+            "classroom":         h_classroom,
+            "shutdown_orion":    h_shutdown,
+        }
+
     async def _execute_tool(self, fc) -> types.FunctionResponse:
         name = fc.name
         args = dict(fc.args or {})
@@ -733,7 +1024,7 @@ class OrionLive:
         print(f"[ORION] 🔧 {name}  {args}")
         self.ui.set_state("PENSANDO")
 
-        # save_memory se ejecuta de forma silenciosa
+        # save_memory se ejecuta de forma silenciosa (caso especial)
         if name == "save_memory":
             category = args.get("category", "notes")
             key      = args.get("key", "")
@@ -748,187 +1039,27 @@ class OrionLive:
                 response={"result": "ok", "silent": True}
             )
 
-        loop   = asyncio.get_event_loop()
-        result = "Listo."
+        # Lazy init de los handlers (solo una vez por sesión)
+        if self._tool_handlers is None:
+            self._tool_handlers = self._build_tool_handlers()
+
+        result  = "Listo."
+        handler = self._tool_handlers.get(name)
 
         try:
-            if name == "open_app":
-                r = await loop.run_in_executor(
-                    None,
-                    lambda: open_app(parameters=args, response=None, player=self.ui)
-                )
-                result = r or f"Aplicación abierta: {args.get('app_name')}."
-
-            elif name == "weather_report":
-                r = await loop.run_in_executor(
-                    None,
-                    lambda: weather_action(parameters=args, player=self.ui)
-                )
-                result = r or "Reporte del clima entregado."
-
-            elif name == "browser_control":
-                r = await loop.run_in_executor(
-                    None,
-                    lambda: browser_control(parameters=args, player=self.ui)
-                )
-                result = r or "Listo."
-
-            elif name == "file_controller":
-                r = await loop.run_in_executor(
-                    None,
-                    lambda: file_controller(parameters=args, player=self.ui)
-                )
-                result = r or "Listo."
-
-            elif name == "send_message":
-                r = await loop.run_in_executor(
-                    None,
-                    lambda: send_message(parameters=args, response=None, player=self.ui, session_memory=None)
-                )
-                result = r or f"Mensaje enviado a {args.get('receiver')}."
-
-            elif name == "reminder":
-                r = await loop.run_in_executor(
-                    None,
-                    lambda: reminder(parameters=args, response=None, player=self.ui)
-                )
-                result = r or "Recordatorio creado."
-
-            elif name == "youtube_video":
-                r = await loop.run_in_executor(
-                    None,
-                    lambda: youtube_video(parameters=args, response=None, player=self.ui)
-                )
-                result = r or "Listo."
-
-            elif name == "screen_process":
-                # Vision corre en su propio hilo y habla por sí mismo
-                threading.Thread(
-                    target=screen_process,
-                    kwargs={
-                        "parameters": args, "response": None,
-                        "player": self.ui, "session_memory": None
-                    },
-                    daemon=True
-                ).start()
-                result = (
-                    "Vision module activated. Stay silent — "
-                    "the vision module will speak directly to the user."
-                )
-
-            elif name == "computer_settings":
-                r = await loop.run_in_executor(
-                    None,
-                    lambda: computer_settings(parameters=args, response=None, player=self.ui)
-                )
-                result = r or "Listo."
-
-            elif name == "desktop_control":
-                r = await loop.run_in_executor(
-                    None,
-                    lambda: desktop_control(parameters=args, player=self.ui)
-                )
-                result = r or "Listo."
-
-            elif name == "code_helper":
-                r = await loop.run_in_executor(
-                    None,
-                    lambda: code_helper(parameters=args, player=self.ui, speak=self.speak)
-                )
-                result = r or "Listo."
-
-            elif name == "dev_agent":
-                r = await loop.run_in_executor(
-                    None,
-                    lambda: dev_agent(parameters=args, player=self.ui, speak=self.speak)
-                )
-                result = r or "Listo."
-
-            elif name == "agent_task":
-                from agent.task_queue import get_queue, TaskPriority
-                priority_map = {
-                    "low":    TaskPriority.LOW,
-                    "normal": TaskPriority.NORMAL,
-                    "high":   TaskPriority.HIGH,
-                }
-                priority = priority_map.get(
-                    args.get("priority", "normal").lower(),
-                    TaskPriority.NORMAL
-                )
-                task_id = get_queue().submit(
-                    goal=args.get("goal", ""),
-                    priority=priority,
-                    speak=self.speak
-                )
-                result = f"Tarea iniciada (ID: {task_id})."
-
-            elif name == "web_search":
-                r = await loop.run_in_executor(
-                    None,
-                    lambda: web_search_action(parameters=args, player=self.ui)
-                )
-                result = r or "Listo."
-
-            elif name == "file_processor":
-                # Si no se especificó archivo, usa el actualmente cargado en la UI
-                if not args.get("file_path") and self.ui.current_file:
-                    args["file_path"] = self.ui.current_file
-                r = await loop.run_in_executor(
-                    None,
-                    lambda: file_processor(parameters=args, player=self.ui, speak=self.speak)
-                )
-                result = r or "Listo."
-
-            elif name == "computer_control":
-                r = await loop.run_in_executor(
-                    None,
-                    lambda: computer_control(parameters=args, player=self.ui)
-                )
-                result = r or "Listo."
-
-            elif name == "game_updater":
-                r = await loop.run_in_executor(
-                    None,
-                    lambda: game_updater(parameters=args, player=self.ui, speak=self.speak)
-                )
-                result = r or "Listo."
-
-            elif name == "flight_finder":
-                r = await loop.run_in_executor(
-                    None,
-                    lambda: flight_finder(parameters=args, player=self.ui)
-                )
-                result = r or "Listo."
-
-            elif name == "iot_control":
-                r = await loop.run_in_executor(
-                    None,
-                    lambda: iot_control(parameters=args, player=self.ui, speak=self.speak)
-                )
-                result = r or "Listo."
-
-            elif name == "google_drive":
-                if not args.get("file_path") and self.ui.current_file:
-                    if args.get("action") in ("upload", "edit", "update"):
-                        args["file_path"] = self.ui.current_file
-                r = await loop.run_in_executor(
-                    None,
-                    lambda: google_drive(parameters=args, player=self.ui)
-                )
-                result = r or "Listo."
-
-            elif name == "shutdown_orion":
-                self.ui.write_log("SISTEMA: Apagado solicitado.")
-                self.speak("Hasta luego.")
-                def _shutdown():
-                    import os, time
-                    time.sleep(1.5)
-                    os._exit(0)
-                threading.Thread(target=_shutdown, daemon=True).start()
-                result = "Apagando ORION."
-
-            else:
+            if handler is None:
                 result = f"Herramienta desconocida: {name}"
+            else:
+                timeout = self._TOOL_TIMEOUTS.get(name, self._DEFAULT_TOOL_TIMEOUT)
+                try:
+                    result = await asyncio.wait_for(handler(args), timeout=timeout)
+                except asyncio.TimeoutError:
+                    result = (
+                        f"La herramienta '{name}' tardó más de {timeout}s y fue cancelada."
+                    )
+                    print(f"[ORION] ⏱️  Timeout en {name}")
+                if not result:
+                    result = "Listo."
 
         except Exception as e:
             result = f"La herramienta '{name}' falló: {e}"
@@ -1074,10 +1205,20 @@ class OrionLive:
 
     # ── Loop principal ───────────────────────────────────────────────────
     async def run(self):
-        client = genai.Client(
-            api_key=_get_api_key(),
-            http_options={"api_version": "v1beta"}
-        )
+        try:
+            client = genai.Client(
+                api_key=_get_api_key(),
+                http_options={"api_version": "v1beta"}
+            )
+        except RuntimeError as e:
+            print(f"[ORION] ❌ {e}")
+            self.ui.write_log(f"ERROR DE CONFIGURACIÓN: {e}")
+            return
+
+        # Backoff exponencial: 3s → 5s → 10s → 20s → 30s (máx)
+        # Evita bombardear la API si Gemini está caído.
+        backoff_s = 3
+        max_backoff_s = 30
 
         while True:
             try:
@@ -1099,6 +1240,9 @@ class OrionLive:
                     self.ui.set_state("ESCUCHANDO")
                     self.ui.write_log("SISTEMA: ORION en línea.")
 
+                    # Conexión exitosa → reset del backoff
+                    backoff_s = 3
+
                     tg.create_task(self._send_realtime())
                     tg.create_task(self._listen_audio())
                     tg.create_task(self._receive_audio())
@@ -1110,8 +1254,10 @@ class OrionLive:
 
             self.set_speaking(False)
             self.ui.set_state("PENSANDO")
-            print("[ORION] 🔄 Reconectando en 3s...")
-            await asyncio.sleep(3)
+            print(f"[ORION] 🔄 Reconectando en {backoff_s}s...")
+            await asyncio.sleep(backoff_s)
+            # Crece el backoff para el siguiente intento si vuelve a fallar
+            backoff_s = min(int(backoff_s * 1.8), max_backoff_s)
 
 
 # ============================================================================

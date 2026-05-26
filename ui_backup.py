@@ -19,17 +19,15 @@ from PyQt6.QtCore import (
     QTimer, QUrl, pyqtSignal,
 )
 from PyQt6.QtGui import (
-    QAction, QBrush, QColor, QDragEnterEvent, QDropEvent, QFont,
-    QFontDatabase, QIcon, QKeySequence, QLinearGradient, QPainter,
-    QPainterPath, QPen, QPixmap, QRadialGradient, QShortcut,
+    QBrush, QColor, QDragEnterEvent, QDropEvent, QFont, QFontDatabase,
+    QKeySequence, QLinearGradient, QPainter, QPainterPath, QPen, QPixmap,
+    QRadialGradient, QShortcut,
 )
 from PyQt6.QtWidgets import (
     QApplication, QFileDialog, QFrame, QHBoxLayout, QLabel, QLineEdit,
-    QMainWindow, QMenu, QPushButton, QScrollArea, QSizePolicy,
-    QSystemTrayIcon, QTextEdit, QVBoxLayout, QWidget, QProgressBar,
+    QMainWindow, QPushButton, QScrollArea, QSizePolicy, QTextEdit,
+    QVBoxLayout, QWidget, QProgressBar,
 )
-
-import keyboard
 
 # ============================================================
 #  Configuración base / rutas
@@ -39,26 +37,9 @@ def _base_dir() -> Path:
         return Path(sys.executable).parent
     return Path(__file__).resolve().parent
 
-BASE_DIR      = _base_dir()
-CONFIG_DIR    = BASE_DIR / "config"
-API_FILE      = CONFIG_DIR / "api_keys.json"
-HOTKEYS_FILE  = CONFIG_DIR / "hotkeys.json"
-TRAY_ICON_PATH = Path(os.environ.get("USERPROFILE", "")) / "Downloads" / "Gemini_Generated_Image_g9g7adg9g7adg9g7.ico"
-
-
-def _load_hotkeys() -> dict:
-    defaults = {
-        "toggle_microphone": "ctrl+\\",
-        "show_window": "ctrl+shift+o",
-        "quit": "ctrl+shift+q",
-    }
-    try:
-        with open(HOTKEYS_FILE, "r", encoding="utf-8") as f:
-            data = json.load(f)
-        defaults.update(data)
-    except Exception:
-        pass
-    return defaults
+BASE_DIR   = _base_dir()
+CONFIG_DIR = BASE_DIR / "config"
+API_FILE   = CONFIG_DIR / "api_keys.json"
 
 _DEFAULT_W, _DEFAULT_H = 980, 700
 _MIN_W,     _MIN_H     = 820, 580
@@ -324,27 +305,6 @@ class HudCanvas(QWidget):
         self._face_px: QPixmap | None = None
         self._load_face(face_path)
 
-        # ── Esfera 3D de partículas ──
-        # Cada partícula es un punto en una esfera, en coords esféricas (theta, phi).
-        # La esfera completa rota sobre dos ejes; la velocidad cambia con el estado.
-        self._orb_particles: list[dict] = []
-        N_ORB = 140
-        for _ in range(N_ORB):
-            self._orb_particles.append({
-                "theta":      random.uniform(0, 2 * math.pi),
-                "phi":        math.acos(2 * random.random() - 1),
-                "spd_theta":  random.uniform(0.005, 0.020),
-                "spd_phi":    random.uniform(0.002, 0.010),
-                "base_size":  random.uniform(1.6, 3.4),
-                "pulse_t":    random.uniform(0, 100),
-                "pulse_spd":  random.uniform(0.02, 0.07),
-                "color_idx":  random.randint(0, 3),
-            })
-        self._orb_rot_x   = 0.0
-        self._orb_rot_y   = 0.0
-        self._orb_speed   = 0.18   # factor global de velocidad (0.18 reposo)
-        self._orb_tgt_spd = 0.18
-
         self._tmr = QTimer(self)
         self._tmr.timeout.connect(self._step)
         self._tmr.start(16)
@@ -417,30 +377,6 @@ class HudCanvas(QWidget):
         if self._blink_tick >= 38:
             self._blink = not self._blink
             self._blink_tick = 0
-
-        # ── Velocidad de la esfera 3D según el estado ──
-        if self.state == "PENSANDO" or self.state == "PROCESANDO":
-            self._orb_tgt_spd = 2.8      # giro rápido (pensando)
-        elif self.speaking:
-            self._orb_tgt_spd = 1.5      # giro medio (hablando)
-        elif self.muted:
-            self._orb_tgt_spd = 0.08     # casi quieto (mute)
-        else:
-            self._orb_tgt_spd = 0.35     # giro lento (escuchando/reposo)
-
-        # suavizado
-        self._orb_speed += (self._orb_tgt_spd - self._orb_speed) * 0.08
-
-        # rotación global de la esfera
-        self._orb_rot_x += 0.004 * self._orb_speed * 2.5
-        self._orb_rot_y += 0.006 * self._orb_speed * 2.5
-
-        # actualiza cada partícula
-        for op in self._orb_particles:
-            op["theta"]   += op["spd_theta"] * self._orb_speed * 3.0
-            op["phi"]     += op["spd_phi"]   * self._orb_speed * 1.5
-            op["pulse_t"] += op["pulse_spd"]
-
         self.update()
 
     def paintEvent(self, _):
@@ -537,81 +473,29 @@ class HudCanvas(QWidget):
             p.drawLine(QPointF(bx, by), QPointF(bx + dx * bl, by))
             p.drawLine(QPointF(bx, by), QPointF(bx, by + dy * bl))
 
-        # ── Esfera 3D de partículas ──
-        # paleta de colores (rojos/coral) — más apagada en mute
-        if self.muted:
-            orb_colors = [
-                (140, 60, 80),
-                (110, 40, 60),
-                (90,  30, 50),
-                (70,  20, 35),
-            ]
+        # rostro / orbe
+        if self._face_px:
+            fsz    = int(fw * 0.62 * self._scale)
+            scaled = self._face_px.scaled(
+                fsz, fsz,
+                Qt.AspectRatioMode.KeepAspectRatio,
+                Qt.TransformationMode.SmoothTransformation,
+            )
+            p.drawPixmap(int(cx - fsz / 2), int(cy - fsz / 2), scaled)
         else:
-            orb_colors = [
-                (255, 60,  60),    # rojo brillante
-                (255, 110, 70),    # coral
-                (220, 30,  55),    # carmesí
-                (170, 15,  40),    # vino oscuro
-            ]
-
-        orb_radius = fw * 0.22 * self._scale
-        cos_y = math.cos(self._orb_rot_y); sin_y = math.sin(self._orb_rot_y)
-        cos_x = math.cos(self._orb_rot_x); sin_x = math.sin(self._orb_rot_x)
-
-        # halo central detrás de la esfera (un brillo difuso)
-        halo_r = orb_radius * 1.05
-        halo_gr = QRadialGradient(QPointF(cx, cy), halo_r)
-        if self.muted:
-            halo_gr.setColorAt(0.0, QColor(150, 40, 60, 90))
-        else:
-            halo_gr.setColorAt(0.0, QColor(255, 50, 50, 110))
-        halo_gr.setColorAt(0.55, QColor(255, 20, 30, 40))
-        halo_gr.setColorAt(1.0, QColor(0, 0, 0, 0))
-        p.setBrush(QBrush(halo_gr)); p.setPen(Qt.PenStyle.NoPen)
-        p.drawEllipse(QPointF(cx, cy), halo_r, halo_r)
-
-        # proyección 3D de las partículas y dibujado
-        rendered: list[tuple[float, float, float, float, float, tuple]] = []
-        for op in self._orb_particles:
-            theta = op["theta"]; phi = op["phi"]
-            x3 = orb_radius * math.sin(phi) * math.cos(theta)
-            y3 = orb_radius * math.sin(phi) * math.sin(theta)
-            z3 = orb_radius * math.cos(phi)
-
-            # rotación Y luego X
-            xR = x3 * cos_y - z3 * sin_y
-            zR = x3 * sin_y + z3 * cos_y
-            yR = y3 * cos_x - zR * sin_x
-            zF = y3 * sin_x + zR * cos_x
-
-            # escala de profundidad (0..1) — más al frente = más grande/brillante
-            depth = (zF + orb_radius) / (orb_radius * 2)
-            depth = max(0.0, min(1.0, depth))
-
-            size  = (op["base_size"] + math.sin(op["pulse_t"]) * 0.5) * (0.4 + depth * 1.2)
-            alpha = 0.15 + depth * 0.85
-            col   = orb_colors[op["color_idx"]]
-
-            rendered.append((cx + xR, cy + yR, zF, size, alpha, col))
-
-        # ordenar por Z (más al fondo primero) para que las del frente queden encima
-        rendered.sort(key=lambda t: t[2])
-
-        for x, y, z, size, alpha, col in rendered:
-            # destello exterior
-            glow_r = size * 4.0
-            gr = QRadialGradient(QPointF(x, y), glow_r)
-            gr.setColorAt(0.0, QColor(col[0], col[1], col[2], int(alpha * 200)))
-            gr.setColorAt(0.35, QColor(col[0], col[1], col[2], int(alpha * 60)))
-            gr.setColorAt(1.0, QColor(0, 0, 0, 0))
-            p.setBrush(QBrush(gr)); p.setPen(Qt.PenStyle.NoPen)
-            p.drawEllipse(QPointF(x, y), glow_r, glow_r)
-
-            # núcleo brillante
-            core_a = int(min(255, alpha * 230))
-            p.setBrush(QBrush(QColor(255, 245, 230, core_a)))
-            p.setPen(Qt.PenStyle.NoPen)
-            p.drawEllipse(QPointF(x, y), size, size)
+            orb_r = int(fw * 0.27 * self._scale)
+            oc    = (200, 30, 60) if self.muted else (180, 20, 50)
+            for i in range(8, 0, -1):
+                r2  = int(orb_r * i / 8)
+                frc = i / 8
+                a   = max(0, min(255, int(self._halo * 1.1 * frc)))
+                p.setBrush(QBrush(QColor(int(oc[0]*frc), int(oc[1]*frc), int(oc[2]*frc), a)))
+                p.setPen(Qt.PenStyle.NoPen)
+                p.drawEllipse(QRectF(cx - r2, cy - r2, r2 * 2, r2 * 2))
+            p.setPen(QPen(qcol(C.PRI, min(255, int(self._halo * 2))), 1))
+            p.setFont(QFont("Courier New", 13, QFont.Weight.Bold))
+            p.drawText(QRectF(cx - 80, cy - 14, 160, 28),
+                       Qt.AlignmentFlag.AlignCenter, "O.R.I.O.N")
 
         # partículas
         for pt in self._particles:
@@ -768,10 +652,6 @@ class LogWidget(QTextEdit):
         self._text    = ""
         self._pos     = 0
         self._tag     = "sys"
-        # Límite de líneas visibles para evitar fuga de memoria en sesiones largas
-        self.document().setMaximumBlockCount(500)
-        # Tamaño máximo de la cola de mensajes pendientes
-        self._max_queue = 200
         self._tmr = QTimer(self)
         self._tmr.timeout.connect(self._step)
         self._sig.connect(self._enqueue)
@@ -780,9 +660,6 @@ class LogWidget(QTextEdit):
         self._sig.emit(text)
 
     def _enqueue(self, text: str):
-        # Ring buffer: si la cola está llena, descarta los más viejos
-        if len(self._queue) >= self._max_queue:
-            self._queue = self._queue[-(self._max_queue - 1):]
         self._queue.append(text)
         if not self._typing:
             self._next()
@@ -1259,142 +1136,11 @@ class MainWindow(QMainWindow):
         sc_full = QShortcut(QKeySequence("F11"), self)
         sc_full.activated.connect(self._toggle_fullscreen)
 
-        # ── System Tray ──
-        self._setup_tray()
-
-        # ── Global Hotkeys ──
-        self._hotkeys = _load_hotkeys()
-        self._setup_global_hotkeys()
-
     def _toggle_fullscreen(self):
         if self.isFullScreen():
             self.showNormal()
         else:
             self.showFullScreen()
-
-    # ── System Tray ──────────────────────────────────────────────────────
-    def _setup_tray(self):
-        self._tray = QSystemTrayIcon(self)
-
-        icon_path = str(TRAY_ICON_PATH)
-        if TRAY_ICON_PATH.exists():
-            self._tray.setIcon(QIcon(icon_path))
-        else:
-            self._tray.setIcon(self.style().standardIcon(
-                self.style().StandardPixmap.SP_ComputerIcon
-            ))
-
-        tray_menu = QMenu()
-        tray_menu.setStyleSheet(f"""
-            QMenu {{
-                background: {C.DARK}; color: {C.TEXT};
-                border: 1px solid {C.BORDER_B};
-            }}
-            QMenu::item:selected {{
-                background: {C.PRI_GHO}; color: {C.PRI};
-            }}
-        """)
-
-        show_action = QAction("Mostrar O.R.I.O.N", self)
-        show_action.triggered.connect(self._tray_show)
-        tray_menu.addAction(show_action)
-
-        self._tray_mic_action = QAction("Activar Mic", self)
-        self._tray_mic_action.triggered.connect(self._toggle_mute)
-        tray_menu.addAction(self._tray_mic_action)
-
-        tray_menu.addSeparator()
-
-        quit_action = QAction("Salir", self)
-        quit_action.triggered.connect(self._quit_app)
-        tray_menu.addAction(quit_action)
-
-        self._tray.setContextMenu(tray_menu)
-        self._tray.activated.connect(self._on_tray_activated)
-        self._tray.setToolTip("O.R.I.O.N — Asistente IA")
-        self._tray.show()
-
-    def _on_tray_activated(self, reason):
-        if reason == QSystemTrayIcon.ActivationReason.DoubleClick:
-            self._tray_show()
-
-    def _tray_show(self):
-        self.showNormal()
-        self.activateWindow()
-        self.raise_()
-
-    def _quit_app(self):
-        self._really_quit = True
-        try:
-            keyboard.unhook_all()
-        except Exception:
-            pass
-        try:
-            if hasattr(self, "_clock_tmr"):
-                self._clock_tmr.stop()
-            if hasattr(self, "_metric_tmr"):
-                self._metric_tmr.stop()
-        except Exception:
-            pass
-        self._tray.hide()
-        QApplication.quit()
-
-    # ── Global Hotkeys ───────────────────────────────────────────────────
-    def _setup_global_hotkeys(self):
-        hk = self._hotkeys
-        try:
-            keyboard.add_hotkey(
-                hk.get("toggle_microphone", "ctrl+\\"),
-                self._global_toggle_mic,
-                suppress=False,
-            )
-        except Exception as e:
-            print(f"[ORION] Hotkey toggle_microphone falló: {e}")
-        try:
-            keyboard.add_hotkey(
-                hk.get("show_window", "ctrl+shift+o"),
-                self._global_show_window,
-                suppress=False,
-            )
-        except Exception as e:
-            print(f"[ORION] Hotkey show_window falló: {e}")
-
-    def _global_toggle_mic(self):
-        QTimer.singleShot(0, self._toggle_mute)
-
-    def _global_show_window(self):
-        QTimer.singleShot(0, self._tray_show)
-
-    # ── Close Event (minimize to tray + mute mic) ────────────────────────
-    def closeEvent(self, event):
-        if getattr(self, "_really_quit", False):
-            try:
-                keyboard.unhook_all()
-            except Exception:
-                pass
-            try:
-                if hasattr(self, "_clock_tmr"):
-                    self._clock_tmr.stop()
-                if hasattr(self, "_metric_tmr"):
-                    self._metric_tmr.stop()
-            except Exception:
-                pass
-            super().closeEvent(event)
-            return
-
-        event.ignore()
-        self.hide()
-
-        if not self._muted:
-            self._toggle_mute()
-
-        hotkey_str = self._hotkeys.get("toggle_microphone", "ctrl+\\")
-        self._tray.showMessage(
-            "O.R.I.O.N",
-            f"Minimizado a la bandeja. Mic apagado.\nUsa {hotkey_str} para activar el mic.",
-            QSystemTrayIcon.MessageIcon.Information,
-            3000,
-        )
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
@@ -1702,8 +1448,7 @@ class MainWindow(QMainWindow):
             l.setStyleSheet(f"color: {color}; background: transparent;")
             return l
 
-        hk_mic = _load_hotkeys().get("toggle_microphone", "ctrl+\\")
-        lay.addWidget(_fl(f"[F4/{hk_mic}] Silenciar  ·  [F11] Pantalla completa"))
+        lay.addWidget(_fl("[F4] Silenciar  ·  [F11] Pantalla completa"))
         lay.addStretch()
         lay.addWidget(_fl("O.R.I.O.N  ·  En línea", C.PRI_DIM))
         return w
@@ -1730,10 +1475,6 @@ class MainWindow(QMainWindow):
         self._muted = not self._muted
         self.hud.muted = self._muted
         self._style_mute_btn()
-        if hasattr(self, "_tray_mic_action"):
-            self._tray_mic_action.setText(
-                "Activar Mic" if self._muted else "Silenciar Mic"
-            )
         if self._muted:
             self._apply_state("SILENCIADO")
             self._log.append_log("SISTEMA: Micrófono silenciado.")
@@ -1812,15 +1553,12 @@ class MainWindow(QMainWindow):
 #  Capa de compatibilidad / API pública
 # ============================================================
 class _RootShim:
-    def __init__(self, app: QApplication, win: MainWindow):
+    def __init__(self, app: QApplication):
         self._app = app
-        self._win = win
     def mainloop(self):
         self._app.exec()
     def protocol(self, *_):
         pass
-    def quit(self):
-        self._win._quit_app()
 
 
 class OrionUI:
@@ -1831,7 +1569,7 @@ class OrionUI:
         self._app.setStyle("Fusion")
         self._win = MainWindow(face_path)
         self._win.show()
-        self.root = _RootShim(self._app, self._win)
+        self.root = _RootShim(self._app)
 
     @property
     def muted(self) -> bool:
