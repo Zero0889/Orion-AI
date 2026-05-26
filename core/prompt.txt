@@ -14,7 +14,8 @@ Response time: Respond as fast as you can
 TOOL ROUTING:
 
 computer_settings: ALL single OS actions (volume, brightness, wifi, close, shortcuts, power).
-google_drive: ALL Google Drive operations (upload, create, edit, move, list, search, download, delete). NEVER use browser_control or agent_task for Drive. When user wants to upload a file they dropped in the UI, use action=upload with the current file path. When user says "create a document in Drive", use action=create. First use action=list or action=search to find file IDs when needed for move/rename/delete.
+google_drive: ALL Google Drive operations (upload, create, edit, move, list, search, download, delete). NEVER use browser_control or agent_task for Drive.
+classroom: ALL Google Classroom requests. NEVER use browser_control or open_app for Classroom. Use account=personal for normal classroom, account=institucional for university/UNMSM classroom.
 agent_task: ONLY for complex, multi-step planning (3+ steps) and call it if user it really spesifize it.
 Language: Respond in user's language; extract parameters in English.
 Do not call agent_task while you can accomplish it with a tool

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import concurrent.futures
+import json
 import os
 import platform
 import shutil
@@ -18,6 +19,50 @@ from playwright.async_api import (
     TimeoutError as PlaywrightTimeout,
 )
 _OS = platform.system()   # "Windows" | "Darwin" | "Linux"
+
+# ── Configuración de Chrome directo ─────────────────────────────────────────
+_BASE_DIR = Path(__file__).resolve().parent.parent
+_BROWSER_CONFIG_PATH = _BASE_DIR / "config" / "browser.json"
+
+
+def _load_browser_config() -> dict:
+    """Carga la configuración del navegador desde browser.json."""
+    defaults = {
+        "chrome_path": r"C:\Program Files\Google\Chrome\Application\chrome.exe",
+        "use_direct_chrome": True,
+        "profile_directory": "",
+    }
+    try:
+        with open(_BROWSER_CONFIG_PATH, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        defaults.update(data)
+    except Exception:
+        pass
+    return defaults
+
+
+def _open_url_in_chrome(url: str) -> str:
+    """Abre una URL directamente en Chrome usando subprocess (sin perfiles nuevos)."""
+    cfg = _load_browser_config()
+    chrome_path = cfg.get("chrome_path", "")
+    profile_dir = cfg.get("profile_directory", "")
+
+    if not chrome_path or not Path(chrome_path).exists():
+        chrome_path = shutil.which("chrome") or shutil.which("google-chrome")
+        if not chrome_path:
+            return ""
+
+    cmd = [chrome_path]
+    if profile_dir:
+        cmd.append(f"--profile-directory={profile_dir}")
+    cmd.append(url)
+
+    try:
+        subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        return f"Abierto en Chrome: {url}"
+    except Exception as e:
+        print(f"[Navegador] Error al abrir Chrome directo: {e}")
+        return ""
 
 def _normalize_url(url: str) -> str:
     """
@@ -811,6 +856,45 @@ def browser_control(
     browser = params.get("browser", "").lower().strip() or None
     result  = "Acción desconocida."
 
+    # ── Verificar si usar Chrome directo (sin Playwright/perfiles) ──
+    cfg = _load_browser_config()
+    use_direct = cfg.get("use_direct_chrome", True)
+
+    # Acciones simples de navegación → Chrome directo
+    if use_direct and action in ("go_to", "search", "new_tab"):
+        if action == "go_to":
+            url = _normalize_url(params.get("url", ""))
+            result = _open_url_in_chrome(url)
+            if result:
+                _log(player, result)
+                return result
+
+        elif action == "search":
+            query = params.get("query", "")
+            engine = params.get("engine", "google").lower()
+            _engines = {
+                "google":     "https://www.google.com/search?q=",
+                "bing":       "https://www.bing.com/search?q=",
+                "duckduckgo": "https://duckduckgo.com/?q=",
+                "yandex":     "https://yandex.com/search/?text=",
+            }
+            base = _engines.get(engine, _engines["google"])
+            url = base + query.replace(" ", "+")
+            result = _open_url_in_chrome(url)
+            if result:
+                _log(player, result)
+                return result
+
+        elif action == "new_tab":
+            url = params.get("url", "")
+            if url:
+                url = _normalize_url(url)
+                result = _open_url_in_chrome(url)
+                if result:
+                    _log(player, result)
+                    return result
+
+    # ── Acciones que no requieren Chrome directo o fallback a Playwright ──
     if action == "switch":
         target = browser or params.get("target", "").lower().strip()
         result = _registry.switch(target) if target else "Por favor, indique un navegador."

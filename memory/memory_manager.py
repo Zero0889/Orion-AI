@@ -1,4 +1,6 @@
 import json
+import os
+import tempfile
 from datetime import datetime
 from threading import Lock
 from pathlib import Path
@@ -68,15 +70,35 @@ def _trim_to_limit(memory: dict) -> dict:
     return memory
 
 def save_memory(memory: dict) -> None:
+    """Atomic write: writes to a temp file then renames it.
+    This prevents corruption if the process crashes mid-write.
+    """
     if not isinstance(memory, dict):
         return
     memory = _trim_to_limit(memory)
     MEMORY_PATH.parent.mkdir(parents=True, exist_ok=True)
+    payload = json.dumps(memory, indent=2, ensure_ascii=False)
+
     with _lock:
-        MEMORY_PATH.write_text(
-            json.dumps(memory, indent=2, ensure_ascii=False),
-            encoding="utf-8",
+        tmp_fd, tmp_path = tempfile.mkstemp(
+            prefix=".memory_", suffix=".tmp", dir=str(MEMORY_PATH.parent)
         )
+        try:
+            with os.fdopen(tmp_fd, "w", encoding="utf-8") as f:
+                f.write(payload)
+                f.flush()
+                try:
+                    os.fsync(f.fileno())
+                except OSError:
+                    pass
+            os.replace(tmp_path, MEMORY_PATH)
+        except Exception as e:
+            print(f"[Memory] ⚠️  Save error: {e}")
+            try:
+                if os.path.exists(tmp_path):
+                    os.unlink(tmp_path)
+            except OSError:
+                pass
 
 
 def _truncate_value(val: str) -> str:
