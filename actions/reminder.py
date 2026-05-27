@@ -6,20 +6,10 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
+from config import get_os as _get_os, BASE_DIR
+
 def _base_dir() -> Path:
-    if getattr(sys, "frozen", False):
-        return Path(sys.executable).parent
-    return Path(__file__).resolve().parent.parent
-
-
-def _get_os() -> str:
-    try:
-        cfg = json.loads(
-            (_base_dir() / "config" / "api_keys.json").read_text(encoding="utf-8")
-        )
-        return cfg.get("os_system", "windows").lower()
-    except Exception:
-        return "windows"
+    return BASE_DIR
 
 
 def _scripts_dir() -> Path:

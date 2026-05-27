@@ -36,14 +36,7 @@ except ImportError:
 from google import genai
 from google.genai import types as gtypes
 
-def _base_dir() -> Path:
-    if getattr(sys, "frozen", False):
-        return Path(sys.executable).parent
-    return Path(__file__).resolve().parent.parent
-
-
-_BASE        = _base_dir()
-_CONFIG_PATH = _BASE / "config" / "api_keys.json"
+from config import get_api_key, API_CONFIG_PATH as _CONFIG_PATH, BASE_DIR as _BASE
 
 
 def _load_config() -> dict:
@@ -62,11 +55,6 @@ def _save_config_key(key: str, value) -> None:
         print(f"[Vision] ⚠️  No se pudo guardar la clave de configuración '{key}': {e}")
 
 
-def _get_api_key() -> str:
-    key = _load_config().get("gemini_api_key", "")
-    if not key:
-        raise RuntimeError("gemini_api_key no encontrada en la configuración.")
-    return key
 
 
 def _get_os() -> str:
@@ -254,7 +242,7 @@ class _VisionSession:
         self._audio_in  = asyncio.Queue()
 
         client = genai.Client(
-            api_key=_get_api_key(),
+            api_key=get_api_key(),
             http_options={"api_version": "v1beta"},
         )
         config = gtypes.LiveConnectConfig(

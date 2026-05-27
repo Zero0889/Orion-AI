@@ -23,15 +23,7 @@ try:
 except ImportError:
     _PYPERCLIP = False
 
-def _base_dir() -> Path:
-    if getattr(sys, "frozen", False):
-        return Path(sys.executable).parent
-    return Path(__file__).resolve().parent.parent
-
-
-_BASE         = _base_dir()
-_CONFIG_PATH  = _BASE / "config" / "api_keys.json"
-_MEMORY_PATH  = _BASE / "memory" / "long_term.json"
+from config import BASE_DIR as _BASE, API_CONFIG_PATH as _CONFIG_PATH, MEMORY_PATH as _MEMORY_PATH
 
 def _load_config() -> dict:
     try:
@@ -43,8 +35,7 @@ def _get_os() -> str:
     return _load_config().get("os_system", "windows").lower()
 
 
-def _get_api_key() -> str:
-    return _load_config().get("gemini_api_key", "")
+from config import get_api_key
 
 _SAFE_SCREENSHOT_ROOTS = (
     Path.home(),
@@ -297,7 +288,7 @@ def _focus_window(title: str) -> str:
     return f"focus_window: SO desconocido '{os_name}'"
 
 def _screen_find(description: str) -> tuple[int, int] | None:
-    api_key = _get_api_key()
+    api_key = get_api_key()
     if not api_key:
         print("[ComputerControl] ⚠️ No hay clave API para screen_find")
         return None

@@ -4,17 +4,8 @@ import tempfile
 from datetime import datetime
 from threading import Lock
 from pathlib import Path
-import sys
 
-
-def get_base_dir() -> Path:
-    if getattr(sys, "frozen", False):
-        return Path(sys.executable).parent
-    return Path(__file__).resolve().parent.parent
-
-
-BASE_DIR         = get_base_dir()
-MEMORY_PATH      = BASE_DIR / "memory" / "long_term.json"
+from config import MEMORY_PATH
 _lock            = Lock()
 MAX_VALUE_LENGTH = 380
 MEMORY_MAX_CHARS = 2200
@@ -42,7 +33,7 @@ def load_memory() -> dict:
                         data[key] = {}
                 return data
             return _empty_memory()
-        except Exception as e:
+        except (json.JSONDecodeError, OSError) as e:
             print(f"[Memory] ⚠️ Load error: {e}")
             return _empty_memory()
 
@@ -92,7 +83,7 @@ def save_memory(memory: dict) -> None:
                 except OSError:
                     pass
             os.replace(tmp_path, MEMORY_PATH)
-        except Exception as e:
+        except OSError as e:
             print(f"[Memory] ⚠️  Save error: {e}")
             try:
                 if os.path.exists(tmp_path):

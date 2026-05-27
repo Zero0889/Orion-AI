@@ -21,15 +21,7 @@ except ImportError:
 
 # ── Rutas ────────────────────────────────────────────────────
 
-def _get_base_dir() -> Path:
-    if getattr(sys, "frozen", False):
-        return Path(sys.executable).parent
-    return Path(__file__).resolve().parent.parent
-
-
-_BASE_DIR   = _get_base_dir()
-_API_CONFIG = _BASE_DIR / "config" / "api_keys.json"
-_IOT_CONFIG = _BASE_DIR / "config" / "iot_config.json"
+from config import get_api_key, IOT_CONFIG_PATH as _IOT_CONFIG
 
 
 # ── Configuración por defecto ────────────────────────────────
@@ -66,11 +58,6 @@ def _load_iot_config() -> dict:
     )
     print("[IoT] Archivo de configuración creado: config/iot_config.json")
     return _DEFAULT_IOT_CONFIG.copy()
-
-
-def _get_api_key() -> str:
-    with open(_API_CONFIG, "r", encoding="utf-8") as f:
-        return json.load(f)["gemini_api_key"]
 
 
 def _get_serial() -> "serial.Serial | None":
@@ -379,7 +366,7 @@ def _detect_iot_intent(description: str, cfg: dict) -> list[str]:
     """
     import google.generativeai as genai
 
-    genai.configure(api_key=_get_api_key())
+    genai.configure(api_key=get_api_key())
     model = genai.GenerativeModel("gemini-2.5-flash-lite")
 
     # Build device list for prompt
