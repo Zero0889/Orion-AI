@@ -27,7 +27,7 @@ except ImportError:
     _GOOGLE_AVAILABLE = False
 
 # ── Paths ──────────────────────────────────────────────────────────────────
-_BASE_DIR = Path(__file__).resolve().parent.parent
+from config import BASE_DIR as _BASE_DIR
 _CREDENTIALS_PATH = _BASE_DIR / "config" / "credentials.json"
 _TOKEN_PATH = _BASE_DIR / "config" / "gdrive_token.json"
 

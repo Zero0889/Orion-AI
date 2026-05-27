@@ -6,21 +6,7 @@ import sys
 from datetime import datetime, timedelta
 from pathlib import Path
 
-from config import is_windows, is_mac, is_linux
-
-def _get_base_dir() -> Path:
-    if getattr(sys, "frozen", False):
-        return Path(sys.executable).parent
-    return Path(__file__).resolve().parent.parent
-
-
-BASE_DIR        = _get_base_dir()
-API_CONFIG_PATH = BASE_DIR / "config" / "api_keys.json"
-
-
-def _get_api_key() -> str:
-    with open(API_CONFIG_PATH, "r", encoding="utf-8") as f:
-        return json.load(f)["gemini_api_key"]
+from config import is_windows, is_mac, is_linux, get_api_key
 
 _MONTH_MAP: dict[str, int] = {
 
@@ -64,7 +50,7 @@ def _parse_date(raw: str) -> str:
 
     try:
         import google.generativeai as genai
-        genai.configure(api_key=_get_api_key())
+        genai.configure(api_key=get_api_key())
         model    = genai.GenerativeModel("gemini-2.5-flash-lite")
         response = model.generate_content(
             f"Today's date is {today.strftime('%Y-%m-%d')}. "
@@ -155,7 +141,7 @@ def _parse_flights_with_gemini(
 ) -> list[dict]:
     import google.generativeai as genai
 
-    genai.configure(api_key=_get_api_key())
+    genai.configure(api_key=get_api_key())
     model = genai.GenerativeModel(
         model_name="gemini-2.5-flash",
         system_instruction=(

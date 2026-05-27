@@ -21,8 +21,7 @@ from playwright.async_api import (
 _OS = platform.system()   # "Windows" | "Darwin" | "Linux"
 
 # ── Configuración de Chrome directo ─────────────────────────────────────────
-_BASE_DIR = Path(__file__).resolve().parent.parent
-_BROWSER_CONFIG_PATH = _BASE_DIR / "config" / "browser.json"
+from config import BASE_DIR as _BASE_DIR, BROWSER_CONFIG_PATH as _BROWSER_CONFIG_PATH
 
 
 def _load_browser_config() -> dict:
@@ -36,7 +35,7 @@ def _load_browser_config() -> dict:
         with open(_BROWSER_CONFIG_PATH, "r", encoding="utf-8") as f:
             data = json.load(f)
         defaults.update(data)
-    except Exception:
+    except (FileNotFoundError, json.JSONDecodeError, OSError):
         pass
     return defaults
 
@@ -60,7 +59,7 @@ def _open_url_in_chrome(url: str) -> str:
     try:
         subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         return f"Abierto en Chrome: {url}"
-    except Exception as e:
+    except (OSError, subprocess.SubprocessError) as e:
         print(f"[Navegador] Error al abrir Chrome directo: {e}")
         return ""
 
