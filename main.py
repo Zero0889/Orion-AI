@@ -8,7 +8,6 @@ audio bidireccional, ejecuta herramientas y se sincroniza con la UI.
 from __future__ import annotations
 
 import asyncio
-import json
 import re
 import sys
 import threading
@@ -19,6 +18,9 @@ import sounddevice as sd
 from google import genai
 from google.genai import types
 
+from config import get_api_key, PROMPT_PATH
+from core.logger import get_logger
+from plugins.base import PluginRegistry
 from ui import OrionUI
 from memory.memory_manager import (
     load_memory, update_memory, format_memory_for_prompt,
@@ -46,19 +48,7 @@ from actions.iot              import iot_control
 from actions.google_drive     import google_drive
 from actions.classroom        import classroom
 
-
-# ============================================================================
-#  Rutas y configuración
-# ============================================================================
-def get_base_dir() -> Path:
-    if getattr(sys, "frozen", False):
-        return Path(sys.executable).parent
-    return Path(__file__).resolve().parent
-
-
-BASE_DIR        = get_base_dir()
-API_CONFIG_PATH = BASE_DIR / "config" / "api_keys.json"
-PROMPT_PATH     = BASE_DIR / "core" / "prompt.txt"
+log = get_logger("main")
 
 LIVE_MODEL          = "models/gemini-2.5-flash-native-audio-preview-12-2025"
 CHANNELS            = 1
@@ -67,34 +57,12 @@ RECEIVE_SAMPLE_RATE = 24000
 CHUNK_SIZE          = 1024
 
 
-def _get_api_key() -> str:
-    """Lee la clave API de Gemini desde el archivo de configuración."""
-    try:
-        with open(API_CONFIG_PATH, "r", encoding="utf-8") as f:
-            cfg = json.load(f)
-    except FileNotFoundError:
-        raise RuntimeError(
-            f"No se encontró el archivo de configuración: {API_CONFIG_PATH}. "
-            "Crea el archivo con tu clave de Gemini."
-        )
-    except json.JSONDecodeError as e:
-        raise RuntimeError(
-            f"El archivo {API_CONFIG_PATH} contiene JSON inválido: {e}"
-        )
-
-    key = cfg.get("gemini_api_key", "").strip()
-    if not key:
-        raise RuntimeError(
-            "La clave 'gemini_api_key' está vacía en api_keys.json."
-        )
-    return key
-
-
 def _load_system_prompt() -> str:
     """Carga el prompt del sistema. Si no existe, usa uno por defecto en español."""
     try:
         return PROMPT_PATH.read_text(encoding="utf-8")
-    except Exception:
+    except FileNotFoundError:
+        log.warning("Prompt no encontrado en %s, usando default", PROMPT_PATH)
         return (
             "You are ORION (Operador de Redes Inteligentes y Optimización Neural), "
             "a personal voice assistant. Be concise, direct, and always use "
@@ -683,9 +651,16 @@ class OrionLive:
         self._is_speaking   = False
         self._speaking_lock = threading.Lock()
         self.ui.on_text_command = self._on_text_command
+        self.ui.on_interrupt    = self.interrupt
         self._turn_done_event: asyncio.Event | None = None
         # Tabla de despacho de herramientas (lazy init en _execute_tool)
         self._tool_handlers: dict | None = None
+
+        # ── Plugins ──
+        self._plugin_registry = PluginRegistry()
+        n = self._plugin_registry.discover_and_load()
+        if n:
+            log.info("Plugins disponibles: %s", list(self._plugin_registry.plugins.keys()))
 
     # ── Callbacks de UI ──────────────────────────────────────────────────
     def _on_text_command(self, text: str):
@@ -705,7 +680,7 @@ class OrionLive:
                 loop
             )
         except Exception as e:
-            print(f"[ORION] ⚠️  on_text_command falló: {e}")
+            log.warning("on_text_command falló: %s", e)
 
     def set_speaking(self, value: bool):
         with self._speaking_lock:
@@ -730,13 +705,53 @@ class OrionLive:
                 loop
             )
         except Exception as e:
-            print(f"[ORION] ⚠️  speak falló: {e}")
+            log.warning("speak falló: %s", e)
 
     def speak_error(self, tool_name: str, error: str):
         """Informa al usuario de un error en una herramienta."""
         short = str(error)[:120]
         self.ui.write_log(f"ERROR: {tool_name} — {short}")
         self.speak(f"Hubo un problema al ejecutar {tool_name}. {short}")
+
+    def interrupt(self):
+        """Interrumpe inmediatamente la voz de ORION.
+
+        - Vacía la cola de audio que está pendiente de reproducción.
+        - Marca el turno como terminado y vuelve al estado ESCUCHANDO.
+        """
+        log.info("Interrupción del usuario solicitada")
+        # Vaciar la cola de audio pendiente — la reproducción se detiene
+        q = self.audio_in_queue
+        if q is not None:
+            try:
+                while not q.empty():
+                    q.get_nowait()
+            except Exception:
+                pass
+
+        # Forzar el turno como terminado
+        if self._turn_done_event is not None:
+            try:
+                self._loop.call_soon_threadsafe(self._turn_done_event.set)
+            except Exception:
+                pass
+
+        self.set_speaking(False)
+
+        # Avisar al modelo que pare (le enviamos un mensaje vacío de turno)
+        loop = self._loop
+        session = self.session
+        if loop and session:
+            try:
+                asyncio.run_coroutine_threadsafe(
+                    session.send_client_content(
+                        turns={"parts": [{"text": "[INTERRUPCIÓN_USUARIO] El usuario te ha pedido detenerte. No continúes."}]},
+                        turn_complete=True
+                    ),
+                    loop,
+                )
+            except Exception as e:
+                log.warning("Interrupción remota falló: %s", e)
 
     # ── Configuración de la sesión ───────────────────────────────────────
     def _build_config(self) -> types.LiveConnectConfig:
@@ -773,7 +788,7 @@ class OrionLive:
             output_audio_transcription={},
             input_audio_transcription={},
             system_instruction="\n".join(parts),
-            tools=[{"function_declarations": TOOL_DECLARATIONS}],
+            tools=[{"function_declarations": TOOL_DECLARATIONS + self._plugin_registry.get_tool_declarations()}],
             session_resumption=types.SessionResumptionConfig(),
             speech_config=types.SpeechConfig(
                 voice_config=types.VoiceConfig(
@@ -1021,7 +1036,7 @@ class OrionLive:
         name = fc.name
         args = dict(fc.args or {})
 
-        print(f"[ORION] 🔧 {name}  {args}")
+        log.info("Tool call: %s  %s", name, args)
         self.ui.set_state("PENSANDO")
 
         # save_memory se ejecuta de forma silenciosa (caso especial)
@@ -1031,7 +1046,7 @@ class OrionLive:
             value    = args.get("value", "")
             if key and value:
                 update_memory({category: {key: {"value": value}}})
-                print(f"[Memoria] 💾 save_memory: {category}/{key} = {value}")
+                log.info("Memoria guardada: %s/%s = %s", category, key, value)
             if not self.ui.muted:
                 self.ui.set_state("ESCUCHANDO")
             return types.FunctionResponse(
@@ -1046,9 +1061,30 @@ class OrionLive:
         result  = "Listo."
         handler = self._tool_handlers.get(name)
 
+        # Si no hay handler nativo, buscar en plugins
+        plugin = None
+        if handler is None:
+            plugin = self._plugin_registry.get(name)
+
         try:
-            if handler is None:
+            if handler is None and plugin is None:
                 result = f"Herramienta desconocida: {name}"
+            elif plugin is not None:
+                loop = asyncio.get_event_loop()
+                timeout = plugin.timeout
+                try:
+                    result = await asyncio.wait_for(
+                        loop.run_in_executor(
+                            None,
+                            lambda: plugin.execute(args, player=self.ui, speak=self.speak)
+                        ),
+                        timeout=timeout,
+                    )
+                except asyncio.TimeoutError:
+                    result = f"Plugin '{name}' tardó más de {timeout}s y fue cancelado."
+                    log.warning("Timeout en plugin %s (%ds)", name, timeout)
+                if not result:
+                    result = "Listo."
             else:
                 timeout = self._TOOL_TIMEOUTS.get(name, self._DEFAULT_TOOL_TIMEOUT)
                 try:
@@ -1057,19 +1093,19 @@ class OrionLive:
                     result = (
                         f"La herramienta '{name}' tardó más de {timeout}s y fue cancelada."
                     )
-                    print(f"[ORION] ⏱️  Timeout en {name}")
+                    log.warning("Timeout en %s (%ds)", name, timeout)
                 if not result:
                     result = "Listo."
 
         except Exception as e:
             result = f"La herramienta '{name}' falló: {e}"
-            traceback.print_exc()
+            log.error("Tool %s falló", name, exc_info=True)
             self.speak_error(name, e)
 
         if not self.ui.muted:
             self.ui.set_state("ESCUCHANDO")
 
-        print(f"[ORION] 📤 {name} → {str(result)[:80]}")
+        log.info("Tool result: %s → %s", name, str(result)[:80])
         return types.FunctionResponse(
             id=fc.id, name=name,
             response={"result": result}
@@ -1082,7 +1118,7 @@ class OrionLive:
             await self.session.send_realtime_input(media=msg)
 
     async def _listen_audio(self):
-        print("[ORION] 🎤 Micrófono iniciado")
+        log.info("Micrófono iniciado")
         loop = asyncio.get_event_loop()
 
         def callback(indata, frames, time_info, status):
@@ -1104,15 +1140,18 @@ class OrionLive:
                 blocksize=CHUNK_SIZE,
                 callback=callback,
             ):
-                print("[ORION] 🎤 Stream de micrófono abierto")
+                log.info("Stream de micrófono abierto")
                 while True:
                     await asyncio.sleep(0.1)
-        except Exception as e:
-            print(f"[ORION] ❌ Micrófono: {e}")
+        except sd.PortAudioError as e:
+            log.error("Error de audio en micrófono: %s", e)
+            raise
+        except OSError as e:
+            log.error("Error de sistema en micrófono: %s", e)
             raise
 
     async def _receive_audio(self):
-        print("[ORION] 👂 Recepción iniciada")
+        log.info("Recepción de audio iniciada")
         out_buf, in_buf = [], []
 
         try:
@@ -1154,19 +1193,18 @@ class OrionLive:
                     if response.tool_call:
                         fn_responses = []
                         for fc in response.tool_call.function_calls:
-                            print(f"[ORION] 📞 {fc.name}")
+                            log.debug("Function call: %s", fc.name)
                             fr = await self._execute_tool(fc)
                             fn_responses.append(fr)
                         await self.session.send_tool_response(
                             function_responses=fn_responses
                         )
         except Exception as e:
-            print(f"[ORION] ❌ Recepción: {e}")
-            traceback.print_exc()
+            log.error("Error en recepción de audio: %s", e, exc_info=True)
             raise
 
     async def _play_audio(self):
-        print("[ORION] 🔊 Reproducción iniciada")
+        log.info("Reproducción de audio iniciada")
 
         stream = sd.RawOutputStream(
             samplerate=RECEIVE_SAMPLE_RATE,
@@ -1195,8 +1233,11 @@ class OrionLive:
                     continue
                 self.set_speaking(True)
                 await asyncio.to_thread(stream.write, chunk)
-        except Exception as e:
-            print(f"[ORION] ❌ Reproducción: {e}")
+        except sd.PortAudioError as e:
+            log.error("Error de audio en reproducción: %s", e)
+            raise
+        except OSError as e:
+            log.error("Error de sistema en reproducción: %s", e)
             raise
         finally:
             self.set_speaking(False)
@@ -1207,11 +1248,11 @@ class OrionLive:
     async def run(self):
         try:
             client = genai.Client(
-                api_key=_get_api_key(),
+                api_key=get_api_key(),
                 http_options={"api_version": "v1beta"}
             )
         except RuntimeError as e:
-            print(f"[ORION] ❌ {e}")
+            log.error("Error de configuración: %s", e)
             self.ui.write_log(f"ERROR DE CONFIGURACIÓN: {e}")
             return
 
@@ -1222,7 +1263,7 @@ class OrionLive:
 
         while True:
             try:
-                print("[ORION] 🔌 Conectando...")
+                log.info("Conectando a Gemini Live...")
                 self.ui.set_state("PENSANDO")
                 config = self._build_config()
 
@@ -1236,7 +1277,7 @@ class OrionLive:
                     self.out_queue        = asyncio.Queue(maxsize=10)
                     self._turn_done_event = asyncio.Event()
 
-                    print("[ORION] ✅ Conectado.")
+                    log.info("Conectado a Gemini Live.")
                     self.ui.set_state("ESCUCHANDO")
                     self.ui.write_log("SISTEMA: ORION en línea.")
 
@@ -1249,12 +1290,11 @@ class OrionLive:
                     tg.create_task(self._play_audio())
 
             except Exception as e:
-                print(f"[ORION] ⚠️ {e}")
-                traceback.print_exc()
+                log.warning("Sesión desconectada: %s", e, exc_info=True)
 
             self.set_speaking(False)
             self.ui.set_state("PENSANDO")
-            print(f"[ORION] 🔄 Reconectando en {backoff_s}s...")
+            log.info("Reconectando en %ds...", backoff_s)
             await asyncio.sleep(backoff_s)
             # Crece el backoff para el siguiente intento si vuelve a fallar
             backoff_s = min(int(backoff_s * 1.8), max_backoff_s)
@@ -1272,7 +1312,7 @@ def main():
         try:
             asyncio.run(orion.run())
         except KeyboardInterrupt:
-            print("\n🔴 Cerrando ORION...")
+            log.info("Cerrando ORION...")
 
     threading.Thread(target=runner, daemon=True).start()
     ui.root.mainloop()

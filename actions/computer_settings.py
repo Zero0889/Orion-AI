@@ -7,6 +7,8 @@ import subprocess
 import platform
 from pathlib import Path
 
+from config import get_api_key
+
 try:
     import pyautogui
     pyautogui.FAILSAFE = True
@@ -21,18 +23,7 @@ try:
 except ImportError:
     _PYPERCLIP = False
 
-_OS = platform.system()  # "Windows" | "Darwin" | "Linux"
-
-
-def _get_base_dir() -> Path:
-    if getattr(sys, "frozen", False):
-        return Path(sys.executable).parent
-    return Path(__file__).resolve().parent.parent
-
-def _get_api_key() -> str:
-    path = _get_base_dir() / "config" / "api_keys.json"
-    with open(path, "r", encoding="utf-8") as f:
-        return json.load(f)["gemini_api_key"]
+_OS = platform.system()
 
 def _get_macos_wifi_interface() -> str:
     try:
@@ -571,7 +562,7 @@ _DANGEROUS_ACTIONS = {"restart", "shutdown"}
 def _detect_action(description: str) -> dict:
 
     import google.generativeai as genai
-    genai.configure(api_key=_get_api_key())
+    genai.configure(api_key=get_api_key())
     model = genai.GenerativeModel("gemini-2.5-flash-lite")
 
     available = ", ".join(sorted(ACTION_MAP.keys())) + \

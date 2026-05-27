@@ -4,15 +4,7 @@ import sys
 from pathlib import Path
 from enum import Enum
 
-
-def get_base_dir() -> Path:
-    if getattr(sys, "frozen", False):
-        return Path(sys.executable).parent
-    return Path(__file__).resolve().parent.parent
-
-
-BASE_DIR        = get_base_dir()
-API_CONFIG_PATH = BASE_DIR / "config" / "api_keys.json"
+from config import get_api_key
 
 
 class ErrorDecision(Enum):
@@ -47,11 +39,6 @@ Return ONLY valid JSON:
   "user_message": "Short message to tell the user in Spanish (max 15 words, use 'señor')"
 }
 """
-
-
-def _get_api_key() -> str:
-    with open(API_CONFIG_PATH, "r", encoding="utf-8") as f:
-        return json.load(f)["gemini_api_key"]
 
 
 def analyze_error(
@@ -90,7 +77,7 @@ def analyze_error(
             "user_message":  "Intentando un enfoque diferente, señor."
         }
 
-    genai.configure(api_key=_get_api_key())
+    genai.configure(api_key=get_api_key())
     model = genai.GenerativeModel(
         model_name="gemini-2.5-flash-lite",
         system_instruction=ERROR_ANALYST_PROMPT
@@ -130,7 +117,7 @@ Attempt number: {attempt}"""
         print(f"[ErrorHandler] Decision: {result['decision'].value} — {result.get('reason', '')}")
         return result
 
-    except Exception as e:
+    except (json.JSONDecodeError, ValueError, RuntimeError) as e:
         print(f"[ErrorHandler] ⚠️ Analysis failed: {e} — defaulting to replan")
         return {
             "decision":       ErrorDecision.REPLAN,
@@ -150,7 +137,7 @@ def generate_fix(step: dict, error: str, fix_suggestion: str) -> dict:
     """
     import google.generativeai as genai
 
-    genai.configure(api_key=_get_api_key())
+    genai.configure(api_key=get_api_key())
     model = genai.GenerativeModel(model_name="gemini-2.0-flash")
 
     prompt = f"""A task step failed. Generate a replacement step.
@@ -185,7 +172,7 @@ Return ONLY the Python code, no explanation."""
             "critical":   step.get("critical", False)
         }
 
-    except Exception as e:
+    except (ValueError, RuntimeError) as e:
         print(f"[ErrorHandler] ⚠️ Fix generation failed: {e}")
         return {
             "step":        step.get("step"),

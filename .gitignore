@@ -4,3 +4,5 @@ __pycache__/
 .verify*.py
 .test*.py
 .venv/
+logs/
+config/theme.json

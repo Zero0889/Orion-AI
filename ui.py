@@ -10,16 +10,17 @@ import subprocess
 import sys
 import threading
 import time
+import webbrowser
 from pathlib import Path
 
 import psutil
 
 from PyQt6.QtCore import (
-    QEasingCurve, QMimeData, QObject, QPointF, QRectF, QSize, Qt,
+    QEasingCurve, QMimeData, QObject, QPoint, QPointF, QRectF, QSize, Qt,
     QTimer, QUrl, pyqtSignal,
 )
 from PyQt6.QtGui import (
-    QAction, QBrush, QColor, QDragEnterEvent, QDropEvent, QFont,
+    QAction, QActionGroup, QBrush, QColor, QDragEnterEvent, QDropEvent, QFont,
     QFontDatabase, QIcon, QKeySequence, QLinearGradient, QPainter,
     QPainterPath, QPen, QPixmap, QRadialGradient, QShortcut,
 )
@@ -30,6 +31,93 @@ from PyQt6.QtWidgets import (
 )
 
 import keyboard
+
+from config.theme import (
+    get_theme, list_themes, load_theme_name, save_theme_name,
+)
+from config import BASE_DIR
+
+GITHUB_URL  = "https://github.com/Zero0889/O.R.I.O.N---IA"
+GITHUB_ICON = BASE_DIR / "assets" / "github-logo.png"
+
+
+# ============================================================
+#  Botón GitHub (imagen PNG, clickeable)
+# ============================================================
+class GitHubButton(QPushButton):
+    """Botón pequeño que muestra el logo de GitHub y abre la URL del repo."""
+
+    def __init__(self, url: str, parent=None):
+        super().__init__(parent)
+        self._url = url
+        self.setFixedSize(30, 30)
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.setToolTip(f"Ver código fuente · {url}")
+        self.setFlat(True)
+        self.setStyleSheet("QPushButton { background: transparent; border: none; }")
+
+        # Cargar el logo desde assets
+        self._pixmap: QPixmap | None = None
+        if GITHUB_ICON.exists():
+            px = QPixmap(str(GITHUB_ICON))
+            if not px.isNull():
+                # Escalar suavemente al tamaño del botón
+                self._pixmap = px.scaled(
+                    22, 22,
+                    Qt.AspectRatioMode.KeepAspectRatio,
+                    Qt.TransformationMode.SmoothTransformation,
+                )
+
+        self._hover = False
+        self.clicked.connect(self._open_url)
+
+    def _open_url(self):
+        try:
+            webbrowser.open(self._url)
+        except Exception:
+            pass
+
+    def enterEvent(self, e):
+        self._hover = True
+        self.update()
+        super().enterEvent(e)
+
+    def leaveEvent(self, e):
+        self._hover = False
+        self.update()
+        super().leaveEvent(e)
+
+    def paintEvent(self, _):
+        p = QPainter(self)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing)
+        p.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
+
+        W, H = self.width(), self.height()
+        cx, cy = W / 2, H / 2
+        r = min(W, H) * 0.46
+
+        # Círculo de fondo (con un brillo del tema en hover)
+        if self._hover:
+            p.setBrush(QBrush(qcol(C.PRI, 70)))
+            p.setPen(QPen(qcol(C.PRI), 1.5))
+        else:
+            p.setBrush(QBrush(qcol(C.PANEL2)))
+            p.setPen(QPen(qcol(C.BORDER_B), 1))
+        p.drawEllipse(QPointF(cx, cy), r, r)
+
+        # Dibujar el PNG centrado
+        if self._pixmap is not None:
+            pw, ph = self._pixmap.width(), self._pixmap.height()
+            x = int(cx - pw / 2)
+            y = int(cy - ph / 2)
+            # Si está en hover, aplicar un poco de opacidad menor al fondo
+            # y dibujamos la imagen tal cual (es blanca sobre cualquier fondo)
+            p.drawPixmap(x, y, self._pixmap)
+        else:
+            # Fallback: texto si la imagen no existe
+            p.setPen(QPen(qcol(C.WHITE), 1))
+            p.setFont(QFont("Courier New", 10, QFont.Weight.Bold))
+            p.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter, "GH")
 
 # ============================================================
 #  Configuración base / rutas
@@ -82,41 +170,37 @@ _MESES_ES  = ["Ene", "Feb", "Mar", "Abr", "May", "Jun",
 
 
 # ============================================================
-#  Paleta de colores — tema ROJO ORION
+#  Paleta de colores — cargada desde config/theme.json
 # ============================================================
+_ACTIVE_THEME = get_theme()
+
+
 class C:
-    # Fondo y paneles
-    BG        = "#0a0205"   # negro con tinte rojo profundo
-    PANEL     = "#140307"   # panel base
-    PANEL2    = "#1a040a"   # panel secundario
-    DARK      = "#0d0204"   # barras superiores/inferiores
-
-    # Bordes
-    BORDER    = "#3d0d18"
-    BORDER_B  = "#7a1a2c"
-    BORDER_A  = "#5c1422"
-
-    # Primario (rojo eléctrico) — antes era cian
-    PRI       = "#ff2a4d"
-    PRI_DIM   = "#a01828"
-    PRI_GHO   = "#2e0810"
-
-    # Acentos
-    ACC       = "#ff6b1a"   # naranja para resaltar
-    ACC2      = "#ffb84d"   # ámbar / oro suave
-    GREEN     = "#33ff99"   # estado OK
-    GREEN_D   = "#15994d"
-    RED       = "#ff1f3a"   # alerta
-    MUTED_C   = "#ff5577"   # micrófono silenciado
-
-    # Texto
-    TEXT      = "#ffc4cc"   # texto principal con tinte rosado
-    TEXT_DIM  = "#8a3a48"
-    TEXT_MED  = "#cc6678"
-    WHITE     = "#fff0f2"
-
-    # Barras de progreso
-    BAR_BG    = "#1f0510"
+    """Paleta de colores. Valores cargados del tema activo al iniciar."""
+    BG        = _ACTIVE_THEME["BG"]
+    PANEL     = _ACTIVE_THEME["PANEL"]
+    PANEL2    = _ACTIVE_THEME["PANEL2"]
+    DARK      = _ACTIVE_THEME["DARK"]
+    BORDER    = _ACTIVE_THEME["BORDER"]
+    BORDER_B  = _ACTIVE_THEME["BORDER_B"]
+    BORDER_A  = _ACTIVE_THEME["BORDER_A"]
+    PRI       = _ACTIVE_THEME["PRI"]
+    PRI_DIM   = _ACTIVE_THEME["PRI_DIM"]
+    PRI_GHO   = _ACTIVE_THEME["PRI_GHO"]
+    ACC       = _ACTIVE_THEME["ACC"]
+    ACC2      = _ACTIVE_THEME["ACC2"]
+    GREEN     = _ACTIVE_THEME["GREEN"]
+    GREEN_D   = _ACTIVE_THEME["GREEN_D"]
+    RED       = _ACTIVE_THEME["RED"]
+    MUTED_C   = _ACTIVE_THEME["MUTED_C"]
+    TEXT      = _ACTIVE_THEME["TEXT"]
+    TEXT_DIM  = _ACTIVE_THEME["TEXT_DIM"]
+    TEXT_MED  = _ACTIVE_THEME["TEXT_MED"]
+    WHITE     = _ACTIVE_THEME["WHITE"]
+    BAR_BG    = _ACTIVE_THEME["BAR_BG"]
+    # Paletas del orb 3D (RGB tuples)
+    ORB_ACTIVE = _ACTIVE_THEME["ORB_ACTIVE"]
+    ORB_MUTED  = _ACTIVE_THEME["ORB_MUTED"]
 
 
 def qcol(h: str, a: int = 255) -> QColor:
@@ -307,6 +391,8 @@ class HudCanvas(QWidget):
         self.muted    = False
         self.speaking = False
         self.state    = "INICIALIZANDO"
+        # Performance: pausar la animación cuando el widget no es visible
+        self._paused  = False
 
         self._tick       = 0
         self._scale      = 1.0
@@ -348,6 +434,14 @@ class HudCanvas(QWidget):
         self._tmr = QTimer(self)
         self._tmr.timeout.connect(self._step)
         self._tmr.start(16)
+
+    def set_paused(self, paused: bool) -> None:
+        """Pausa la animación (cuando la ventana está minimizada/oculta)."""
+        self._paused = paused
+        if paused:
+            self._tmr.stop()
+        elif not self._tmr.isActive():
+            self._tmr.start(16)
 
     def _load_face(self, path: str):
         try:
@@ -538,21 +632,11 @@ class HudCanvas(QWidget):
             p.drawLine(QPointF(bx, by), QPointF(bx, by + dy * bl))
 
         # ── Esfera 3D de partículas ──
-        # paleta de colores (rojos/coral) — más apagada en mute
-        if self.muted:
-            orb_colors = [
-                (140, 60, 80),
-                (110, 40, 60),
-                (90,  30, 50),
-                (70,  20, 35),
-            ]
-        else:
-            orb_colors = [
-                (255, 60,  60),    # rojo brillante
-                (255, 110, 70),    # coral
-                (220, 30,  55),    # carmesí
-                (170, 15,  40),    # vino oscuro
-            ]
+        # Paleta del tema activo
+        orb_colors = C.ORB_MUTED if self.muted else C.ORB_ACTIVE
+
+        # Color del halo derivado del primer color del orb
+        halo_rgb = orb_colors[0]
 
         orb_radius = fw * 0.22 * self._scale
         cos_y = math.cos(self._orb_rot_y); sin_y = math.sin(self._orb_rot_y)
@@ -561,11 +645,8 @@ class HudCanvas(QWidget):
         # halo central detrás de la esfera (un brillo difuso)
         halo_r = orb_radius * 1.05
         halo_gr = QRadialGradient(QPointF(cx, cy), halo_r)
-        if self.muted:
-            halo_gr.setColorAt(0.0, QColor(150, 40, 60, 90))
-        else:
-            halo_gr.setColorAt(0.0, QColor(255, 50, 50, 110))
-        halo_gr.setColorAt(0.55, QColor(255, 20, 30, 40))
+        halo_gr.setColorAt(0.0, QColor(halo_rgb[0], halo_rgb[1], halo_rgb[2], 110 if not self.muted else 90))
+        halo_gr.setColorAt(0.55, QColor(halo_rgb[0], halo_rgb[1], halo_rgb[2], 40))
         halo_gr.setColorAt(1.0, QColor(0, 0, 0, 0))
         p.setBrush(QBrush(halo_gr)); p.setPen(Qt.PenStyle.NoPen)
         p.drawEllipse(QPointF(cx, cy), halo_r, halo_r)
@@ -735,10 +816,14 @@ class MetricBar(QWidget):
 # ============================================================
 class LogWidget(QTextEdit):
     _sig = pyqtSignal(str)
+    # Señal emitida cuando el usuario suelta contenido en el log
+    dropped_text = pyqtSignal(str)     # texto plano o link
+    dropped_file = pyqtSignal(str)     # ruta absoluta a un archivo
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setReadOnly(True)
+        self.setAcceptDrops(True)
         self.setFont(QFont("Courier New", 9))
         self.setStyleSheet(f"""
             QTextEdit {{
@@ -801,7 +886,30 @@ class LogWidget(QTextEdit):
         elif tl.startswith("sistema:") or tl.startswith("sys:"): self._tag = "sys"
         elif "error" in tl or "err" in tl:                  self._tag = "err"
         else:                                               self._tag = "sys"
-        self._tmr.start(6)
+        # Performance: si hay muchos mensajes acumulados, omitir la animación
+        # de máquina de escribir y volcar el texto de golpe.
+        if len(self._queue) > 5:
+            self._flush_instant()
+        else:
+            self._tmr.start(6)
+
+    def _flush_instant(self):
+        cur = self.textCursor()
+        fmt = cur.charFormat()
+        col = {
+            "you":  qcol(C.WHITE),
+            "ai":   qcol(C.PRI),
+            "err":  qcol(C.RED),
+            "file": qcol(C.GREEN),
+            "sys":  qcol(C.ACC2),
+        }.get(self._tag, qcol(C.TEXT))
+        fmt.setForeground(QBrush(col))
+        cur.movePosition(cur.MoveOperation.End)
+        cur.insertText(self._text + "\n", fmt)
+        self.setTextCursor(cur)
+        self.ensureCursorVisible()
+        self._pos = len(self._text)
+        QTimer.singleShot(5, self._next)
 
     def _step(self):
         if self._pos < len(self._text):
@@ -829,6 +937,80 @@ class LogWidget(QTextEdit):
             self.setTextCursor(cur)
             self.ensureCursorVisible()
             QTimer.singleShot(20, self._next)
+
+    # ── Drag & Drop ─────────────────────────────────────────────────────
+    def dragEnterEvent(self, e):
+        mime = e.mimeData()
+        if mime.hasUrls() or mime.hasText() or mime.hasImage():
+            e.acceptProposedAction()
+            # Resaltado visual del log
+            self.setStyleSheet(self.styleSheet() +
+                f"\nQTextEdit {{ border: 1px solid {C.PRI}; }}")
+        else:
+            e.ignore()
+
+    def dragLeaveEvent(self, e):
+        # Re-aplicar estilo base
+        self._reset_border()
+        super().dragLeaveEvent(e)
+
+    def dragMoveEvent(self, e):
+        if e.mimeData().hasUrls() or e.mimeData().hasText():
+            e.acceptProposedAction()
+
+    def _reset_border(self):
+        self.setStyleSheet(f"""
+            QTextEdit {{
+                background: {C.PANEL};
+                color: {C.TEXT};
+                border: 1px solid {C.BORDER};
+                border-radius: 5px;
+                padding: 7px;
+                selection-background-color: {C.PRI_GHO};
+            }}
+            QScrollBar:vertical {{
+                background: {C.BG};
+                width: 8px;
+                border: none;
+            }}
+            QScrollBar::handle:vertical {{
+                background: {C.BORDER_B};
+                border-radius: 4px;
+                min-height: 20px;
+            }}
+            QScrollBar::handle:vertical:hover {{
+                background: {C.PRI_DIM};
+            }}
+        """)
+
+    def dropEvent(self, e):
+        mime = e.mimeData()
+        self._reset_border()
+
+        # 1) Archivo local
+        if mime.hasUrls():
+            for url in mime.urls():
+                if url.isLocalFile():
+                    path = url.toLocalFile()
+                    if Path(path).is_file():
+                        self.dropped_file.emit(path)
+                        e.acceptProposedAction()
+                        return
+                # Si es URL web, enviarla como texto
+                if url.scheme() in ("http", "https"):
+                    self.dropped_text.emit(url.toString())
+                    e.acceptProposedAction()
+                    return
+
+        # 2) Texto plano
+        if mime.hasText():
+            text = mime.text().strip()
+            if text:
+                self.dropped_text.emit(text)
+                e.acceptProposedAction()
+                return
+
+        e.ignore()
 
 
 # ============================================================
@@ -1054,6 +1236,485 @@ class _DropCanvas(QWidget):
 
 
 # ============================================================
+#  Panel de memoria — ver y editar long_term.json
+# ============================================================
+class MemoryPanel(QWidget):
+    """Ventana modal que muestra las categorías de memoria con edición."""
+
+    memory_changed = pyqtSignal()
+
+    _CATEGORIES = [
+        ("identity",      "Identidad",     "#ff2a4d"),
+        ("preferences",   "Preferencias",  "#ffb84d"),
+        ("projects",      "Proyectos",     "#33ff99"),
+        ("relationships", "Relaciones",    "#ff6b1a"),
+        ("wishes",        "Deseos",        "#cc44ff"),
+        ("notes",         "Notas",         "#aaaaaa"),
+    ]
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowFlags(
+            Qt.WindowType.Window |
+            Qt.WindowType.WindowStaysOnTopHint
+        )
+        self.setWindowTitle("O.R.I.O.N — Memoria")
+        self.setMinimumSize(560, 480)
+        self.resize(640, 540)
+        self.setStyleSheet(f"background: {C.BG};")
+
+        root = QVBoxLayout(self)
+        root.setContentsMargins(14, 12, 14, 12)
+        root.setSpacing(10)
+
+        # Header
+        hdr = QLabel("◈  MEMORIA DE O.R.I.O.N")
+        hdr.setFont(QFont("Courier New", 12, QFont.Weight.Bold))
+        hdr.setStyleSheet(
+            f"color: {C.PRI}; background: transparent; "
+            f"border-bottom: 1px solid {C.BORDER_B}; padding-bottom: 6px;"
+        )
+        root.addWidget(hdr)
+
+        sub = QLabel("Lo que ORION recuerda de ti. Edita o borra cualquier entrada.")
+        sub.setFont(QFont("Courier New", 8))
+        sub.setStyleSheet(f"color: {C.TEXT_DIM}; background: transparent;")
+        root.addWidget(sub)
+
+        # Área scrollable de entradas
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setStyleSheet(f"""
+            QScrollArea {{ border: 1px solid {C.BORDER}; border-radius: 5px; }}
+            QScrollBar:vertical {{
+                background: {C.BG}; width: 10px; border: none;
+            }}
+            QScrollBar::handle:vertical {{
+                background: {C.BORDER_B}; border-radius: 4px; min-height: 20px;
+            }}
+            QScrollBar::handle:vertical:hover {{ background: {C.PRI_DIM}; }}
+        """)
+
+        self._content = QWidget()
+        self._content.setStyleSheet(f"background: {C.PANEL};")
+        self._content_lay = QVBoxLayout(self._content)
+        self._content_lay.setContentsMargins(10, 10, 10, 10)
+        self._content_lay.setSpacing(8)
+        scroll.setWidget(self._content)
+        root.addWidget(scroll, stretch=1)
+
+        # Pie con botones
+        footer = QHBoxLayout()
+        footer.setSpacing(6)
+
+        refresh_btn = QPushButton("⟳  Recargar")
+        refresh_btn.setFixedHeight(28)
+        refresh_btn.setFont(QFont("Courier New", 8, QFont.Weight.Bold))
+        refresh_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        refresh_btn.setStyleSheet(f"""
+            QPushButton {{
+                background: transparent; color: {C.TEXT_MED};
+                border: 1px solid {C.BORDER}; border-radius: 4px;
+                padding: 0 14px;
+            }}
+            QPushButton:hover {{ color: {C.PRI}; border-color: {C.PRI}; }}
+        """)
+        refresh_btn.clicked.connect(self.reload)
+        footer.addWidget(refresh_btn)
+
+        footer.addStretch()
+
+        close_btn = QPushButton("Cerrar")
+        close_btn.setFixedHeight(28)
+        close_btn.setFont(QFont("Courier New", 8, QFont.Weight.Bold))
+        close_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        close_btn.setStyleSheet(f"""
+            QPushButton {{
+                background: transparent; color: {C.PRI};
+                border: 1px solid {C.PRI_DIM}; border-radius: 4px;
+                padding: 0 18px;
+            }}
+            QPushButton:hover {{ background: {C.PRI_GHO}; border-color: {C.PRI}; }}
+        """)
+        close_btn.clicked.connect(self.close)
+        footer.addWidget(close_btn)
+
+        root.addLayout(footer)
+
+        self.reload()
+
+    def reload(self):
+        """Lee long_term.json y reconstruye la vista."""
+        # Limpiar layout
+        while self._content_lay.count():
+            item = self._content_lay.takeAt(0)
+            w = item.widget()
+            if w:
+                w.deleteLater()
+
+        try:
+            from memory.memory_manager import load_memory
+            memory = load_memory()
+        except Exception as e:
+            err = QLabel(f"Error al cargar memoria: {e}")
+            err.setStyleSheet(f"color: {C.RED};")
+            self._content_lay.addWidget(err)
+            return
+
+        total = 0
+        for cat_id, cat_name, cat_color in self._CATEGORIES:
+            entries = memory.get(cat_id, {}) or {}
+            section = self._build_section(cat_id, cat_name, cat_color, entries)
+            self._content_lay.addWidget(section)
+            total += len(entries)
+
+        if total == 0:
+            empty = QLabel(
+                "Aún no hay entradas en la memoria.\n"
+                "Cuéntale algo a ORION sobre ti y aparecerá aquí."
+            )
+            empty.setStyleSheet(
+                f"color: {C.TEXT_DIM}; padding: 30px; background: transparent;"
+            )
+            empty.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            self._content_lay.addWidget(empty)
+
+        self._content_lay.addStretch()
+
+    def _build_section(self, cat_id: str, cat_name: str, color: str, entries: dict) -> QWidget:
+        wrap = QWidget()
+        wrap.setStyleSheet(
+            f"background: {C.PANEL2}; border: 1px solid {C.BORDER}; border-radius: 5px;"
+        )
+        v = QVBoxLayout(wrap)
+        v.setContentsMargins(10, 8, 10, 10)
+        v.setSpacing(6)
+
+        # Cabecera de la sección
+        hdr_row = QHBoxLayout()
+        title = QLabel(f"▸  {cat_name.upper()}  ({len(entries)})")
+        title.setFont(QFont("Courier New", 9, QFont.Weight.Bold))
+        title.setStyleSheet(f"color: {color}; background: transparent; border: none;")
+        hdr_row.addWidget(title)
+        hdr_row.addStretch()
+        v.addLayout(hdr_row)
+
+        if not entries:
+            lbl = QLabel("    Vacío")
+            lbl.setFont(QFont("Courier New", 8))
+            lbl.setStyleSheet(f"color: {C.TEXT_DIM}; background: transparent; border: none;")
+            v.addWidget(lbl)
+            return wrap
+
+        for key, entry in entries.items():
+            val = entry.get("value", "") if isinstance(entry, dict) else str(entry)
+            updated = entry.get("updated", "") if isinstance(entry, dict) else ""
+            v.addLayout(self._build_entry_row(cat_id, key, val, updated))
+
+        return wrap
+
+    def _build_entry_row(self, cat_id: str, key: str, value: str, updated: str) -> QHBoxLayout:
+        row = QHBoxLayout()
+        row.setSpacing(6)
+
+        key_lbl = QLabel(key)
+        key_lbl.setFont(QFont("Courier New", 8, QFont.Weight.Bold))
+        key_lbl.setStyleSheet(f"color: {C.TEXT_MED}; background: transparent; border: none;")
+        key_lbl.setFixedWidth(130)
+        key_lbl.setWordWrap(True)
+        row.addWidget(key_lbl)
+
+        editor = QLineEdit(value)
+        editor.setFont(QFont("Courier New", 9))
+        editor.setStyleSheet(f"""
+            QLineEdit {{
+                background: {C.BG}; color: {C.TEXT};
+                border: 1px solid {C.BORDER}; border-radius: 3px;
+                padding: 3px 6px;
+            }}
+            QLineEdit:focus {{ border: 1px solid {C.PRI}; }}
+        """)
+        row.addWidget(editor, stretch=1)
+
+        save_btn = QPushButton("✓")
+        save_btn.setFixedSize(28, 26)
+        save_btn.setFont(QFont("Courier New", 10, QFont.Weight.Bold))
+        save_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        save_btn.setToolTip("Guardar cambios")
+        save_btn.setStyleSheet(f"""
+            QPushButton {{
+                background: transparent; color: {C.GREEN};
+                border: 1px solid {C.BORDER}; border-radius: 3px;
+            }}
+            QPushButton:hover {{ background: {C.PRI_GHO}; border-color: {C.GREEN}; }}
+        """)
+        save_btn.clicked.connect(lambda: self._save_entry(cat_id, key, editor.text()))
+        row.addWidget(save_btn)
+
+        del_btn = QPushButton("✕")
+        del_btn.setFixedSize(28, 26)
+        del_btn.setFont(QFont("Courier New", 10, QFont.Weight.Bold))
+        del_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        del_btn.setToolTip("Borrar entrada")
+        del_btn.setStyleSheet(f"""
+            QPushButton {{
+                background: transparent; color: {C.RED};
+                border: 1px solid {C.BORDER}; border-radius: 3px;
+            }}
+            QPushButton:hover {{ background: #2a060f; border-color: {C.RED}; }}
+        """)
+        del_btn.clicked.connect(lambda: self._delete_entry(cat_id, key))
+        row.addWidget(del_btn)
+
+        return row
+
+    def _save_entry(self, cat_id: str, key: str, value: str):
+        try:
+            from memory.memory_manager import update_memory
+            update_memory({cat_id: {key: {"value": value.strip()}}})
+            self.memory_changed.emit()
+            self.reload()
+        except Exception as e:
+            print(f"[MemoryPanel] Error guardando: {e}")
+
+    def _delete_entry(self, cat_id: str, key: str):
+        try:
+            from memory.memory_manager import forget
+            forget(key, category=cat_id)
+            self.memory_changed.emit()
+            self.reload()
+        except Exception as e:
+            print(f"[MemoryPanel] Error borrando: {e}")
+
+
+# ============================================================
+#  Ventana de modo compacto (Picture-in-Picture)
+# ============================================================
+class CompactWindow(QMainWindow):
+    """Ventana flotante always-on-top con solo el HUD del orb.
+    Permite mantener ORION visible mientras se trabaja en otra app.
+
+    Soporta:
+      - Mover arrastrando desde el área del HUD.
+      - Redimensionar arrastrando cualquier borde o esquina con el mouse.
+    """
+
+    restore_requested = pyqtSignal()
+
+    # Tamaño del borde sensible al resize (en px)
+    _RESIZE_MARGIN = 6
+
+    # Flags internos para resize
+    _RESIZE_NONE  = 0
+    _RESIZE_LEFT  = 1
+    _RESIZE_RIGHT = 2
+    _RESIZE_TOP   = 4
+    _RESIZE_BOT   = 8
+
+    def __init__(self, face_path: str, parent=None):
+        super().__init__(parent)
+        self.setWindowFlags(
+            Qt.WindowType.FramelessWindowHint |
+            Qt.WindowType.WindowStaysOnTopHint |
+            Qt.WindowType.Tool
+        )
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, False)
+        # Tamaño inicial + límites en lugar de fijo
+        self.resize(240, 280)
+        self.setMinimumSize(180, 220)
+        self.setMaximumSize(900, 900)
+        self.setWindowTitle("O.R.I.O.N — Compacto")
+        # Mover el seguimiento de mouse para detectar el cursor sobre bordes
+        self.setMouseTracking(True)
+
+        central = QWidget()
+        central.setMouseTracking(True)
+        self.setCentralWidget(central)
+
+        lay = QVBoxLayout(central)
+        lay.setContentsMargins(6, 6, 6, 6)
+        lay.setSpacing(2)
+
+        # Barra superior con título y botones (área de "drag")
+        self._top_bar = QWidget()
+        self._top_bar.setMouseTracking(True)
+        self._top_bar.setFixedHeight(22)
+        top = QHBoxLayout(self._top_bar)
+        top.setContentsMargins(2, 0, 2, 0)
+        top.setSpacing(4)
+
+        title = QLabel("◈  O.R.I.O.N")
+        title.setFont(QFont("Courier New", 7, QFont.Weight.Bold))
+        title.setStyleSheet(f"color: {C.PRI}; background: transparent;")
+        top.addWidget(title)
+        top.addStretch()
+
+        restore_btn = QPushButton("⛶")
+        restore_btn.setFixedSize(20, 20)
+        restore_btn.setFont(QFont("Courier New", 10, QFont.Weight.Bold))
+        restore_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        restore_btn.setToolTip("Restaurar ventana principal")
+        restore_btn.setStyleSheet(f"""
+            QPushButton {{
+                background: transparent; color: {C.TEXT_MED};
+                border: 1px solid {C.BORDER}; border-radius: 3px;
+            }}
+            QPushButton:hover {{ color: {C.PRI}; border-color: {C.PRI}; }}
+        """)
+        restore_btn.clicked.connect(self.restore_requested.emit)
+        top.addWidget(restore_btn)
+
+        close_btn = QPushButton("✕")
+        close_btn.setFixedSize(20, 20)
+        close_btn.setFont(QFont("Courier New", 9, QFont.Weight.Bold))
+        close_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        close_btn.setToolTip("Cerrar compacto")
+        close_btn.setStyleSheet(f"""
+            QPushButton {{
+                background: transparent; color: {C.TEXT_MED};
+                border: 1px solid {C.BORDER}; border-radius: 3px;
+            }}
+            QPushButton:hover {{ color: {C.RED}; border-color: {C.RED}; }}
+        """)
+        close_btn.clicked.connect(self.restore_requested.emit)
+        top.addWidget(close_btn)
+
+        lay.addWidget(self._top_bar)
+
+        # HUD redimensionable
+        self.hud = HudCanvas(face_path)
+        self.hud.setMinimumSize(150, 150)
+        self.hud.setMouseTracking(True)
+        lay.addWidget(self.hud, stretch=1)
+
+        # Pequeña "esquina" visual de resize en la esquina inferior derecha
+        self._resize_hint = QLabel("⤡")
+        self._resize_hint.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignBottom)
+        self._resize_hint.setFont(QFont("Courier New", 10, QFont.Weight.Bold))
+        self._resize_hint.setStyleSheet(
+            f"color: {C.TEXT_DIM}; background: transparent; padding-right: 2px;"
+        )
+        self._resize_hint.setFixedHeight(12)
+        self._resize_hint.setMouseTracking(True)
+        lay.addWidget(self._resize_hint)
+
+        # Borde sutil alrededor de la ventana
+        central.setStyleSheet(
+            f"QWidget {{ background: {C.BG}; }}"
+            f"QWidget#wrap {{ border: 1px solid {C.BORDER_B}; border-radius: 6px; }}"
+        )
+        central.setObjectName("wrap")
+
+        # Estado interno para mover/redimensionar
+        self._drag_pos: QPoint | None = None
+        self._resize_edge: int = self._RESIZE_NONE
+        self._resize_start_geom = None
+        self._resize_start_mouse = None
+
+    # Sincronización de estado con la ventana principal
+    def set_state(self, state: str):
+        self.hud.state    = state
+        self.hud.speaking = (state == "HABLANDO")
+
+    def set_muted(self, muted: bool):
+        self.hud.muted = muted
+
+    # ── Detección del borde bajo el cursor ──────────────────────────────
+    def _edge_at(self, pos: QPoint) -> int:
+        m = self._RESIZE_MARGIN
+        w, h = self.width(), self.height()
+        edge = self._RESIZE_NONE
+        if pos.x() <= m:           edge |= self._RESIZE_LEFT
+        if pos.x() >= w - m:       edge |= self._RESIZE_RIGHT
+        if pos.y() <= m:           edge |= self._RESIZE_TOP
+        if pos.y() >= h - m:       edge |= self._RESIZE_BOT
+        return edge
+
+    def _cursor_for_edge(self, edge: int) -> Qt.CursorShape:
+        if edge == (self._RESIZE_LEFT | self._RESIZE_TOP) or \
+           edge == (self._RESIZE_RIGHT | self._RESIZE_BOT):
+            return Qt.CursorShape.SizeFDiagCursor
+        if edge == (self._RESIZE_RIGHT | self._RESIZE_TOP) or \
+           edge == (self._RESIZE_LEFT | self._RESIZE_BOT):
+            return Qt.CursorShape.SizeBDiagCursor
+        if edge & (self._RESIZE_LEFT | self._RESIZE_RIGHT):
+            return Qt.CursorShape.SizeHorCursor
+        if edge & (self._RESIZE_TOP | self._RESIZE_BOT):
+            return Qt.CursorShape.SizeVerCursor
+        return Qt.CursorShape.ArrowCursor
+
+    # ── Eventos de mouse ────────────────────────────────────────────────
+    def mousePressEvent(self, e):
+        if e.button() == Qt.MouseButton.LeftButton:
+            edge = self._edge_at(e.position().toPoint())
+            if edge != self._RESIZE_NONE:
+                # Iniciar redimensionado
+                self._resize_edge = edge
+                self._resize_start_geom = self.geometry()
+                self._resize_start_mouse = e.globalPosition().toPoint()
+                e.accept()
+                return
+            # Solo mover si el clic fue en la barra superior o el HUD
+            self._drag_pos = e.globalPosition().toPoint() - self.frameGeometry().topLeft()
+            e.accept()
+
+    def mouseMoveEvent(self, e):
+        pos = e.position().toPoint()
+        # Si está en proceso de redimensionado
+        if self._resize_edge != self._RESIZE_NONE and (e.buttons() & Qt.MouseButton.LeftButton):
+            self._do_resize(e.globalPosition().toPoint())
+            e.accept()
+            return
+        # Si está moviendo la ventana
+        if self._drag_pos is not None and (e.buttons() & Qt.MouseButton.LeftButton):
+            self.move(e.globalPosition().toPoint() - self._drag_pos)
+            e.accept()
+            return
+        # Si no, solo actualizar cursor según borde
+        edge = self._edge_at(pos)
+        self.setCursor(self._cursor_for_edge(edge))
+
+    def mouseReleaseEvent(self, e):
+        self._drag_pos = None
+        self._resize_edge = self._RESIZE_NONE
+        self._resize_start_geom = None
+        self._resize_start_mouse = None
+        self.setCursor(Qt.CursorShape.ArrowCursor)
+
+    def _do_resize(self, global_pos: QPoint):
+        if self._resize_start_geom is None or self._resize_start_mouse is None:
+            return
+        dx = global_pos.x() - self._resize_start_mouse.x()
+        dy = global_pos.y() - self._resize_start_mouse.y()
+        g = self._resize_start_geom
+        x, y, w, h = g.x(), g.y(), g.width(), g.height()
+        min_w = self.minimumWidth()
+        min_h = self.minimumHeight()
+        max_w = self.maximumWidth()
+        max_h = self.maximumHeight()
+
+        if self._resize_edge & self._RESIZE_RIGHT:
+            w = max(min_w, min(max_w, w + dx))
+        if self._resize_edge & self._RESIZE_BOT:
+            h = max(min_h, min(max_h, h + dy))
+        if self._resize_edge & self._RESIZE_LEFT:
+            new_w = max(min_w, min(max_w, w - dx))
+            x = x + (w - new_w)
+            w = new_w
+        if self._resize_edge & self._RESIZE_TOP:
+            new_h = max(min_h, min(max_h, h - dy))
+            y = y + (h - new_h)
+            h = new_h
+
+        self.setGeometry(x, y, w, h)
+
+    def closeEvent(self, e):
+        # Al cerrar el compacto, restaurar la principal
+        self.restore_requested.emit()
+        e.accept()
+
+
+# ============================================================
 #  Overlay de configuración inicial
 # ============================================================
 class SetupOverlay(QWidget):
@@ -1205,6 +1866,7 @@ class MainWindow(QMainWindow):
         )
 
         self.on_text_command  = None
+        self.on_interrupt     = None
         self._muted           = False
         self._current_file: str | None = None
 
@@ -1259,6 +1921,14 @@ class MainWindow(QMainWindow):
         sc_full = QShortcut(QKeySequence("F11"), self)
         sc_full.activated.connect(self._toggle_fullscreen)
 
+        sc_compact = QShortcut(QKeySequence("F9"), self)
+        sc_compact.activated.connect(self._toggle_compact_mode)
+
+        # Path para crear la ventana compacta más tarde (lazy init)
+        self._face_path = face_path
+        self._compact_window: CompactWindow | None = None
+        self._memory_panel: "MemoryPanel | None" = None
+
         # ── System Tray ──
         self._setup_tray()
 
@@ -1271,6 +1941,122 @@ class MainWindow(QMainWindow):
             self.showNormal()
         else:
             self.showFullScreen()
+
+    # ── Panel de memoria ─────────────────────────────────────────────────
+    def _show_memory_panel(self):
+        if not hasattr(self, "_memory_panel") or self._memory_panel is None:
+            self._memory_panel = MemoryPanel(self)
+            self._memory_panel.memory_changed.connect(
+                lambda: self._log.append_log("SISTEMA: Memoria actualizada.")
+            )
+        self._memory_panel.reload()
+        self._memory_panel.show()
+        self._memory_panel.raise_()
+        self._memory_panel.activateWindow()
+
+    # ── Modo compacto (PiP) ──────────────────────────────────────────────
+    def _toggle_compact_mode(self):
+        if self._compact_window and self._compact_window.isVisible():
+            self._close_compact()
+            return
+
+        if self._compact_window is None:
+            self._compact_window = CompactWindow(self._face_path)
+            self._compact_window.restore_requested.connect(self._close_compact)
+            # Sincronizar estado actual
+            self._state_sig.connect(self._compact_window.set_state)
+            self._compact_window.set_muted(self._muted)
+            self._compact_window.set_state(self.hud.state)
+
+        # Posicionar en la esquina inferior derecha de la pantalla
+        screen = QApplication.primaryScreen().availableGeometry()
+        cw = self._compact_window
+        cw.move(
+            screen.right() - cw.width() - 20,
+            screen.bottom() - cw.height() - 20,
+        )
+        cw.show()
+        cw.raise_()
+        # Ocultar la principal
+        self.hide()
+
+    def _close_compact(self):
+        if self._compact_window:
+            self._compact_window.hide()
+        self.showNormal()
+        self.activateWindow()
+        self.raise_()
+
+    # ── Selector de tema ─────────────────────────────────────────────────
+    def _show_theme_menu(self):
+        menu = QMenu(self)
+        menu.setStyleSheet(f"""
+            QMenu {{
+                background: {C.DARK}; color: {C.TEXT};
+                border: 1px solid {C.BORDER_B}; padding: 4px;
+            }}
+            QMenu::item {{
+                padding: 6px 24px; font-family: 'Courier New'; font-size: 9pt;
+            }}
+            QMenu::item:selected {{
+                background: {C.PRI_GHO}; color: {C.PRI};
+            }}
+            QMenu::separator {{ height: 1px; background: {C.BORDER}; margin: 4px 0; }}
+        """)
+
+        title = QAction("◈  ELEGIR TEMA", self)
+        title.setEnabled(False)
+        menu.addAction(title)
+        menu.addSeparator()
+
+        current = load_theme_name()
+        group = QActionGroup(self)
+        group.setExclusive(True)
+
+        for theme_id, theme_name in list_themes():
+            act = QAction(("● " if theme_id == current else "  ") + theme_name, self)
+            act.setCheckable(True)
+            act.setChecked(theme_id == current)
+            act.triggered.connect(lambda _, t=theme_id: self._apply_theme_choice(t))
+            group.addAction(act)
+            menu.addAction(act)
+
+        menu.addSeparator()
+        info = QAction("Reinicia ORION para aplicar", self)
+        info.setEnabled(False)
+        menu.addAction(info)
+
+        # Mostrar bajo el botón
+        if hasattr(self, "_theme_btn"):
+            pos = self._theme_btn.mapToGlobal(QPoint(0, self._theme_btn.height()))
+            menu.exec(pos)
+        else:
+            menu.exec(self.cursor().pos())
+
+    def _apply_theme_choice(self, theme_id: str):
+        save_theme_name(theme_id)
+        self._log.append_log(
+            f"SISTEMA: Tema cambiado a '{theme_id}'. Reinicia ORION para aplicar."
+        )
+        if hasattr(self, "_tray"):
+            self._tray.showMessage(
+                "O.R.I.O.N — Tema",
+                f"Tema cambiado a '{theme_id}'. Reinicia para aplicar.",
+                QSystemTrayIcon.MessageIcon.Information,
+                3000,
+            )
+
+    # ── Pausar animaciones cuando se minimiza ────────────────────────────
+    def changeEvent(self, event):
+        from PyQt6.QtCore import QEvent
+        if event.type() == QEvent.Type.WindowStateChange:
+            paused = self.isMinimized()
+            if hasattr(self, "hud"):
+                self.hud.set_paused(paused)
+            # Reducir frecuencia de actualización de métricas al minimizar
+            if hasattr(self, "_metric_tmr"):
+                self._metric_tmr.setInterval(8000 if paused else 2000)
+        super().changeEvent(event)
 
     # ── System Tray ──────────────────────────────────────────────────────
     def _setup_tray(self):
@@ -1336,6 +2122,8 @@ class MainWindow(QMainWindow):
                 self._metric_tmr.stop()
         except Exception:
             pass
+        if self._compact_window:
+            self._compact_window.close()
         self._tray.hide()
         QApplication.quit()
 
@@ -1473,6 +2261,9 @@ class MainWindow(QMainWindow):
             l.setStyleSheet(f"color: {color}; background: transparent;")
             return l
 
+        gh_btn = GitHubButton(GITHUB_URL)
+        lay.addWidget(gh_btn)
+        lay.addSpacing(8)
         lay.addWidget(_badge("Versión 1.0", C.PRI_DIM))
         lay.addStretch()
 
@@ -1607,6 +2398,9 @@ class MainWindow(QMainWindow):
 
         lay.addWidget(_sec("REGISTRO DE ACTIVIDAD"))
         self._log = LogWidget()
+        # Drag-and-drop: aceptar texto y archivos directamente en el log
+        self._log.dropped_text.connect(self._on_log_drop_text)
+        self._log.dropped_file.connect(self._on_file_selected)
         lay.addWidget(self._log, stretch=1)
 
         sep = QFrame(); sep.setFrameShape(QFrame.Shape.HLine)
@@ -1630,6 +2424,29 @@ class MainWindow(QMainWindow):
 
         lay.addWidget(_sec("COMANDOS"))
         lay.addLayout(self._build_input_row())
+
+        # ── Botón INTERRUMPIR (visible solo cuando ORION habla) ──
+        self._stop_btn = QPushButton("⏹  INTERRUMPIR")
+        self._stop_btn.setFixedHeight(36)
+        self._stop_btn.setFont(QFont("Courier New", 10, QFont.Weight.Bold))
+        self._stop_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._stop_btn.setToolTip("Detener la voz de ORION ahora")
+        self._stop_btn.setStyleSheet(f"""
+            QPushButton {{
+                background: {C.RED}; color: {C.WHITE};
+                border: 2px solid {C.RED}; border-radius: 5px;
+                letter-spacing: 2px;
+            }}
+            QPushButton:hover {{
+                background: #ff5577; border: 2px solid #ffffff;
+            }}
+            QPushButton:pressed {{
+                background: #cc1133;
+            }}
+        """)
+        self._stop_btn.clicked.connect(self._on_stop_clicked)
+        self._stop_btn.hide()
+        lay.addWidget(self._stop_btn)
 
         self._mute_btn = QPushButton("🎙  MICRÓFONO ACTIVO")
         self._mute_btn.setFixedHeight(32)
@@ -1655,6 +2472,62 @@ class MainWindow(QMainWindow):
         """)
         fs_btn.clicked.connect(self._toggle_fullscreen)
         lay.addWidget(fs_btn)
+
+        # Botón panel de memoria
+        mem_btn = QPushButton("⚙  MEMORIA")
+        mem_btn.setFixedHeight(28)
+        mem_btn.setFont(QFont("Courier New", 7))
+        mem_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        mem_btn.setToolTip("Ver y editar lo que ORION recuerda")
+        mem_btn.setStyleSheet(f"""
+            QPushButton {{
+                background: transparent; color: {C.TEXT_MED};
+                border: 1px solid {C.BORDER}; border-radius: 4px;
+            }}
+            QPushButton:hover {{
+                color: {C.GREEN}; border: 1px solid {C.GREEN_D};
+                background: {C.PRI_GHO};
+            }}
+        """)
+        mem_btn.clicked.connect(self._show_memory_panel)
+        lay.addWidget(mem_btn)
+
+        # Botón modo compacto (PiP)
+        compact_btn = QPushButton("◰  MODO COMPACTO  [F9]")
+        compact_btn.setFixedHeight(28)
+        compact_btn.setFont(QFont("Courier New", 7))
+        compact_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        compact_btn.setStyleSheet(f"""
+            QPushButton {{
+                background: transparent; color: {C.TEXT_MED};
+                border: 1px solid {C.BORDER}; border-radius: 4px;
+            }}
+            QPushButton:hover {{
+                color: {C.PRI}; border: 1px solid {C.BORDER_B};
+                background: {C.PRI_GHO};
+            }}
+        """)
+        compact_btn.clicked.connect(self._toggle_compact_mode)
+        lay.addWidget(compact_btn)
+
+        # Selector de tema
+        theme_btn = QPushButton(f"◈  TEMA: {get_theme()['name'].upper()}")
+        theme_btn.setFixedHeight(28)
+        theme_btn.setFont(QFont("Courier New", 7))
+        theme_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        theme_btn.setStyleSheet(f"""
+            QPushButton {{
+                background: transparent; color: {C.ACC2};
+                border: 1px solid {C.BORDER}; border-radius: 4px;
+            }}
+            QPushButton:hover {{
+                color: {C.ACC}; border: 1px solid {C.BORDER_B};
+                background: {C.PRI_GHO};
+            }}
+        """)
+        theme_btn.clicked.connect(self._show_theme_menu)
+        self._theme_btn = theme_btn
+        lay.addWidget(theme_btn)
 
         return w
 
@@ -1703,7 +2576,7 @@ class MainWindow(QMainWindow):
             return l
 
         hk_mic = _load_hotkeys().get("toggle_microphone", "ctrl+\\")
-        lay.addWidget(_fl(f"[F4/{hk_mic}] Silenciar  ·  [F11] Pantalla completa"))
+        lay.addWidget(_fl(f"[F4/{hk_mic}] Silenciar  ·  [F11] Pantalla completa  ·  [F9] Compacto"))
         lay.addStretch()
         lay.addWidget(_fl("O.R.I.O.N  ·  En línea", C.PRI_DIM))
         return w
@@ -1729,6 +2602,8 @@ class MainWindow(QMainWindow):
     def _toggle_mute(self):
         self._muted = not self._muted
         self.hud.muted = self._muted
+        if self._compact_window:
+            self._compact_window.set_muted(self._muted)
         self._style_mute_btn()
         if hasattr(self, "_tray_mic_action"):
             self._tray_mic_action.setText(
@@ -1772,6 +2647,40 @@ class MainWindow(QMainWindow):
     def _apply_state(self, state: str):
         self.hud.state    = state
         self.hud.speaking = (state == "HABLANDO")
+        # Mostrar/ocultar el botón de interrumpir según el estado
+        if hasattr(self, "_stop_btn"):
+            if state == "HABLANDO":
+                self._stop_btn.show()
+            else:
+                self._stop_btn.hide()
+
+    def _on_log_drop_text(self, text: str):
+        """Procesa texto/URL arrastrado al log."""
+        if not text:
+            return
+        preview = text if len(text) <= 80 else text[:77] + "..."
+        self._log.append_log(f"ARCHIVO: Texto recibido → {preview}")
+        # Si parece una URL, formato distinto
+        if text.startswith(("http://", "https://")):
+            msg = (
+                f"[CONTENIDO_ARRASTRADO] tipo=URL valor={text} | "
+                f"Procesa esta URL: abre, busca información o resume lo que el usuario quiera."
+            )
+        else:
+            msg = (
+                f"[CONTENIDO_ARRASTRADO] tipo=texto valor={text[:500]} | "
+                f"Procesa este texto según el contexto."
+            )
+        if self.on_text_command:
+            threading.Thread(target=self.on_text_command, args=(msg,), daemon=True).start()
+
+    def _on_stop_clicked(self):
+        self._log.append_log("SISTEMA: Interrupción solicitada por el usuario.")
+        if self.on_interrupt:
+            try:
+                threading.Thread(target=self.on_interrupt, daemon=True).start()
+            except Exception as e:
+                self._log.append_log(f"ERROR al interrumpir: {e}")
 
     def _check_config(self) -> bool:
         if not API_FILE.exists(): return False
@@ -1853,6 +2762,14 @@ class OrionUI:
     @on_text_command.setter
     def on_text_command(self, cb):
         self._win.on_text_command = cb
+
+    @property
+    def on_interrupt(self):
+        return self._win.on_interrupt
+
+    @on_interrupt.setter
+    def on_interrupt(self, cb):
+        self._win.on_interrupt = cb
 
     def set_state(self, state: str):
         self._win._state_sig.emit(state)

@@ -12,8 +12,7 @@ except ImportError:
     _PSUTIL = False
 
 _SYSTEM = platform.system()
-_BASE_DIR = Path(__file__).resolve().parent.parent
-_BROWSER_CONFIG_PATH = _BASE_DIR / "config" / "browser.json"
+from config import BASE_DIR as _BASE_DIR, BROWSER_CONFIG_PATH as _BROWSER_CONFIG_PATH
 
 
 def _get_chrome_path() -> str | None:
