@@ -12,13 +12,17 @@
 
 import { useEffect, useState } from "react";
 
+import { AgentsPanel } from "@/components/AgentsPanel";
 import { ChatPanel } from "@/components/ChatPanel";
 import { HistoryPanel } from "@/components/HistoryPanel";
+import { IoTPanel } from "@/components/IoTPanel";
 import { MemoryPanel } from "@/components/MemoryPanel";
 import { NotesPanel } from "@/components/NotesPanel";
+import { Onboarding } from "@/components/Onboarding";
 import { OrbHUD } from "@/components/OrbHUD";
 import { SettingsPanel } from "@/components/SettingsPanel";
 import { Sidebar } from "@/components/Sidebar";
+import { TelemetryPanel } from "@/components/TelemetryPanel";
 import { useOrionSocket } from "@/hooks/useOrionSocket";
 import { useOrionStore } from "@/stores/orion";
 import { useViewStore } from "@/stores/view";
@@ -89,12 +93,18 @@ export default function App() {
 
       {/* Vista activa */}
       <main className="flex flex-col overflow-hidden">
-        {view === "chat"     && <ChatPanel onSend={(t) => send("text", { text: t })} />}
-        {view === "notes"    && <NotesPanel />}
-        {view === "memory"   && <MemoryPanel />}
-        {view === "history"  && <HistoryPanel />}
-        {view === "settings" && <SettingsPanel />}
+        {view === "chat"      && <ChatPanel onSend={(t) => send("text", { text: t })} />}
+        {view === "notes"     && <NotesPanel />}
+        {view === "memory"    && <MemoryPanel />}
+        {view === "history"   && <HistoryPanel />}
+        {view === "telemetry" && <TelemetryPanel />}
+        {view === "agents"    && <AgentsPanel />}
+        {view === "iot"       && <IoTPanel />}
+        {view === "settings"  && <SettingsPanel />}
       </main>
+
+      {/* Onboarding overlay si la API key no está configurada */}
+      <Onboarding />
     </div>
   );
 }

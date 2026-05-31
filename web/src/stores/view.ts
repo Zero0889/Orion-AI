@@ -7,7 +7,9 @@
 
 import { create } from "zustand";
 
-export type View = "chat" | "notes" | "memory" | "history" | "settings";
+export type View =
+  | "chat" | "notes" | "memory" | "history"
+  | "telemetry" | "agents" | "iot" | "settings";
 
 interface ViewState {
   view: View;

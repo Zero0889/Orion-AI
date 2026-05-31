@@ -56,6 +56,36 @@ export const api = {
     request<{ ok: true; name: string; theme: Record<string, unknown> }>(
       "PATCH", "/api/settings/theme", { name },
     ),
+  getApiKeyStatus: () => request<ApiKeyStatus>("GET", "/api/settings/api_key"),
+  setApiKey:       (key: string) =>
+    request<{ ok: true; configured: true }>("POST", "/api/settings/api_key", { key }),
+
+  // Agent / TaskQueue
+  listTasks:   () => request<Array<AgentTask>>("GET", "/api/agent/tasks"),
+  submitTask:  (goal: string, priority: "low" | "normal" | "high" = "normal") =>
+    request<{ task_id: string; status: string; goal: string }>(
+      "POST", "/api/agent/tasks", { goal, priority },
+    ),
+  cancelTask:  (id: string) =>
+    request<{ ok: true; id: string; status: string }>(
+      "POST", `/api/agent/tasks/${id}/cancel`,
+    ),
+
+  // IoT
+  iotDevices:  () => request<Array<IoTDevice>>("GET", "/api/iot/devices"),
+  iotScenes:   () => request<Array<IoTScene>>("GET",  "/api/iot/scenes"),
+  iotSensors:  () => request<Record<string, IoTSensor>>("GET", "/api/iot/sensors"),
+  iotAction:   (
+    deviceId: string,
+    body: { action: string; value?: number; color?: string; duration?: number },
+  ) =>
+    request<{ ok: true; device: string; action: string; result: string }>(
+      "POST", `/api/iot/devices/${deviceId}/action`, body,
+    ),
+  iotRunScene: (sceneId: string) =>
+    request<{ ok: true; scene: string; result: string }>(
+      "POST", `/api/iot/scenes/${sceneId}/run`,
+    ),
 };
 
 // ── Types ──────────────────────────────────────────────────────────────
@@ -97,4 +127,44 @@ export interface ThemeInfo {
   name:      string;
   theme:     Record<string, unknown>;
   available: Array<{ id: string; name: string }>;
+}
+
+export interface ApiKeyStatus {
+  configured: boolean;
+  source:     "env" | "file" | null;
+  path:       string | null;
+}
+
+export interface AgentTask {
+  task_id: string;
+  goal:    string;
+  status:  "pending" | "running" | "completed" | "failed" | "cancelled";
+  result?: unknown;
+  error?:  string;
+}
+
+export interface IoTCapabilities {
+  on_off:   boolean;
+  dimmable: boolean;
+  rgb:      boolean;
+  sensor:   string | null;
+}
+
+export interface IoTDevice {
+  id:           string;
+  name:         string;
+  transport:    string;
+  capabilities: IoTCapabilities;
+}
+
+export interface IoTScene {
+  id:    string;
+  name:  string;
+  steps: number;
+}
+
+export interface IoTSensor {
+  value:   string;
+  numeric: number | null;
+  age_s:   number;
 }
