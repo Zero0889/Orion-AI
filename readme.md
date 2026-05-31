@@ -48,6 +48,41 @@ python main.py
 
 ---
 
+## 🖥️ Modos de UI
+
+Desde la Fase 5 de la migración web, Orion puede arrancar en tres modos seleccionables con la variable de entorno **`ORION_UI`**:
+
+| Modo | Qué levanta | Cuándo usarlo |
+|---|---|---|
+| `both` *(default)* | UI Qt **+** backend FastAPI/WS en paralelo. Mismo proceso, mismo origen. | Día a día — tienes la ventana de escritorio y además puedes abrir `http://127.0.0.1:8765` en cualquier navegador. |
+| `web` | Solo backend + frontend React. **No carga PyQt6**. Abre el navegador automáticamente. | Servidores headless, Tauri, Raspberry Pi, o cuando prefieras solo la UI web. |
+| `qt` | Solo UI PyQt6 (modo legacy). Sin backend web. | Compatibilidad con flujos antiguos / debug aislado de la UI Qt. |
+
+```powershell
+# Windows PowerShell
+$env:ORION_UI = "web"
+python main.py
+```
+
+```bash
+# macOS / Linux
+ORION_UI=web python main.py
+```
+
+Si prefieres dejarlo fijo, edita `config/api_keys.json` y añade `"ui_mode": "web"`. La variable de entorno siempre tiene prioridad.
+
+**Desarrollo del frontend** (hot reload sobre cambios en `web/src/`):
+
+```bash
+cd web
+npm install      # solo la primera vez
+npm run dev      # http://localhost:5173 → backend en :8765
+```
+
+Para producción / Tauri, `npm run build` deja el bundle en `web/dist/`. El backend lo sirve automáticamente bajo `/`.
+
+---
+
 ## 📋 Requirements
 
 | Requirement | Details |
