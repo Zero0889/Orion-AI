@@ -5,4 +5,18 @@ __pycache__/
 .test*.py
 .venv/
 logs/
+
+# ── Backups locales (versiones viejas; git ya guarda el historial) ──────────
+ui_backup.py
+*.bak
+
+# ── Configuración local del usuario ────────────────────────────────────────
 config/theme.json
+
+# ── SECRETOS — NUNCA subir a git ────────────────────────────────────────────
+# Las claves y tokens de OAuth se guardan localmente; cada usuario rota las
+# suyas. Si necesitas un ejemplo, crea `config/api_keys.example.json` con
+# campos vacíos.
+config/api_keys.json
+config/credentials.json
+config/gdrive_token.json
