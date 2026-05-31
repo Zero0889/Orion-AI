@@ -100,11 +100,68 @@ def _authenticate():
 # ============================================================================
 #  Individual operations
 # ============================================================================
+def _resolve_local_upload(file_path: str) -> "Path | str":
+    """Resuelve un ``file_path`` local de forma inteligente.
+
+    Si la ruta exacta existe → devuelve Path.
+    Si no, intenta buscar por nombre parcial en los lugares más comunes
+    (escritorio, descargas, documentos, home) y devuelve:
+      - Path si encuentra exactamente una coincidencia
+      - str con el mensaje de desambiguación si hay varias
+      - str con un error si no hay nada
+    """
+    p = Path(file_path).expanduser()
+    if p.exists():
+        return p
+
+    # Si solo tenemos un nombre (no una ruta), buscar en lugares comunes
+    name = p.name if p.name else file_path
+    try:
+        from actions.file_controller import (
+            _resolve_file, _resolve_path, _format_disambiguation,
+        )
+    except Exception:
+        return f"Archivo no encontrado: {file_path}"
+
+    candidates: list = []
+    for loc in ("desktop", "downloads", "documents", "home"):
+        try:
+            base = _resolve_path(loc)
+            found = _resolve_file(base, name)
+            if isinstance(found, Path):
+                candidates.append(found)
+            elif isinstance(found, list):
+                for m in found:
+                    candidates.append(m["path"])
+        except Exception:
+            continue
+
+    # Dedup
+    seen = set()
+    uniq = []
+    for c in candidates:
+        key = str(c.resolve())
+        if key not in seen:
+            seen.add(key)
+            uniq.append(c)
+
+    if len(uniq) == 1:
+        return uniq[0]
+    if len(uniq) > 1:
+        from actions.file_controller import _build_disambiguation
+        return _format_disambiguation(
+            _build_disambiguation(uniq),
+            action_verb="subir a Drive",
+        )
+    return f"Archivo no encontrado: {file_path}"
+
+
 def _upload_file(service, file_path: str, folder_id: str = None) -> str:
     """Upload a local file to Google Drive."""
-    p = Path(file_path)
-    if not p.exists():
-        return f"Archivo no encontrado: {file_path}"
+    resolved = _resolve_local_upload(file_path)
+    if isinstance(resolved, str):
+        return resolved
+    p = resolved
 
     mime_type = mimetypes.guess_type(str(p))[0] or "application/octet-stream"
 

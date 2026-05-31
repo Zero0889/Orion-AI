@@ -364,10 +364,9 @@ def _detect_iot_intent(description: str, cfg: dict) -> list[str]:
     Usa Gemini para interpretar un comando de lenguaje natural
     y devolver la lista de comandos Arduino a ejecutar.
     """
-    import google.generativeai as genai
+    from core import gemini
 
-    genai.configure(api_key=get_api_key())
-    model = genai.GenerativeModel("gemini-2.5-flash-lite")
+    model = gemini.model("gemini-2.5-flash-lite")
 
     # Build device list for prompt
     device_lines = []

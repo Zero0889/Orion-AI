@@ -15,9 +15,8 @@ MODEL_WRITER     = "gemini-2.5-flash"
 
 
 def _get_model(model_name: str):
-    import google.generativeai as genai
-    genai.configure(api_key=get_api_key())
-    return genai.GenerativeModel(model_name)
+    from core import gemini
+    return gemini.model(model_name)
 
 
 def _strip_fences(text: str) -> str:

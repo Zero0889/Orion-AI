@@ -36,6 +36,12 @@ from config.theme import (
     get_theme, list_themes, load_theme_name, save_theme_name,
 )
 from config import BASE_DIR
+from ui_components.chat_panel import ChatPanel
+from ui_components.history_panel import HistoryPanel
+from ui_components.settings_panel import SettingsPanel
+from ui_components.onboarding import OnboardingWizard
+from ui_components.notes_panel import NotesPanel
+from memory.conversations import ConversationSession, get_conversation
 
 GITHUB_URL  = "https://github.com/Zero0889/O.R.I.O.N---IA"
 GITHUB_ICON = BASE_DIR / "assets" / "github-logo.png"
@@ -148,10 +154,10 @@ def _load_hotkeys() -> dict:
         pass
     return defaults
 
-_DEFAULT_W, _DEFAULT_H = 980, 700
-_MIN_W,     _MIN_H     = 820, 580
-_LEFT_W  = 158
-_RIGHT_W = 350
+_DEFAULT_W, _DEFAULT_H = 1080, 740
+_MIN_W,     _MIN_H     = 900, 600
+_LEFT_W  = 148
+_RIGHT_W = 430
 
 _OS = platform.system()  # "Windows" | "Darwin" | "Linux"
 
@@ -201,6 +207,18 @@ class C:
     # Paletas del orb 3D (RGB tuples)
     ORB_ACTIVE = _ACTIVE_THEME["ORB_ACTIVE"]
     ORB_MUTED  = _ACTIVE_THEME["ORB_MUTED"]
+    # Colores derivados con fallback (para temas que aún no los definen)
+    BG_GLOW   = _ACTIVE_THEME.get("BG_GLOW",   _ACTIVE_THEME["PRI_GHO"])
+    BG_DARK   = _ACTIVE_THEME.get("BG_DARK",   _ACTIVE_THEME["DARK"])
+    DROP_HOVER= _ACTIVE_THEME.get("DROP_HOVER", _ACTIVE_THEME["PRI_GHO"])
+    DROP_OVER = _ACTIVE_THEME.get("DROP_OVER",  _ACTIVE_THEME["BAR_BG"])
+    TEMP_C    = _ACTIVE_THEME.get("TEMP_C",     _ACTIVE_THEME["RED"])
+    MUTE_BTN_BG  = _ACTIVE_THEME.get("MUTE_BTN_BG",  _ACTIVE_THEME["RED"])
+    MUTE_BTN_HOV = _ACTIVE_THEME.get("MUTE_BTN_HOV", _ACTIVE_THEME["PRI_DIM"])
+    BTN_BG_ERR   = _ACTIVE_THEME.get("BTN_BG_ERR",   _ACTIVE_THEME["BAR_BG"])
+    BTN_BG_ERR_H = _ACTIVE_THEME.get("BTN_BG_ERR_H", _ACTIVE_THEME["PRI_GHO"])
+    BTN_BG_OK    = _ACTIVE_THEME.get("BTN_BG_OK",    "#04140a")
+    BTN_BG_OK_H  = _ACTIVE_THEME.get("BTN_BG_OK_H",  "#061f10")
 
 
 def qcol(h: str, a: int = 255) -> QColor:
@@ -545,9 +563,9 @@ class HudCanvas(QWidget):
         W, H = self.width(), self.height()
         cx, cy = W / 2, H / 2
         rg = QRadialGradient(cx, cy, max(W, H) * 0.65)
-        rg.setColorAt(0.0, qcol("#1a0410"))
+        rg.setColorAt(0.0, qcol(C.BG_GLOW))
         rg.setColorAt(0.55, qcol(C.BG))
-        rg.setColorAt(1.0, qcol("#050103"))
+        rg.setColorAt(1.0, qcol(C.BG_DARK))
         p.fillRect(self.rect(), QBrush(rg))
 
         fw = min(W, H)
@@ -688,9 +706,12 @@ class HudCanvas(QWidget):
             p.setBrush(QBrush(gr)); p.setPen(Qt.PenStyle.NoPen)
             p.drawEllipse(QPointF(x, y), glow_r, glow_r)
 
-            # núcleo brillante
+            # núcleo brillante — usa el WHITE del tema para evitar tintes
+            # cálidos en temas monocromáticos (Blanco & Negro, Mono).
             core_a = int(min(255, alpha * 230))
-            p.setBrush(QBrush(QColor(255, 245, 230, core_a)))
+            core_qcol = QColor(C.WHITE)
+            core_qcol.setAlpha(core_a)
+            p.setBrush(QBrush(core_qcol))
             p.setPen(Qt.PenStyle.NoPen)
             p.drawEllipse(QPointF(x, y), size, size)
 
@@ -1053,7 +1074,8 @@ def _fmt_size(size: int) -> str:
 #  Zona de arrastrar y soltar
 # ============================================================
 class FileDropZone(QWidget):
-    file_selected = pyqtSignal(str)
+    file_selected  = pyqtSignal(str)         # primer archivo (compatibilidad)
+    files_selected = pyqtSignal(list)        # lista completa de archivos
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -1061,6 +1083,7 @@ class FileDropZone(QWidget):
         self.setCursor(Qt.CursorShape.PointingHandCursor)
         self.setFixedHeight(100)
         self._current_file: str | None = None
+        self._current_files: list[str] = []   # soporte multi-archivo
         self._hovering  = False
         self._drag_over = False
         self._dash_offset = 0.0
@@ -1088,10 +1111,13 @@ class FileDropZone(QWidget):
     def dropEvent(self, e: QDropEvent):
         self._drag_over = False
         urls = e.mimeData().urls()
-        if urls:
-            path = urls[0].toLocalFile()
-            if Path(path).is_file():
-                self._set_file(path)
+        paths: list[str] = []
+        for url in urls:
+            p = url.toLocalFile()
+            if p and Path(p).is_file():
+                paths.append(p)
+        if paths:
+            self._set_files(paths)
         self._canvas.update()
 
     def mousePressEvent(self, e):
@@ -1107,12 +1133,17 @@ class FileDropZone(QWidget):
     def current_file(self) -> str | None:
         return self._current_file
 
+    def current_files(self) -> list[str]:
+        return list(self._current_files)
+
     def clear_file(self):
-        self._current_file = None; self._canvas.update()
+        self._current_file = None
+        self._current_files = []
+        self._canvas.update()
 
     def _browse(self):
-        path, _ = QFileDialog.getOpenFileName(
-            self, "Seleccionar archivo para ORION", str(Path.home()),
+        paths, _ = QFileDialog.getOpenFileNames(
+            self, "Seleccionar archivo(s) para ORION", str(Path.home()),
             "Todos los archivos (*.*);;"
             "Imágenes (*.jpg *.jpeg *.png *.gif *.webp *.bmp *.svg);;"
             "Documentos (*.pdf *.docx *.txt *.md *.pptx);;"
@@ -1122,13 +1153,22 @@ class FileDropZone(QWidget):
             "Video (*.mp4 *.avi *.mov *.mkv *.wmv *.webm);;"
             "Archivos comprimidos (*.zip *.rar *.tar *.gz *.7z)",
         )
-        if path:
-            self._set_file(path)
+        if paths:
+            self._set_files(paths)
 
     def _set_file(self, path: str):
-        self._current_file = path
+        """Compatibilidad: un solo archivo."""
+        self._set_files([path])
+
+    def _set_files(self, paths: list[str]):
+        if not paths:
+            return
+        self._current_files = list(paths)
+        self._current_file  = paths[0]
         self._canvas.update()
-        self.file_selected.emit(path)
+        # Emitimos ambas señales para compatibilidad
+        self.files_selected.emit(paths)
+        self.file_selected.emit(paths[0])
 
 
 class _DropCanvas(QWidget):
@@ -1144,7 +1184,7 @@ class _DropCanvas(QWidget):
         pad  = 6
         rect = QRectF(pad, pad, W - pad * 2, H - pad * 2)
 
-        bg_col = qcol("#220612" if z._drag_over else ("#1a0410" if z._hovering else C.PANEL))
+        bg_col = qcol(C.DROP_OVER if z._drag_over else (C.DROP_HOVER if z._hovering else C.PANEL))
         p.setBrush(QBrush(bg_col)); p.setPen(Qt.PenStyle.NoPen)
         p.drawRoundedRect(rect, 7, 7)
 
@@ -1158,9 +1198,45 @@ class _DropCanvas(QWidget):
         p.setPen(pen); p.setBrush(Qt.BrushStyle.NoBrush)
         p.drawRoundedRect(rect, 7, 7)
 
-        if z._current_file:   self._paint_file(p, W, H)
-        elif z._drag_over:    self._paint_drag_over(p, W, H)
-        else:                 self._paint_idle(p, W, H, z._hovering)
+        if len(z._current_files) > 1:
+            self._paint_multi(p, W, H, z._current_files)
+        elif z._current_file:
+            self._paint_file(p, W, H)
+        elif z._drag_over:
+            self._paint_drag_over(p, W, H)
+        else:
+            self._paint_idle(p, W, H, z._hovering)
+
+    def _paint_multi(self, p, W, H, files):
+        """Vista cuando hay varios archivos cargados."""
+        n = len(files)
+        # Título grande con el conteo
+        p.setFont(QFont("Courier New", 11, QFont.Weight.Bold))
+        p.setPen(QPen(qcol(C.GREEN), 1))
+        p.drawText(QRectF(10, 6, W - 20, 18),
+                   Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter,
+                   f"📎  {n} archivos cargados")
+
+        # Listar hasta 3 nombres + "..."
+        p.setFont(QFont("Courier New", 7))
+        p.setPen(QPen(qcol(C.TEXT_DIM), 1))
+        max_show = 3
+        for i, fp in enumerate(files[:max_show]):
+            name = Path(fp).name
+            if len(name) > 38: name = name[:35] + "..."
+            p.drawText(QRectF(14, 26 + i * 14, W - 50, 14),
+                       Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter,
+                       f"• {name}")
+        if n > max_show:
+            p.setPen(QPen(qcol(C.TEXT_MED), 1))
+            p.drawText(QRectF(14, 26 + max_show * 14, W - 50, 14),
+                       Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter,
+                       f"  …y {n - max_show} más")
+
+        # botón ✕ para limpiar todo
+        p.setFont(QFont("Courier New", 9, QFont.Weight.Bold))
+        p.setPen(QPen(qcol(C.RED, 200), 1))
+        p.drawText(QRectF(W - 34, 0, 28, H), Qt.AlignmentFlag.AlignCenter, "✕")
 
     def _paint_idle(self, p, W, H, hover):
         cx, cy = W / 2, H / 2
@@ -1175,7 +1251,7 @@ class _DropCanvas(QWidget):
         p.drawText(QRectF(0, cy + 8, W, 16), Qt.AlignmentFlag.AlignCenter,
                    "Suelta un archivo aquí  o  haz clic para buscar")
         p.setFont(QFont("Courier New", 7))
-        p.setPen(QPen(qcol("#5a1a2a"), 1))
+        p.setPen(QPen(qcol(C.TEXT_DIM), 1))
         p.drawText(QRectF(0, cy + 24, W, 14), Qt.AlignmentFlag.AlignCenter,
                    "Imágenes · Video · Audio · PDF · Documentos · Código · Datos")
 
@@ -1217,7 +1293,7 @@ class _DropCanvas(QWidget):
                    f"{ext_str}  ·  {size_str}")
 
         p.setFont(QFont("Courier New", 6))
-        p.setPen(QPen(qcol("#5c1a26"), 1))
+        p.setPen(QPen(qcol(C.TEXT_DIM), 1))
         par = str(path.parent)
         if len(par) > 42: par = "…" + par[-41:]
         p.drawText(QRectF(tx, H * 0.18 + 34, tw, 12),
@@ -1235,256 +1311,8 @@ class _DropCanvas(QWidget):
             z.mousePressEvent(e)
 
 
-# ============================================================
-#  Panel de memoria — ver y editar long_term.json
-# ============================================================
-class MemoryPanel(QWidget):
-    """Ventana modal que muestra las categorías de memoria con edición."""
-
-    memory_changed = pyqtSignal()
-
-    _CATEGORIES = [
-        ("identity",      "Identidad",     "#ff2a4d"),
-        ("preferences",   "Preferencias",  "#ffb84d"),
-        ("projects",      "Proyectos",     "#33ff99"),
-        ("relationships", "Relaciones",    "#ff6b1a"),
-        ("wishes",        "Deseos",        "#cc44ff"),
-        ("notes",         "Notas",         "#aaaaaa"),
-    ]
-
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self.setWindowFlags(
-            Qt.WindowType.Window |
-            Qt.WindowType.WindowStaysOnTopHint
-        )
-        self.setWindowTitle("O.R.I.O.N — Memoria")
-        self.setMinimumSize(560, 480)
-        self.resize(640, 540)
-        self.setStyleSheet(f"background: {C.BG};")
-
-        root = QVBoxLayout(self)
-        root.setContentsMargins(14, 12, 14, 12)
-        root.setSpacing(10)
-
-        # Header
-        hdr = QLabel("◈  MEMORIA DE O.R.I.O.N")
-        hdr.setFont(QFont("Courier New", 12, QFont.Weight.Bold))
-        hdr.setStyleSheet(
-            f"color: {C.PRI}; background: transparent; "
-            f"border-bottom: 1px solid {C.BORDER_B}; padding-bottom: 6px;"
-        )
-        root.addWidget(hdr)
-
-        sub = QLabel("Lo que ORION recuerda de ti. Edita o borra cualquier entrada.")
-        sub.setFont(QFont("Courier New", 8))
-        sub.setStyleSheet(f"color: {C.TEXT_DIM}; background: transparent;")
-        root.addWidget(sub)
-
-        # Área scrollable de entradas
-        scroll = QScrollArea()
-        scroll.setWidgetResizable(True)
-        scroll.setStyleSheet(f"""
-            QScrollArea {{ border: 1px solid {C.BORDER}; border-radius: 5px; }}
-            QScrollBar:vertical {{
-                background: {C.BG}; width: 10px; border: none;
-            }}
-            QScrollBar::handle:vertical {{
-                background: {C.BORDER_B}; border-radius: 4px; min-height: 20px;
-            }}
-            QScrollBar::handle:vertical:hover {{ background: {C.PRI_DIM}; }}
-        """)
-
-        self._content = QWidget()
-        self._content.setStyleSheet(f"background: {C.PANEL};")
-        self._content_lay = QVBoxLayout(self._content)
-        self._content_lay.setContentsMargins(10, 10, 10, 10)
-        self._content_lay.setSpacing(8)
-        scroll.setWidget(self._content)
-        root.addWidget(scroll, stretch=1)
-
-        # Pie con botones
-        footer = QHBoxLayout()
-        footer.setSpacing(6)
-
-        refresh_btn = QPushButton("⟳  Recargar")
-        refresh_btn.setFixedHeight(28)
-        refresh_btn.setFont(QFont("Courier New", 8, QFont.Weight.Bold))
-        refresh_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        refresh_btn.setStyleSheet(f"""
-            QPushButton {{
-                background: transparent; color: {C.TEXT_MED};
-                border: 1px solid {C.BORDER}; border-radius: 4px;
-                padding: 0 14px;
-            }}
-            QPushButton:hover {{ color: {C.PRI}; border-color: {C.PRI}; }}
-        """)
-        refresh_btn.clicked.connect(self.reload)
-        footer.addWidget(refresh_btn)
-
-        footer.addStretch()
-
-        close_btn = QPushButton("Cerrar")
-        close_btn.setFixedHeight(28)
-        close_btn.setFont(QFont("Courier New", 8, QFont.Weight.Bold))
-        close_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        close_btn.setStyleSheet(f"""
-            QPushButton {{
-                background: transparent; color: {C.PRI};
-                border: 1px solid {C.PRI_DIM}; border-radius: 4px;
-                padding: 0 18px;
-            }}
-            QPushButton:hover {{ background: {C.PRI_GHO}; border-color: {C.PRI}; }}
-        """)
-        close_btn.clicked.connect(self.close)
-        footer.addWidget(close_btn)
-
-        root.addLayout(footer)
-
-        self.reload()
-
-    def reload(self):
-        """Lee long_term.json y reconstruye la vista."""
-        # Limpiar layout
-        while self._content_lay.count():
-            item = self._content_lay.takeAt(0)
-            w = item.widget()
-            if w:
-                w.deleteLater()
-
-        try:
-            from memory.memory_manager import load_memory
-            memory = load_memory()
-        except Exception as e:
-            err = QLabel(f"Error al cargar memoria: {e}")
-            err.setStyleSheet(f"color: {C.RED};")
-            self._content_lay.addWidget(err)
-            return
-
-        total = 0
-        for cat_id, cat_name, cat_color in self._CATEGORIES:
-            entries = memory.get(cat_id, {}) or {}
-            section = self._build_section(cat_id, cat_name, cat_color, entries)
-            self._content_lay.addWidget(section)
-            total += len(entries)
-
-        if total == 0:
-            empty = QLabel(
-                "Aún no hay entradas en la memoria.\n"
-                "Cuéntale algo a ORION sobre ti y aparecerá aquí."
-            )
-            empty.setStyleSheet(
-                f"color: {C.TEXT_DIM}; padding: 30px; background: transparent;"
-            )
-            empty.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            self._content_lay.addWidget(empty)
-
-        self._content_lay.addStretch()
-
-    def _build_section(self, cat_id: str, cat_name: str, color: str, entries: dict) -> QWidget:
-        wrap = QWidget()
-        wrap.setStyleSheet(
-            f"background: {C.PANEL2}; border: 1px solid {C.BORDER}; border-radius: 5px;"
-        )
-        v = QVBoxLayout(wrap)
-        v.setContentsMargins(10, 8, 10, 10)
-        v.setSpacing(6)
-
-        # Cabecera de la sección
-        hdr_row = QHBoxLayout()
-        title = QLabel(f"▸  {cat_name.upper()}  ({len(entries)})")
-        title.setFont(QFont("Courier New", 9, QFont.Weight.Bold))
-        title.setStyleSheet(f"color: {color}; background: transparent; border: none;")
-        hdr_row.addWidget(title)
-        hdr_row.addStretch()
-        v.addLayout(hdr_row)
-
-        if not entries:
-            lbl = QLabel("    Vacío")
-            lbl.setFont(QFont("Courier New", 8))
-            lbl.setStyleSheet(f"color: {C.TEXT_DIM}; background: transparent; border: none;")
-            v.addWidget(lbl)
-            return wrap
-
-        for key, entry in entries.items():
-            val = entry.get("value", "") if isinstance(entry, dict) else str(entry)
-            updated = entry.get("updated", "") if isinstance(entry, dict) else ""
-            v.addLayout(self._build_entry_row(cat_id, key, val, updated))
-
-        return wrap
-
-    def _build_entry_row(self, cat_id: str, key: str, value: str, updated: str) -> QHBoxLayout:
-        row = QHBoxLayout()
-        row.setSpacing(6)
-
-        key_lbl = QLabel(key)
-        key_lbl.setFont(QFont("Courier New", 8, QFont.Weight.Bold))
-        key_lbl.setStyleSheet(f"color: {C.TEXT_MED}; background: transparent; border: none;")
-        key_lbl.setFixedWidth(130)
-        key_lbl.setWordWrap(True)
-        row.addWidget(key_lbl)
-
-        editor = QLineEdit(value)
-        editor.setFont(QFont("Courier New", 9))
-        editor.setStyleSheet(f"""
-            QLineEdit {{
-                background: {C.BG}; color: {C.TEXT};
-                border: 1px solid {C.BORDER}; border-radius: 3px;
-                padding: 3px 6px;
-            }}
-            QLineEdit:focus {{ border: 1px solid {C.PRI}; }}
-        """)
-        row.addWidget(editor, stretch=1)
-
-        save_btn = QPushButton("✓")
-        save_btn.setFixedSize(28, 26)
-        save_btn.setFont(QFont("Courier New", 10, QFont.Weight.Bold))
-        save_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        save_btn.setToolTip("Guardar cambios")
-        save_btn.setStyleSheet(f"""
-            QPushButton {{
-                background: transparent; color: {C.GREEN};
-                border: 1px solid {C.BORDER}; border-radius: 3px;
-            }}
-            QPushButton:hover {{ background: {C.PRI_GHO}; border-color: {C.GREEN}; }}
-        """)
-        save_btn.clicked.connect(lambda: self._save_entry(cat_id, key, editor.text()))
-        row.addWidget(save_btn)
-
-        del_btn = QPushButton("✕")
-        del_btn.setFixedSize(28, 26)
-        del_btn.setFont(QFont("Courier New", 10, QFont.Weight.Bold))
-        del_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        del_btn.setToolTip("Borrar entrada")
-        del_btn.setStyleSheet(f"""
-            QPushButton {{
-                background: transparent; color: {C.RED};
-                border: 1px solid {C.BORDER}; border-radius: 3px;
-            }}
-            QPushButton:hover {{ background: #2a060f; border-color: {C.RED}; }}
-        """)
-        del_btn.clicked.connect(lambda: self._delete_entry(cat_id, key))
-        row.addWidget(del_btn)
-
-        return row
-
-    def _save_entry(self, cat_id: str, key: str, value: str):
-        try:
-            from memory.memory_manager import update_memory
-            update_memory({cat_id: {key: {"value": value.strip()}}})
-            self.memory_changed.emit()
-            self.reload()
-        except Exception as e:
-            print(f"[MemoryPanel] Error guardando: {e}")
-
-    def _delete_entry(self, cat_id: str, key: str):
-        try:
-            from memory.memory_manager import forget
-            forget(key, category=cat_id)
-            self.memory_changed.emit()
-            self.reload()
-        except Exception as e:
-            print(f"[MemoryPanel] Error borrando: {e}")
+# Panel de memoria movido a ui_components/memory_panel.py
+# (ahora se accede como un tab dentro de Ajustes).
 
 
 # ============================================================
@@ -1548,6 +1376,23 @@ class CompactWindow(QMainWindow):
         title.setStyleSheet(f"color: {C.PRI}; background: transparent;")
         top.addWidget(title)
         top.addStretch()
+
+        # Botón "tomar nota" — abre un mini-popup inline para tipear y guardar
+        note_btn = QPushButton("📝")
+        note_btn.setFixedSize(20, 20)
+        note_btn.setFont(QFont("Segoe UI Emoji", 9))
+        note_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        note_btn.setToolTip("Tomar una nota rápida (Enter para guardar)")
+        note_btn.setStyleSheet(f"""
+            QPushButton {{
+                background: transparent; color: {C.TEXT_MED};
+                border: 1px solid {C.BORDER}; border-radius: 3px;
+            }}
+            QPushButton:hover {{ color: {C.PRI}; border-color: {C.PRI}; }}
+        """)
+        note_btn.clicked.connect(self._toggle_note_popup)
+        self._note_btn = note_btn
+        top.addWidget(note_btn)
 
         restore_btn = QPushButton("⛶")
         restore_btn.setFixedSize(20, 20)
@@ -1618,6 +1463,94 @@ class CompactWindow(QMainWindow):
 
     def set_muted(self, muted: bool):
         self.hud.muted = muted
+
+    # ── Popup "tomar nota" en modo compacto ─────────────────────────────
+    def _toggle_note_popup(self):
+        """Muestra un pequeño QLineEdit flotante para escribir una nota
+        que se guarda al pulsar Enter (o Escape para cancelar)."""
+        popup = getattr(self, "_note_popup", None)
+        if popup is not None and popup.isVisible():
+            popup.hide()
+            return
+        if popup is None:
+            popup = QFrame(self)
+            popup.setObjectName("notepop")
+            popup.setStyleSheet(f"""
+                QFrame#notepop {{
+                    background: {C.PANEL2};
+                    border: 1px solid {C.BORDER_B};
+                    border-radius: 6px;
+                }}
+            """)
+            lay = QVBoxLayout(popup)
+            lay.setContentsMargins(8, 6, 8, 6)
+            lay.setSpacing(4)
+
+            hint = QLabel("📝  NUEVA NOTA  (Enter para guardar · Esc para cancelar)")
+            hint.setFont(QFont("Courier New", 7, QFont.Weight.Bold))
+            hint.setStyleSheet(
+                f"color: {C.TEXT_MED}; background: transparent;"
+                f" border: none; letter-spacing: 1px;"
+            )
+            lay.addWidget(hint)
+
+            edit = QLineEdit()
+            edit.setPlaceholderText("Escribe la nota…")
+            edit.setFont(QFont("Segoe UI", 9))
+            edit.setStyleSheet(f"""
+                QLineEdit {{
+                    background: {C.PANEL}; color: {C.TEXT};
+                    border: 1px solid {C.BORDER}; border-radius: 4px;
+                    padding: 4px 6px;
+                }}
+                QLineEdit:focus {{ border: 1px solid {C.PRI}; }}
+            """)
+            edit.returnPressed.connect(self._save_note_from_popup)
+            # Esc cierra
+            try:
+                sc = QShortcut(QKeySequence("Escape"), edit)
+                sc.activated.connect(lambda: (edit.clear(), popup.hide()))
+            except Exception:
+                pass
+            lay.addWidget(edit)
+
+            popup.adjustSize()
+            self._note_popup = popup
+            self._note_edit  = edit
+
+        # Posicionar bajo el botón de notas, dentro de la ventana compacta
+        btn = self._note_btn
+        # mapTo es relativo al widget central
+        p = btn.mapTo(self, QPoint(0, btn.height() + 2))
+        w = max(220, self.width() - 12)
+        popup.setGeometry(6, p.y(), w, popup.sizeHint().height())
+        popup.show()
+        popup.raise_()
+        self._note_edit.setFocus()
+
+    def _save_note_from_popup(self):
+        edit = getattr(self, "_note_edit", None)
+        if edit is None:
+            return
+        text = edit.text().strip()
+        if not text:
+            return
+        try:
+            from memory.quick_notes import add_note
+            add_note(text)
+        except Exception as exc:
+            print(f"[Compact] No se pudo guardar la nota: {exc}")
+            return
+        edit.clear()
+        if hasattr(self, "_note_popup"):
+            self._note_popup.hide()
+        # Feedback visual breve: parpadeo en el botón
+        try:
+            self._note_btn.setText("✓")
+            from PyQt6.QtCore import QTimer
+            QTimer.singleShot(900, lambda: self._note_btn.setText("📝"))
+        except Exception:
+            pass
 
     # ── Detección del borde bajo el cursor ──────────────────────────────
     def _edge_at(self, pos: QPoint) -> int:
@@ -1766,7 +1699,7 @@ class SetupOverlay(QWidget):
         self._key_input.setFixedHeight(32)
         self._key_input.setStyleSheet(f"""
             QLineEdit {{
-                background: #15040a; color: {C.TEXT};
+                background: {C.PANEL2}; color: {C.TEXT};
                 border: 1px solid {C.BORDER}; border-radius: 4px; padding: 4px 8px;
             }}
             QLineEdit:focus {{ border: 1px solid {C.PRI}; }}
@@ -1816,7 +1749,7 @@ class SetupOverlay(QWidget):
 
     def _sel(self, key: str):
         self._sel_os = key
-        pal = {"windows":(C.PRI,"#220612"),"mac":(C.ACC2,"#221400"),"linux":(C.GREEN,"#001a0d")}
+        pal = {"windows":(C.PRI, C.PRI_GHO),"mac":(C.ACC2, C.PANEL2),"linux":(C.GREEN, C.DARK)}
         for k, btn in self._os_btns.items():
             if k == key:
                 fg, bg = pal[k]
@@ -1829,7 +1762,7 @@ class SetupOverlay(QWidget):
             else:
                 btn.setStyleSheet(f"""
                     QPushButton {{
-                        background: #15040a; color: {C.TEXT_DIM};
+                        background: {C.PANEL2}; color: {C.TEXT_DIM};
                         border: 1px solid {C.BORDER}; border-radius: 4px;
                     }}
                     QPushButton:hover {{ color: {C.TEXT}; border: 1px solid {C.BORDER_B}; }}
@@ -1927,7 +1860,6 @@ class MainWindow(QMainWindow):
         # Path para crear la ventana compacta más tarde (lazy init)
         self._face_path = face_path
         self._compact_window: CompactWindow | None = None
-        self._memory_panel: "MemoryPanel | None" = None
 
         # ── System Tray ──
         self._setup_tray()
@@ -1942,17 +1874,84 @@ class MainWindow(QMainWindow):
         else:
             self.showFullScreen()
 
-    # ── Panel de memoria ─────────────────────────────────────────────────
-    def _show_memory_panel(self):
-        if not hasattr(self, "_memory_panel") or self._memory_panel is None:
-            self._memory_panel = MemoryPanel(self)
-            self._memory_panel.memory_changed.connect(
-                lambda: self._log.append_log("SISTEMA: Memoria actualizada.")
+    # ── Panel de configuración ───────────────────────────────────────────
+    def _show_settings_panel(self):
+        if not hasattr(self, "_settings_panel") or self._settings_panel is None:
+            self._settings_panel = SettingsPanel(theme=C, parent=self)
+            self._settings_panel.theme_changed.connect(
+                lambda t: self._tray.showMessage(
+                    "O.R.I.O.N — Tema",
+                    f"Tema cambiado a '{t}'. Reinicia para aplicar.",
+                    QSystemTrayIcon.MessageIcon.Information, 3000,
+                ) if hasattr(self, "_tray") else None
             )
-        self._memory_panel.reload()
-        self._memory_panel.show()
-        self._memory_panel.raise_()
-        self._memory_panel.activateWindow()
+            self._settings_panel.settings_changed.connect(
+                lambda: self._log.append_log("SISTEMA: Configuración actualizada.")
+            )
+        self._settings_panel.show()
+        self._settings_panel.raise_()
+        self._settings_panel.activateWindow()
+
+    # ── Historial de conversaciones ──────────────────────────────────────
+    def _persist_log(self, text: str) -> None:
+        """Guarda el mensaje en la conversación activa, mapeando los prefijos
+        del chat a roles persistibles."""
+        if not text or self._conversation is None:
+            return
+        t = text.strip()
+        tl = t.lower()
+        try:
+            if tl.startswith(("tú:", "tu:")):
+                role, body = "user", t.split(":", 1)[1].strip()
+            elif tl.startswith(("orion:", "o.r.i.o.n:")):
+                role, body = "ai", t.split(":", 1)[1].strip()
+            elif tl.startswith(("sistema:", "sys:")):
+                role, body = "sys", t.split(":", 1)[1].strip()
+            elif tl.startswith("error"):
+                role, body = "err", t
+            elif tl.startswith("archivo:"):
+                role, body = "file", t.split(":", 1)[1].strip()
+            else:
+                role, body = "sys", t
+        except (IndexError, ValueError):
+            role, body = "sys", t
+        if not body:
+            return
+        self._conversation.add(role, body)
+
+    def _show_history_panel(self):
+        if self._history_panel is None:
+            self._history_panel = HistoryPanel(theme=C, parent=self)
+            self._history_panel.conversation_selected.connect(self._load_conversation)
+        self._history_panel.reload()
+        self._history_panel.show()
+        self._history_panel.raise_()
+        self._history_panel.activateWindow()
+
+    def _load_conversation(self, conv_id: str) -> None:
+        conv = get_conversation(conv_id)
+        if not conv:
+            return
+        # Reemplazar el chat actual con los mensajes cargados sin re-persistir
+        self._log.clear()
+        valid_roles = {"user", "ai", "sys", "err", "file"}
+        for msg in conv.get("messages", []):
+            role = msg.get("role", "sys")
+            if role not in valid_roles:
+                role = "sys"
+            txt = msg.get("text", "")
+            if txt:
+                self._log.add_message(role, txt)
+        # Iniciar una nueva sesión nueva para nuevos mensajes (no contaminamos
+        # la sesión cargada que es de solo lectura)
+        self._conversation = ConversationSession()
+        # El siguiente mensaje pasa por el wrapper persistente
+        self._log.append_log(
+            f"SISTEMA: Conversación cargada ({len(conv.get('messages', []))} mensajes)."
+        )
+
+    # Panel de memoria movido a un tab dentro de Ajustes — accesible vía
+    # _show_settings_panel() y cambiando al tab "🧠 Memoria".
 
     # ── Modo compacto (PiP) ──────────────────────────────────────────────
     def _toggle_compact_mode(self):
@@ -1987,64 +1986,14 @@ class MainWindow(QMainWindow):
         self.activateWindow()
         self.raise_()
 
-    # ── Selector de tema ─────────────────────────────────────────────────
-    def _show_theme_menu(self):
-        menu = QMenu(self)
-        menu.setStyleSheet(f"""
-            QMenu {{
-                background: {C.DARK}; color: {C.TEXT};
-                border: 1px solid {C.BORDER_B}; padding: 4px;
-            }}
-            QMenu::item {{
-                padding: 6px 24px; font-family: 'Courier New'; font-size: 9pt;
-            }}
-            QMenu::item:selected {{
-                background: {C.PRI_GHO}; color: {C.PRI};
-            }}
-            QMenu::separator {{ height: 1px; background: {C.BORDER}; margin: 4px 0; }}
-        """)
-
-        title = QAction("◈  ELEGIR TEMA", self)
-        title.setEnabled(False)
-        menu.addAction(title)
-        menu.addSeparator()
-
-        current = load_theme_name()
-        group = QActionGroup(self)
-        group.setExclusive(True)
-
-        for theme_id, theme_name in list_themes():
-            act = QAction(("● " if theme_id == current else "  ") + theme_name, self)
-            act.setCheckable(True)
-            act.setChecked(theme_id == current)
-            act.triggered.connect(lambda _, t=theme_id: self._apply_theme_choice(t))
-            group.addAction(act)
-            menu.addAction(act)
-
-        menu.addSeparator()
-        info = QAction("Reinicia ORION para aplicar", self)
-        info.setEnabled(False)
-        menu.addAction(info)
-
-        # Mostrar bajo el botón
-        if hasattr(self, "_theme_btn"):
-            pos = self._theme_btn.mapToGlobal(QPoint(0, self._theme_btn.height()))
-            menu.exec(pos)
-        else:
-            menu.exec(self.cursor().pos())
-
-    def _apply_theme_choice(self, theme_id: str):
-        save_theme_name(theme_id)
-        self._log.append_log(
-            f"SISTEMA: Tema cambiado a '{theme_id}'. Reinicia ORION para aplicar."
-        )
-        if hasattr(self, "_tray"):
-            self._tray.showMessage(
-                "O.R.I.O.N — Tema",
-                f"Tema cambiado a '{theme_id}'. Reinicia para aplicar.",
-                QSystemTrayIcon.MessageIcon.Information,
-                3000,
-            )
+    # ── Panel de notas rápidas ──────────────────────────────────────────
+    def _show_notes_panel(self):
+        if not hasattr(self, "_notes_panel") or self._notes_panel is None:
+            self._notes_panel = NotesPanel(theme=C, parent=self)
+        self._notes_panel.reload()
+        self._notes_panel.show()
+        self._notes_panel.raise_()
+        self._notes_panel.activateWindow()
 
     # ── Pausar animaciones cuando se minimiza ────────────────────────────
     def changeEvent(self, event):
@@ -2187,7 +2136,7 @@ class MainWindow(QMainWindow):
     def resizeEvent(self, event):
         super().resizeEvent(event)
         if self._overlay and self._overlay.isVisible():
-            ow, oh = 460, 390
+            ow, oh = 540, 470
             cw = self.centralWidget()
             self._overlay.setGeometry(
                 (cw.width()  - ow) // 2,
@@ -2323,7 +2272,7 @@ class MainWindow(QMainWindow):
         self._bar_mem = MetricBar("MEM", C.ACC2)
         self._bar_net = MetricBar("RED", C.GREEN)
         self._bar_gpu = MetricBar("GPU", C.ACC)
-        self._bar_tmp = MetricBar("TEMP", "#ff7799")
+        self._bar_tmp = MetricBar("TEMP", C.TEMP_C)
 
         for bar in [self._bar_cpu, self._bar_mem, self._bar_net,
                     self._bar_gpu, self._bar_tmp]:
@@ -2365,19 +2314,33 @@ class MainWindow(QMainWindow):
         lay.addWidget(info_panel)
         lay.addStretch()
 
-        # Indicadores de estado al fondo
-        for txt, col in [
-            ("NÚCLEO IA\nACTIVO",      C.GREEN),
-            ("SEGURIDAD\nVERIFICADA",  C.PRI),
-        ]:
-            lbl = QLabel(txt)
-            lbl.setFont(QFont("Courier New", 7, QFont.Weight.Bold))
-            lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            lbl.setStyleSheet(
-                f"color: {col}; background: {C.PANEL2};"
-                f" border: 1px solid {C.BORDER_A}; border-radius: 5px; padding: 5px;"
-            )
-            lay.addWidget(lbl)
+        # ── Botones de acceso rápido al fondo ──
+        def _side_btn(label: str, tooltip: str, color: str,
+                      callback) -> QPushButton:
+            b = QPushButton(label)
+            b.setFixedHeight(30)
+            b.setFont(QFont("Courier New", 8, QFont.Weight.Bold))
+            b.setCursor(Qt.CursorShape.PointingHandCursor)
+            b.setToolTip(tooltip)
+            b.setStyleSheet(f"""
+                QPushButton {{
+                    background: {C.PANEL2}; color: {color};
+                    border: 1px solid {C.BORDER}; border-radius: 5px;
+                    text-align: center;
+                }}
+                QPushButton:hover {{
+                    background: {C.PRI_GHO}; border: 1px solid {color};
+                }}
+            """)
+            b.clicked.connect(callback)
+            return b
+
+        lay.addWidget(_side_btn("⚙  AJUSTES",   "Configurar ORION",
+                                 C.PRI,   self._show_settings_panel))
+        lay.addWidget(_side_btn("⏱  HISTORIAL", "Ver conversaciones",
+                                 C.ACC2,  self._show_history_panel))
+        lay.addWidget(_side_btn("📝  NOTAS",    "Notas rápidas",
+                                 C.GREEN, self._show_notes_panel))
 
         return w
 
@@ -2396,11 +2359,30 @@ class MainWindow(QMainWindow):
             l.setStyleSheet(f"color: {C.TEXT_MED}; background: transparent;")
             return l
 
-        lay.addWidget(_sec("REGISTRO DE ACTIVIDAD"))
-        self._log = LogWidget()
-        # Drag-and-drop: aceptar texto y archivos directamente en el log
+        lay.addWidget(_sec("CONVERSACIÓN"))
+        self._log = ChatPanel(theme=C)
+        # Drag-and-drop: aceptar texto y archivos directamente en el chat
         self._log.dropped_text.connect(self._on_log_drop_text)
-        self._log.dropped_file.connect(self._on_file_selected)
+        self._log.dropped_files.connect(self._on_files_selected)
+        # Persistencia: envolver append_log para guardar cada mensaje
+        try:
+            self._conversation = ConversationSession()
+        except Exception as e:
+            print(f"[Conv] no se pudo iniciar sesión: {e}")
+            self._conversation = None
+        self._history_panel: "HistoryPanel | None" = None
+        _orig_append = self._log.append_log
+        def _append_and_persist(text: str):
+            try:
+                _orig_append(text)
+            except Exception as e:
+                print(f"[Chat] append_log falló: {e}")
+                return
+            try:
+                self._persist_log(text)
+            except Exception as e:
+                print(f"[Conv] error persistiendo: {e}")
+        self._log.append_log = _append_and_persist  # type: ignore[method-assign]
         lay.addWidget(self._log, stretch=1)
 
         sep = QFrame(); sep.setFrameShape(QFrame.Shape.HLine)
@@ -2409,7 +2391,10 @@ class MainWindow(QMainWindow):
 
         lay.addWidget(_sec("SUBIR ARCHIVO"))
         self._drop_zone = FileDropZone()
-        self._drop_zone.file_selected.connect(self._on_file_selected)
+        # Conexión preferente: múltiples archivos. La señal de uno solo se
+        # sigue emitiendo pero la ignoramos aquí porque files_selected ya
+        # cubre ambos casos (n=1 y n>1).
+        self._drop_zone.files_selected.connect(self._on_files_selected)
         lay.addWidget(self._drop_zone)
 
         self._file_hint = QLabel("Sin archivos cargados. Arrastra y suelta un archivo aquí para cargarlo.")
@@ -2438,10 +2423,10 @@ class MainWindow(QMainWindow):
                 letter-spacing: 2px;
             }}
             QPushButton:hover {{
-                background: #ff5577; border: 2px solid #ffffff;
+                background: {C.MUTE_BTN_BG}; border: 2px solid {C.WHITE};
             }}
             QPushButton:pressed {{
-                background: #cc1133;
+                background: {C.MUTE_BTN_HOV};
             }}
         """)
         self._stop_btn.clicked.connect(self._on_stop_clicked)
@@ -2473,25 +2458,6 @@ class MainWindow(QMainWindow):
         fs_btn.clicked.connect(self._toggle_fullscreen)
         lay.addWidget(fs_btn)
 
-        # Botón panel de memoria
-        mem_btn = QPushButton("⚙  MEMORIA")
-        mem_btn.setFixedHeight(28)
-        mem_btn.setFont(QFont("Courier New", 7))
-        mem_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        mem_btn.setToolTip("Ver y editar lo que ORION recuerda")
-        mem_btn.setStyleSheet(f"""
-            QPushButton {{
-                background: transparent; color: {C.TEXT_MED};
-                border: 1px solid {C.BORDER}; border-radius: 4px;
-            }}
-            QPushButton:hover {{
-                color: {C.GREEN}; border: 1px solid {C.GREEN_D};
-                background: {C.PRI_GHO};
-            }}
-        """)
-        mem_btn.clicked.connect(self._show_memory_panel)
-        lay.addWidget(mem_btn)
-
         # Botón modo compacto (PiP)
         compact_btn = QPushButton("◰  MODO COMPACTO  [F9]")
         compact_btn.setFixedHeight(28)
@@ -2510,25 +2476,6 @@ class MainWindow(QMainWindow):
         compact_btn.clicked.connect(self._toggle_compact_mode)
         lay.addWidget(compact_btn)
 
-        # Selector de tema
-        theme_btn = QPushButton(f"◈  TEMA: {get_theme()['name'].upper()}")
-        theme_btn.setFixedHeight(28)
-        theme_btn.setFont(QFont("Courier New", 7))
-        theme_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        theme_btn.setStyleSheet(f"""
-            QPushButton {{
-                background: transparent; color: {C.ACC2};
-                border: 1px solid {C.BORDER}; border-radius: 4px;
-            }}
-            QPushButton:hover {{
-                color: {C.ACC}; border: 1px solid {C.BORDER_B};
-                background: {C.PRI_GHO};
-            }}
-        """)
-        theme_btn.clicked.connect(self._show_theme_menu)
-        self._theme_btn = theme_btn
-        lay.addWidget(theme_btn)
-
         return w
 
     def _build_input_row(self) -> QHBoxLayout:
@@ -2539,7 +2486,7 @@ class MainWindow(QMainWindow):
         self._input.setFixedHeight(32)
         self._input.setStyleSheet(f"""
             QLineEdit {{
-                background: #15040a; color: {C.WHITE};
+                background: {C.PANEL2}; color: {C.WHITE};
                 border: 1px solid {C.BORDER}; border-radius: 4px; padding: 3px 8px;
             }}
             QLineEdit:focus {{ border: 1px solid {C.PRI}; }}
@@ -2599,6 +2546,44 @@ class MainWindow(QMainWindow):
             )
             threading.Thread(target=self.on_text_command, args=(msg,), daemon=True).start()
 
+    def _on_files_selected(self, paths: list[str]):
+        """Soporta múltiples archivos arrastrados a la vez."""
+        if not paths:
+            return
+        if len(paths) == 1:
+            self._on_file_selected(paths[0])
+            return
+
+        # Múltiples: registrar todos y notificar al modelo con un mensaje resumen.
+        # El "archivo activo" para herramientas pasa a ser el primero.
+        self._current_file = paths[0]
+        lines = []
+        for p_str in paths:
+            p = Path(p_str)
+            try:
+                size = _fmt_size(p.stat().st_size)
+            except OSError:
+                size = "?"
+            cat = _file_category(p)
+            icon, _ = _FILE_ICONS.get(cat, _FILE_ICONS["unknown"])
+            lines.append(f"  {icon}  {p.name}  ·  {size}")
+            self._log.append_log(f"ARCHIVO: {p.name} ({size}) cargado")
+
+        self._file_hint.setText(
+            f"📎  {len(paths)} archivos cargados  ·  Activo: {Path(paths[0]).name}"
+        )
+
+        if self.on_text_command:
+            files_summary = "\n".join(lines)
+            paths_csv = "|".join(paths)
+            msg = (
+                f"[ARCHIVOS_CARGADOS] count={len(paths)} | "
+                f"rutas={paths_csv} | activo={paths[0]} | "
+                f"Indica brevemente al usuario que recibiste {len(paths)} "
+                f"archivos y pregunta qué desea hacer con ellos. Lista:\n{files_summary}"
+            )
+            threading.Thread(target=self.on_text_command, args=(msg,), daemon=True).start()
+
     def _toggle_mute(self):
         self._muted = not self._muted
         self.hud.muted = self._muted
@@ -2621,19 +2606,19 @@ class MainWindow(QMainWindow):
             self._mute_btn.setText("🔇  MICRÓFONO SILENCIADO")
             self._mute_btn.setStyleSheet(f"""
                 QPushButton {{
-                    background: #1f040a; color: {C.MUTED_C};
+                    background: {C.BTN_BG_ERR}; color: {C.MUTED_C};
                     border: 1px solid {C.MUTED_C}; border-radius: 4px;
                 }}
-                QPushButton:hover {{ background: #2a060f; }}
+                QPushButton:hover {{ background: {C.BTN_BG_ERR_H}; }}
             """)
         else:
             self._mute_btn.setText("🎙  MICRÓFONO ACTIVO")
             self._mute_btn.setStyleSheet(f"""
                 QPushButton {{
-                    background: #04140a; color: {C.GREEN};
+                    background: {C.BTN_BG_OK}; color: {C.GREEN};
                     border: 1px solid {C.GREEN}; border-radius: 4px;
                 }}
-                QPushButton:hover {{ background: #061f10; }}
+                QPushButton:hover {{ background: {C.BTN_BG_OK_H}; }}
             """)
 
     def _send(self):
@@ -2691,9 +2676,9 @@ class MainWindow(QMainWindow):
             return False
 
     def _show_setup(self):
-        ov = SetupOverlay(self.centralWidget())
+        ov = OnboardingWizard(theme=C, parent=self.centralWidget())
         cw = self.centralWidget()
-        ow, oh = 460, 390
+        ow, oh = 540, 470
         ov.setGeometry(
             (cw.width()  - ow) // 2,
             (cw.height() - oh) // 2,
@@ -2703,12 +2688,18 @@ class MainWindow(QMainWindow):
         ov.show()
         self._overlay = ov
 
-    def _on_setup_done(self, key: str, os_name: str):
+    def _on_setup_done(self, key: str, os_name: str, theme_id: str = ""):
         os.makedirs(CONFIG_DIR, exist_ok=True)
         API_FILE.write_text(
             json.dumps({"gemini_api_key": key, "os_system": os_name}, indent=4),
             encoding="utf-8",
         )
+        # Guardar tema elegido si vino del wizard
+        if theme_id:
+            try:
+                save_theme_name(theme_id)
+            except Exception:
+                pass
         self._ready = True
         if self._overlay:
             self._overlay.hide()
@@ -2754,6 +2745,10 @@ class OrionUI:
     @property
     def current_file(self) -> str | None:
         return self._win._drop_zone.current_file()
+
+    @property
+    def current_files(self) -> list[str]:
+        return self._win._drop_zone.current_files()
 
     @property
     def on_text_command(self):

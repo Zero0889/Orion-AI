@@ -49,13 +49,12 @@ def _parse_date(raw: str) -> str:
             return val.strftime("%Y-%m-%d")
 
     try:
-        import google.generativeai as genai
-        genai.configure(api_key=get_api_key())
-        model    = genai.GenerativeModel("gemini-2.5-flash-lite")
-        response = model.generate_content(
+        from core import gemini
+        response = gemini.generate(
             f"Today's date is {today.strftime('%Y-%m-%d')}. "
             f"Convert this date expression to YYYY-MM-DD format: '{raw}'. "
-            f"Return ONLY the date string, nothing else."
+            f"Return ONLY the date string, nothing else.",
+            model=gemini.FLASH_LITE,
         )
         result = response.text.strip()
         if re.match(r"\d{4}-\d{2}-\d{2}", result):
@@ -139,17 +138,7 @@ def _parse_flights_with_gemini(
     destination: str,
     date:        str,
 ) -> list[dict]:
-    import google.generativeai as genai
-
-    genai.configure(api_key=get_api_key())
-    model = genai.GenerativeModel(
-        model_name="gemini-2.5-flash",
-        system_instruction=(
-            "You are an expert flight data extractor. "
-            "Extract flight information from raw web page text. "
-            "Return ONLY valid JSON — no markdown, no explanations."
-        ),
-    )
+    from core import gemini
 
     prompt = (
         f"Extract flight options from {origin} to {destination} on {date} "
@@ -161,7 +150,15 @@ def _parse_flights_with_gemini(
     )
 
     try:
-        response = model.generate_content(prompt)
+        response = gemini.generate(
+            prompt,
+            model=gemini.FLASH,
+            system_instruction=(
+                "You are an expert flight data extractor. "
+                "Extract flight information from raw web page text. "
+                "Return ONLY valid JSON — no markdown, no explanations."
+            ),
+        )
         text     = re.sub(r"```(?:json)?", "", response.text).strip().rstrip("`").strip()
         flights  = json.loads(text)
         return flights if isinstance(flights, list) else []

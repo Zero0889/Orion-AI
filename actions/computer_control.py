@@ -294,8 +294,8 @@ def _screen_find(description: str) -> tuple[int, int] | None:
         return None
 
     try:
-        from google import genai
         from google.genai import types as gtypes
+        from core import gemini
 
         _require_pyautogui()
         w, h  = pyautogui.size()
@@ -304,7 +304,7 @@ def _screen_find(description: str) -> tuple[int, int] | None:
         img.save(buf, format="PNG")
         image_bytes = buf.getvalue()
 
-        client = genai.Client(api_key=api_key)
+        client = gemini.get_client()
         prompt = (
             f"This is a screenshot of a {w}×{h} pixel screen. "
             f"Locate the UI element described as: '{description}'. "

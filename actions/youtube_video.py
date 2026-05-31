@@ -145,11 +145,10 @@ def _get_transcript(video_id: str) -> str | None:
 
 
 def _summarize_with_gemini(transcript: str, video_url: str) -> str:
-    import google.generativeai as genai
+    from core import gemini
 
-    genai.configure(api_key=get_api_key())
-    model = genai.GenerativeModel(
-        model_name="gemini-2.5-flash",
+    model = gemini.model(
+        "gemini-2.5-flash",
         system_instruction=(
             "You are O.R.I.O.N, an AI assistant. "
             "Summarize YouTube video transcripts clearly and concisely. "

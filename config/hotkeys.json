@@ -1,5 +1,5 @@
 {
-    "toggle_microphone": "ctrl+shift+m",
-    "show_window": "ctrl+shift+o",
-    "quit": "ctrl+shift+q"
+  "toggle_microphone": "ctrl+|",
+  "show_window": "ctrl+shift+o",
+  "quit": "ctrl+shift+q"
 }

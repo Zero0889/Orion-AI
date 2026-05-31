@@ -159,11 +159,10 @@ OUTPUT — return ONLY valid JSON, no markdown, no explanation, no code blocks:
 
 
 def create_plan(goal: str, context: str = "") -> dict:
-    import google.generativeai as genai
+    from core import gemini
 
-    genai.configure(api_key=get_api_key())
-    model = genai.GenerativeModel(
-        model_name="gemini-2.5-flash-lite",
+    model = gemini.model(
+        "gemini-2.5-flash-lite",
         system_instruction=PLANNER_PROMPT
     )
 
@@ -219,11 +218,10 @@ def _fallback_plan(goal: str) -> dict:
 
 
 def replan(goal: str, completed_steps: list, failed_step: dict, error: str) -> dict:
-    import google.generativeai as genai
+    from core import gemini
 
-    genai.configure(api_key=get_api_key())
-    model = genai.GenerativeModel(
-        model_name="gemini-2.5-flash",
+    model = gemini.model(
+        "gemini-2.5-flash",
         system_instruction=PLANNER_PROMPT
     )
 
