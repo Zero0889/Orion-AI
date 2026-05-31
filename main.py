@@ -552,11 +552,18 @@ TOOL_DECLARATIONS = [
     {
         "name": "iot_control",
         "description": (
-            "Controls IoT devices (focos/lights) connected to an Arduino via serial. "
-            "Use this for ANY request about turning on/off lights, focos, or home automation devices. "
-            "Supports individual device control, turning all on/off, and timed operations "
-            "(e.g. 'turn on for 30 seconds then auto-off'). "
-            "ALWAYS use this tool for light/foco/IoT requests. NEVER use agent_task for these."
+            "Controls IoT/home-automation devices: lights, dimmers, RGB strips, "
+            "smart plugs, sensors, etc. Devices may be connected via Arduino (serial) "
+            "OR WiFi/MQTT — the tool handles both transparently. "
+            "Use this for ANY home automation request. NEVER use agent_task for IoT. "
+            "When the user says something natural like 'enciende la luz', 'pon la "
+            "tira al 30%', 'luz azul', 'modo película' or 'qué temperatura hay', "
+            "use action=auto and pass the original text as 'description'. "
+            "If you already know the exact device id and action, prefer the explicit "
+            "form (action=on/off/dim/rgb/scene/read_sensor) for lower latency. "
+            "Capabilities are PER DEVICE: dim only works on dimmable devices, rgb "
+            "only on RGB-capable. The tool will tell you if a device doesn't support "
+            "a capability — relay that message to the user."
         ),
         "parameters": {
             "type": "OBJECT",
@@ -564,18 +571,24 @@ TOOL_DECLARATIONS = [
                 "action": {
                     "type": "STRING",
                     "description": (
-                        "on — turn on a specific device | "
-                        "off — turn off a specific device | "
-                        "all_on — turn on all devices | "
-                        "all_off — turn off all devices | "
-                        "timed — turn on for a specific duration then auto-off | "
-                        "status — check Arduino connection status | "
-                        "auto — (default) let AI interpret the natural language command"
+                        "auto — (default) interpret 'description' in natural language | "
+                        "on / off — turn a specific device on/off | "
+                        "all_on / all_off — global on/off across every device | "
+                        "timed — turn a device on for 'duration' seconds then auto-off | "
+                        "dim — set brightness 0-100 (requires the device to be dimmable) | "
+                        "rgb — set RGB color (requires rgb capability) | "
+                        "scene — run a named scene (use 'scene' parameter) | "
+                        "read_sensor — get the latest cached sensor reading for a device | "
+                        "list_devices — return all devices with their capabilities | "
+                        "status — connection status of every configured transport"
                     )
                 },
-                "device":      {"type": "STRING",  "description": "Device ID: foco_1, foco_2, or all"},
-                "duration":    {"type": "INTEGER", "description": "Duration in seconds for timed operation"},
-                "description": {"type": "STRING",  "description": "Natural language description of the IoT command (for auto mode)"},
+                "device":      {"type": "STRING",  "description": "Device id (use list_devices to discover). 'all' is a shortcut for all_on/all_off."},
+                "duration":    {"type": "INTEGER", "description": "Seconds for 'timed' (or for 'on' to auto-off later)."},
+                "value":       {"type": "INTEGER", "description": "Brightness 0-100 for 'dim'."},
+                "color":       {"type": "STRING",  "description": "Color for 'rgb' — accepts a name (rojo/azul/...), hex (#ff00aa) or 'r,g,b'."},
+                "scene":       {"type": "STRING",  "description": "Scene id or name for action=scene."},
+                "description": {"type": "STRING",  "description": "Natural-language command for action=auto."},
             },
             "required": []
         }
