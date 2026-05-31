@@ -27,3 +27,8 @@ google-auth
 google-auth-oauthlib
 google-api-python-client
 matplotlib
+
+# ── Backend web (migración a React + Tauri, ver migration/web-ui) ──
+fastapi
+uvicorn[standard]
+websockets
