@@ -14,9 +14,8 @@ GEMINI_MODEL       = "gemini-2.5-flash"
 
 
 def _get_gemini(model: str = GEMINI_MODEL):
-    import google.generativeai as genai
-    genai.configure(api_key=get_api_key())
-    return genai.GenerativeModel(model)
+    from core import gemini
+    return gemini.model(model)
 
 
 def _clean_code(text: str) -> str:
@@ -431,10 +430,10 @@ def _screen_debug_action(description, file_path, player, speak=None) -> str:
             print(f"[Code] ⚠️ Could not read file: {err}")
 
     try:
-        from google import genai
         from google.genai import types
+        from core import gemini
 
-        client = genai.Client(api_key=get_api_key())
+        client = gemini.get_client()
 
         image_bytes  = screenshot_path.read_bytes()
         image_base64 = _image_to_base64(screenshot_path)

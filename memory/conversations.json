@@ -1,0 +1,1127 @@
+[
+  {
+    "id": "125daf03",
+    "started": "2026-05-27T12:14:15",
+    "title": "Conversación",
+    "messages": [
+      {
+        "role": "sys",
+        "text": "ORION en línea.",
+        "ts": "2026-05-27T12:14:20"
+      }
+    ]
+  },
+  {
+    "id": "6b4012cd",
+    "started": "2026-05-27T12:14:35",
+    "title": "Hurry on Microsoft.",
+    "messages": [
+      {
+        "role": "sys",
+        "text": "ORION en línea.",
+        "ts": "2026-05-27T12:14:40"
+      },
+      {
+        "role": "sys",
+        "text": "[open_app] Microsoft Teams",
+        "ts": "2026-05-27T12:16:08"
+      },
+      {
+        "role": "user",
+        "text": "Hurry on Microsoft.",
+        "ts": "2026-05-27T12:16:16"
+      },
+      {
+        "role": "ai",
+        "text": "Microsoft Teams ha sido abierto.",
+        "ts": "2026-05-27T12:16:17"
+      },
+      {
+        "role": "sys",
+        "text": "[classroom] personal",
+        "ts": "2026-05-27T12:16:23"
+      },
+      {
+        "role": "user",
+        "text": "<noise>",
+        "ts": "2026-05-27T12:16:26"
+      },
+      {
+        "role": "ai",
+        "text": "Google Classroom ha sido abierto.",
+        "ts": "2026-05-27T12:16:26"
+      },
+      {
+        "role": "user",
+        "text": "Pro ba ndo 1 2 3 probando.",
+        "ts": "2026-05-27T12:17:16"
+      },
+      {
+        "role": "ai",
+        "text": "Entendido, te escucho claramente.",
+        "ts": "2026-05-27T12:17:16"
+      }
+    ]
+  },
+  {
+    "id": "13ac642b",
+    "started": "2026-05-27T12:28:23",
+    "title": "I elim ina r me el ar chi vo de in form e te óri co en mi es…",
+    "messages": [
+      {
+        "role": "sys",
+        "text": "ORION en línea.",
+        "ts": "2026-05-27T12:28:27"
+      },
+      {
+        "role": "sys",
+        "text": "[file] delete informe teórico",
+        "ts": "2026-05-27T12:28:53"
+      },
+      {
+        "role": "user",
+        "text": "I elim ina r me el ar chi vo de in form e te óri co en mi escritorio.",
+        "ts": "2026-05-27T12:29:02"
+      },
+      {
+        "role": "ai",
+        "text": "No se encontró ningún archivo o carpeta con nombre similar a 'informe teórico' en el escritorio. ¿Podrías darme el nombre exacto o la ruta?",
+        "ts": "2026-05-27T12:29:02"
+      },
+      {
+        "role": "sys",
+        "text": "[file] delete informe-teórico.PDS",
+        "ts": "2026-05-27T12:29:17"
+      },
+      {
+        "role": "user",
+        "text": "in form e te ó rico PD S",
+        "ts": "2026-05-27T12:29:25"
+      },
+      {
+        "role": "ai",
+        "text": "Sigo sin encontrar un archivo con ese nombre en el escritorio. ¿Estás seguro de la extensión o el nombre exacto?",
+        "ts": "2026-05-27T12:29:25"
+      },
+      {
+        "role": "file",
+        "text": "Informe-teorico.pdsprj.DESKTOP-ARBESUH.zahir.workspace (2.4 KB) cargado",
+        "ts": "2026-05-27T12:29:30"
+      },
+      {
+        "role": "ai",
+        "text": "Veo que has cargado el archivo 'Informe-teorico.pdsprj.DESKTOP-ARBESUH.zahir.workspace' (2.4 KB). ¿Qué te gustaría hacer con él?",
+        "ts": "2026-05-27T12:29:47"
+      },
+      {
+        "role": "sys",
+        "text": "[file] delete Informe-teorico",
+        "ts": "2026-05-27T12:29:56"
+      },
+      {
+        "role": "user",
+        "text": "Quiero que me bu sques uno simi lar en el e scri torio y me que elimines.",
+        "ts": "2026-05-27T12:30:07"
+      },
+      {
+        "role": "ai",
+        "text": "No he encontrado ningún archivo o carpeta similar en el escritorio. ¿Podría ser que se encuentre en otra ubicación o con un nombre ligeramente diferente?",
+        "ts": "2026-05-27T12:30:07"
+      },
+      {
+        "role": "user",
+        "text": "¿Cuál es el mi escritorio?",
+        "ts": "2026-05-27T12:30:20"
+      },
+      {
+        "role": "ai",
+        "text": "Tu escritorio es `C:\\Users\\zahir\\OneDrive\\Desktop`.",
+        "ts": "2026-05-27T12:30:20"
+      },
+      {
+        "role": "sys",
+        "text": "[file] list desktop",
+        "ts": "2026-05-27T12:30:57"
+      },
+      {
+        "role": "user",
+        "text": "Es ca ne a to dos los elemento s de mi escritorio, por favor.",
+        "ts": "2026-05-27T12:31:06"
+      },
+      {
+        "role": "ai",
+        "text": "He escaneado tu escritorio y solo he encontrado un archivo: `orion_code.py` de 1.8 KB.",
+        "ts": "2026-05-27T12:31:06"
+      },
+      {
+        "role": "user",
+        "text": "seguro que sea en mi escritorio.",
+        "ts": "2026-05-27T12:31:25"
+      },
+      {
+        "role": "sys",
+        "text": "[desktop] list",
+        "ts": "2026-05-27T12:31:31"
+      },
+      {
+        "role": "user",
+        "text": "Por que hay más elementos, por ejemplo,",
+        "ts": "2026-05-27T12:31:31"
+      },
+      {
+        "role": "ai",
+        "text": "Entendido. Voy a intentar listarlos nuevamente con una herramienta más específica.",
+        "ts": "2026-05-27T12:31:31"
+      },
+      {
+        "role": "sys",
+        "text": "[desktop] list",
+        "ts": "2026-05-27T12:31:41"
+      },
+      {
+        "role": "user",
+        "text": "all í este por ejemplo hay",
+        "ts": "2026-05-27T12:31:41"
+      },
+      {
+        "role": "user",
+        "text": "A ver , en lístamelo, por favor.",
+        "ts": "2026-05-27T12:31:53"
+      },
+      {
+        "role": "ai",
+        "text": "Como te mencioné, solo he podido listar el archivo `orion_code.py`. Es posible que algunos elementos no sean visibles con las herramientas disponibles.",
+        "ts": "2026-05-27T12:31:53"
+      },
+      {
+        "role": "sys",
+        "text": "[classroom] personal",
+        "ts": "2026-05-27T12:32:19"
+      },
+      {
+        "role": "user",
+        "text": "Classroom sword.",
+        "ts": "2026-05-27T12:32:23"
+      },
+      {
+        "role": "ai",
+        "text": "Google Classroom abierto en tu cuenta personal.",
+        "ts": "2026-05-27T12:32:23"
+      },
+      {
+        "role": "sys",
+        "text": "NOTA guardada: tengo examen el día jueves, estadística y probabilidad",
+        "ts": "2026-05-27T12:32:35"
+      },
+      {
+        "role": "user",
+        "text": "To ma no ta, tengo exa men el dí a ju eve s, esta dí stica y pro babilidad.",
+        "ts": "2026-05-27T12:32:35"
+      },
+      {
+        "role": "sys",
+        "text": "NOTA guardada: Examen: jueves (estadística y probabilidad), viernes (circuitos eléctricos)",
+        "ts": "2026-05-27T12:32:38"
+      },
+      {
+        "role": "user",
+        "text": "El dí a viernes cir cuitos eléctricos.",
+        "ts": "2026-05-27T12:32:42"
+      },
+      {
+        "role": "ai",
+        "text": "Nota guardada correctamente en el panel de notas rápidas.",
+        "ts": "2026-05-27T12:32:42"
+      },
+      {
+        "role": "user",
+        "text": "is I show 50.",
+        "ts": "2026-05-27T12:33:30"
+      },
+      {
+        "role": "ai",
+        "text": "¿A qué te refieres con \"show 50\"? ¿Volumen, brillo o alguna otra cosa?",
+        "ts": "2026-05-27T12:33:30"
+      },
+      {
+        "role": "sys",
+        "text": "[Search] quienes I show speed",
+        "ts": "2026-05-27T12:33:35"
+      },
+      {
+        "role": "user",
+        "text": "Speed.",
+        "ts": "2026-05-27T12:34:09"
+      },
+      {
+        "role": "ai",
+        "text": "IShowSpeed, cuyo nombre real es Darren Jason Watkins Jr., es un conocido YouTuber, streamer, personalidad de internet y rapero estadounidense. Nacido en 2005, se hizo famoso por sus transmisiones en vivo de videojuegos con una energía excéntrica y, a menudo, acalorada, volviéndose viral en plataformas como TikTok. También tiene una carrera musical con varios sencillos y ha colaborado con otros creadores.",
+        "ts": "2026-05-27T12:34:09"
+      },
+      {
+        "role": "user",
+        "text": "¿Qué es la Univers idad Na cional Mayores en Marcos?",
+        "ts": "2026-05-27T12:34:34"
+      },
+      {
+        "role": "ai",
+        "text": "La Universidad Nacional Mayor de San Marcos (UNMSM) es una de las más antiguas y prestigiosas de América, ubicada en Lima, Perú. Es reconocida por su excelencia académica y su gran trayectoria histórica.",
+        "ts": "2026-05-27T12:34:34"
+      },
+      {
+        "role": "user",
+        "text": "Cuando el inte gral de a pi de co sen o de X",
+        "ts": "2026-05-27T12:34:53"
+      },
+      {
+        "role": "ai",
+        "text": "Para calcular esa integral, aplicamos la integral definida: $$\\int_0^\\pi \\cos(x)\\,dx$$ El resultado es $$\\int_0^\\3.14 \\cos(x)\\,dx = [\\sin(x)]_0^\\pi = \\sin(\\pi) - \\sin(0) = 0 - 0 = 0$$ El resultado final es",
+        "ts": "2026-05-27T12:34:53"
+      },
+      {
+        "role": "sys",
+        "text": "Micrófono silenciado.",
+        "ts": "2026-05-27T12:36:18"
+      },
+      {
+        "role": "sys",
+        "text": "Micrófono activo.",
+        "ts": "2026-05-27T12:38:34"
+      },
+      {
+        "role": "user",
+        "text": "Cu enta la inte gral de al in fini to de E a la X E a la - X, perdón.",
+        "ts": "2026-05-27T12:39:05"
+      },
+      {
+        "role": "ai",
+        "text": "Esa es una integral impropia. Su cálculo se realiza mediante un límite: $$\\int_0^\\infty e^{-x}\\,dx = \\lim_{b \\to \\infty} \\int_0^b e^{-x}\\,dx$$ $$\\lim_{b \\to \\infty} [-e^{-x}]_0^b = \\lim_{b \\to \\infty} (-e^{-b} - (-e^{-0}))$$ $$\\lim_{b \\to \\infty} (1 - e^{-b})$$ Dado que $\\lim_{b \\to \\infty} e^{-b} 0$, el resultado final es $$1 - 0 = 1$$ El resultado es",
+        "ts": "2026-05-27T12:39:05"
+      },
+      {
+        "role": "user",
+        "text": "a la -x al cuadrado.",
+        "ts": "2026-05-27T12:39:32"
+      },
+      {
+        "role": "ai",
+        "text": "Esa integral $$\\int e^{-x^2}\\,dx$$ no tiene una solución analítica en términos de funciones elementales. Está relacionada con la función de error y es fundamental en estadística. Se suele calcular de forma numérica.",
+        "ts": "2026-05-27T12:39:32"
+      },
+      {
+        "role": "user",
+        "text": "0 al infinito.",
+        "ts": "2026-05-27T12:39:55"
+      },
+      {
+        "role": "ai",
+        "text": "La integral $$\\int_0^\\infty e^{-x^2}\\,dx$$ es un valor específico relacionado con la integral de Gauss. Su resultado es $$\\frac{\\sqrt{\\pi}}{2}$$ (raíz de pi sobre 2).",
+        "ts": "2026-05-27T12:39:55"
+      }
+    ]
+  },
+  {
+    "id": "3be27379",
+    "started": "2026-05-27T12:41:18",
+    "title": "Conversación",
+    "messages": [
+      {
+        "role": "sys",
+        "text": "ORION en línea.",
+        "ts": "2026-05-27T12:41:22"
+      },
+      {
+        "role": "sys",
+        "text": "Micrófono silenciado.",
+        "ts": "2026-05-27T12:41:33"
+      }
+    ]
+  },
+  {
+    "id": "50d4cdd0",
+    "started": "2026-05-27T12:41:39",
+    "title": "Conversación",
+    "messages": [
+      {
+        "role": "sys",
+        "text": "ORION en línea.",
+        "ts": "2026-05-27T12:41:43"
+      },
+      {
+        "role": "sys",
+        "text": "Micrófono silenciado.",
+        "ts": "2026-05-27T12:41:57"
+      }
+    ]
+  },
+  {
+    "id": "101479de",
+    "started": "2026-05-27T12:42:01",
+    "title": "Conversación",
+    "messages": [
+      {
+        "role": "sys",
+        "text": "ORION en línea.",
+        "ts": "2026-05-27T12:42:05"
+      },
+      {
+        "role": "sys",
+        "text": "Micrófono silenciado.",
+        "ts": "2026-05-27T12:42:06"
+      }
+    ]
+  },
+  {
+    "id": "0c760637",
+    "started": "2026-05-27T14:24:40",
+    "title": "Conversación",
+    "messages": [
+      {
+        "role": "sys",
+        "text": "ORION en línea.",
+        "ts": "2026-05-27T14:24:44"
+      }
+    ]
+  },
+  {
+    "id": "c55b19ce",
+    "started": "2026-05-27T14:25:17",
+    "title": "O rión , ábreme configuración.",
+    "messages": [
+      {
+        "role": "sys",
+        "text": "ORION en línea.",
+        "ts": "2026-05-27T14:25:20"
+      },
+      {
+        "role": "sys",
+        "text": "[open_app] Configuración",
+        "ts": "2026-05-27T14:26:49"
+      },
+      {
+        "role": "user",
+        "text": "O rión , ábreme configuración.",
+        "ts": "2026-05-27T14:26:56"
+      },
+      {
+        "role": "ai",
+        "text": "Abriendo configuración. Abierto.",
+        "ts": "2026-05-27T14:26:56"
+      },
+      {
+        "role": "sys",
+        "text": "[open_app] Configuración",
+        "ts": "2026-05-27T14:27:05"
+      },
+      {
+        "role": "user",
+        "text": "Abre config.",
+        "ts": "2026-05-27T14:27:14"
+      },
+      {
+        "role": "ai",
+        "text": "Configuración abierto.",
+        "ts": "2026-05-27T14:27:14"
+      },
+      {
+        "role": "sys",
+        "text": "[open_app] Configuración",
+        "ts": "2026-05-27T14:27:23"
+      },
+      {
+        "role": "user",
+        "text": "Es te escri biendo con fi gura e s con fi guración.",
+        "ts": "2026-05-27T14:27:32"
+      },
+      {
+        "role": "ai",
+        "text": "Entendido, gracias por la corrección. Abriendo \"Configuración\". Listo, ya está abierto.",
+        "ts": "2026-05-27T14:27:32"
+      },
+      {
+        "role": "sys",
+        "text": "[open_app] configuracion",
+        "ts": "2026-05-27T14:27:43"
+      },
+      {
+        "role": "user",
+        "text": "No está mal , tú me pone s con fi gura r pon me sin til de, sin tilde.",
+        "ts": "2026-05-27T14:27:51"
+      },
+      {
+        "role": "ai",
+        "text": "De acuerdo, intentaré abrir \"configuracion\" sin tilde. Abriendo \"configuracion\".",
+        "ts": "2026-05-27T14:27:51"
+      },
+      {
+        "role": "sys",
+        "text": "Apagado solicitado.",
+        "ts": "2026-05-27T14:27:58"
+      }
+    ]
+  },
+  {
+    "id": "7e5142da",
+    "started": "2026-05-27T14:28:05",
+    "title": "Á breme classroom, por favor.",
+    "messages": [
+      {
+        "role": "sys",
+        "text": "ORION en línea.",
+        "ts": "2026-05-27T14:28:10"
+      },
+      {
+        "role": "sys",
+        "text": "Micrófono silenciado.",
+        "ts": "2026-05-27T14:28:17"
+      },
+      {
+        "role": "sys",
+        "text": "Micrófono activo.",
+        "ts": "2026-05-27T14:28:45"
+      },
+      {
+        "role": "sys",
+        "text": "[classroom] personal",
+        "ts": "2026-05-27T14:28:49"
+      },
+      {
+        "role": "user",
+        "text": "Á breme classroom, por favor.",
+        "ts": "2026-05-27T14:28:52"
+      },
+      {
+        "role": "ai",
+        "text": "Google Classroom ha sido abierto.",
+        "ts": "2026-05-27T14:28:53"
+      },
+      {
+        "role": "sys",
+        "text": "[classroom] institucional",
+        "ts": "2026-05-27T14:28:58"
+      },
+      {
+        "role": "user",
+        "text": "El Clerro institucional.",
+        "ts": "2026-05-27T14:29:02"
+      },
+      {
+        "role": "ai",
+        "text": "Abriendo Google Classroom institucional.",
+        "ts": "2026-05-27T14:29:02"
+      },
+      {
+        "role": "sys",
+        "text": "Micrófono silenciado.",
+        "ts": "2026-05-27T14:29:16"
+      },
+      {
+        "role": "sys",
+        "text": "Micrófono activo.",
+        "ts": "2026-05-27T14:51:53"
+      },
+      {
+        "role": "sys",
+        "text": "[YouTube] Acción: play",
+        "ts": "2026-05-27T14:51:57"
+      },
+      {
+        "role": "sys",
+        "text": "[YouTube] Buscando: maná en youtube",
+        "ts": "2026-05-27T14:51:57"
+      },
+      {
+        "role": "user",
+        "text": "ਉਹ ਕਹਿੰਦਾ ਇੱਕ ਕੌਣ ਰਿੰਨ ਚੋਂ",
+        "ts": "2026-05-27T14:52:02"
+      },
+      {
+        "role": "ai",
+        "text": "Reproduciendo maná en YouTube.",
+        "ts": "2026-05-27T14:52:02"
+      },
+      {
+        "role": "sys",
+        "text": "[YouTube] Acción: play",
+        "ts": "2026-05-27T14:52:10"
+      },
+      {
+        "role": "sys",
+        "text": "[YouTube] Buscando: Night Core",
+        "ts": "2026-05-27T14:52:10"
+      },
+      {
+        "role": "user",
+        "text": "Re produ ce me Night Core en YouTube.",
+        "ts": "2026-05-27T14:52:14"
+      },
+      {
+        "role": "ai",
+        "text": "Reproduciendo Night Core.",
+        "ts": "2026-05-27T14:52:14"
+      },
+      {
+        "role": "sys",
+        "text": "[YouTube] Acción: play",
+        "ts": "2026-05-27T14:52:25"
+      },
+      {
+        "role": "sys",
+        "text": "[YouTube] Buscando: Óscar like",
+        "ts": "2026-05-27T14:52:26"
+      },
+      {
+        "role": "user",
+        "text": "Ó scar like en YouTube.",
+        "ts": "2026-05-27T14:52:30"
+      },
+      {
+        "role": "ai",
+        "text": "Reproduciendo Óscar like.",
+        "ts": "2026-05-27T14:52:30"
+      },
+      {
+        "role": "sys",
+        "text": "[YouTube] Acción: play",
+        "ts": "2026-05-27T14:52:37"
+      },
+      {
+        "role": "sys",
+        "text": "[YouTube] Buscando: Nike Core",
+        "ts": "2026-05-27T14:52:37"
+      },
+      {
+        "role": "user",
+        "text": "Re produ ce me Ni ke en YouTube.",
+        "ts": "2026-05-27T14:52:41"
+      },
+      {
+        "role": "ai",
+        "text": "Reproduciendo Nike Core.",
+        "ts": "2026-05-27T14:52:41"
+      },
+      {
+        "role": "sys",
+        "text": "[YouTube] Acción: play",
+        "ts": "2026-05-27T14:52:51"
+      },
+      {
+        "role": "sys",
+        "text": "[YouTube] Buscando: Nike corre",
+        "ts": "2026-05-27T14:52:51"
+      },
+      {
+        "role": "user",
+        "text": "Re produ ce me Ni ke cor re en YouTube.",
+        "ts": "2026-05-27T14:52:55"
+      },
+      {
+        "role": "ai",
+        "text": "Reproduciendo Nike corre.",
+        "ts": "2026-05-27T14:52:55"
+      },
+      {
+        "role": "user",
+        "text": "nightcore",
+        "ts": "2026-05-27T14:53:03"
+      },
+      {
+        "role": "sys",
+        "text": "[YouTube] Acción: play",
+        "ts": "2026-05-27T14:53:05"
+      },
+      {
+        "role": "sys",
+        "text": "[YouTube] Buscando: Nike",
+        "ts": "2026-05-27T14:53:05"
+      },
+      {
+        "role": "user",
+        "text": "No esto es",
+        "ts": "2026-05-27T14:53:06"
+      },
+      {
+        "role": "sys",
+        "text": "[YouTube] Acción: play",
+        "ts": "2026-05-27T14:53:07"
+      },
+      {
+        "role": "sys",
+        "text": "[YouTube] Buscando: Nightcore",
+        "ts": "2026-05-27T14:53:07"
+      },
+      {
+        "role": "user",
+        "text": "essa.",
+        "ts": "2026-05-27T14:53:12"
+      },
+      {
+        "role": "ai",
+        "text": "Reproduciendo Nightcore.",
+        "ts": "2026-05-27T14:53:12"
+      },
+      {
+        "role": "sys",
+        "text": "[YouTube] Acción: play",
+        "ts": "2026-05-27T14:53:17"
+      },
+      {
+        "role": "sys",
+        "text": "[YouTube] Buscando: Nightcore",
+        "ts": "2026-05-27T14:53:17"
+      },
+      {
+        "role": "user",
+        "text": "bú sca me, búscame.",
+        "ts": "2026-05-27T14:53:22"
+      },
+      {
+        "role": "ai",
+        "text": "Reproduciendo Nightcore.",
+        "ts": "2026-05-27T14:53:22"
+      },
+      {
+        "role": "sys",
+        "text": "[navegador] Abierto en Chrome: https://claude.ai",
+        "ts": "2026-05-27T14:54:54"
+      },
+      {
+        "role": "user",
+        "text": "la pa ja la página de Claudia, por favor.",
+        "ts": "2026-05-27T14:54:57"
+      },
+      {
+        "role": "ai",
+        "text": "Abriendo la página de Claude.",
+        "ts": "2026-05-27T14:54:57"
+      },
+      {
+        "role": "sys",
+        "text": "Micrófono silenciado.",
+        "ts": "2026-05-27T14:56:15"
+      },
+      {
+        "role": "sys",
+        "text": "Micrófono activo.",
+        "ts": "2026-05-27T14:59:46"
+      },
+      {
+        "role": "user",
+        "text": "https://chatgpt.com/share/6a174d2c-e8e4-83e9-a6f2-ac916830ceb9",
+        "ts": "2026-05-27T14:59:51"
+      },
+      {
+        "role": "sys",
+        "text": "NOTA guardada: https://chatgpt.com/share/6a174d2c-e8e4-83e9-a6f2-ac916830ceb9",
+        "ts": "2026-05-27T14:59:53"
+      },
+      {
+        "role": "sys",
+        "text": "Micrófono silenciado.",
+        "ts": "2026-05-27T14:59:56"
+      },
+      {
+        "role": "user",
+        "text": "Guá rda me el sigui ente en lace como nota, por favor.",
+        "ts": "2026-05-27T14:59:56"
+      },
+      {
+        "role": "ai",
+        "text": "Enlace guardado en tus notas.",
+        "ts": "2026-05-27T14:59:56"
+      },
+      {
+        "role": "sys",
+        "text": "Micrófono activo.",
+        "ts": "2026-05-27T15:00:02"
+      },
+      {
+        "role": "sys",
+        "text": "Micrófono silenciado.",
+        "ts": "2026-05-27T15:01:00"
+      },
+      {
+        "role": "sys",
+        "text": "Micrófono activo.",
+        "ts": "2026-05-27T15:08:08"
+      },
+      {
+        "role": "user",
+        "text": "https://chatgpt.com/share/6a174ef5-d4f0-83e9-9d5b-24b1590d7b31",
+        "ts": "2026-05-27T15:08:11"
+      },
+      {
+        "role": "sys",
+        "text": "NOTA guardada: https://chatgpt.com/share/6a174ef5-d4f0-83e9-9d5b-24b1590d7b31",
+        "ts": "2026-05-27T15:08:13"
+      },
+      {
+        "role": "user",
+        "text": "Bueno, no te digo, no.",
+        "ts": "2026-05-27T15:08:16"
+      },
+      {
+        "role": "ai",
+        "text": "Nota rápida guardada.",
+        "ts": "2026-05-27T15:08:16"
+      },
+      {
+        "role": "sys",
+        "text": "Micrófono silenciado.",
+        "ts": "2026-05-27T15:10:33"
+      },
+      {
+        "role": "sys",
+        "text": "ORION en línea.",
+        "ts": "2026-05-27T15:28:15"
+      },
+      {
+        "role": "sys",
+        "text": "ORION en línea.",
+        "ts": "2026-05-27T16:28:20"
+      },
+      {
+        "role": "sys",
+        "text": "Micrófono activo.",
+        "ts": "2026-05-27T16:31:26"
+      },
+      {
+        "role": "sys",
+        "text": "[file] delete circuito",
+        "ts": "2026-05-27T16:31:39"
+      },
+      {
+        "role": "sys",
+        "text": "[file] delete informe",
+        "ts": "2026-05-27T16:31:41"
+      },
+      {
+        "role": "user",
+        "text": "quiero que me elim ine s el ar chivo que ini cia con cir cui to y el que ini cia con informe.",
+        "ts": "2026-05-27T16:31:48"
+      },
+      {
+        "role": "ai",
+        "text": "No encontré ningún archivo o carpeta con nombres similares a 'circuito' ni a 'informe' en el escritorio.",
+        "ts": "2026-05-27T16:31:48"
+      },
+      {
+        "role": "sys",
+        "text": "[file] list desktop",
+        "ts": "2026-05-27T16:31:52"
+      },
+      {
+        "role": "user",
+        "text": "El archivo soy en mi escritorio.",
+        "ts": "2026-05-27T16:31:58"
+      },
+      {
+        "role": "ai",
+        "text": "Tienes un archivo llamado `orion_code.py` en el escritorio.",
+        "ts": "2026-05-27T16:31:58"
+      },
+      {
+        "role": "user",
+        "text": "Nada más.",
+        "ts": "2026-05-27T16:32:06"
+      },
+      {
+        "role": "ai",
+        "text": "Exacto, solo ese archivo está ahí.",
+        "ts": "2026-05-27T16:32:06"
+      },
+      {
+        "role": "sys",
+        "text": "[file] list desktop",
+        "ts": "2026-05-27T16:32:41"
+      },
+      {
+        "role": "user",
+        "text": "¿Qué carapetas ahí en escribir?",
+        "ts": "2026-05-27T16:32:46"
+      },
+      {
+        "role": "ai",
+        "text": "No hay carpetas en el escritorio, solo el archivo `orion_code.py`.",
+        "ts": "2026-05-27T16:32:46"
+      }
+    ]
+  },
+  {
+    "id": "2809d92a",
+    "started": "2026-05-27T16:35:10",
+    "title": "Conversación",
+    "messages": [
+      {
+        "role": "sys",
+        "text": "ORION en línea.",
+        "ts": "2026-05-27T16:35:17"
+      }
+    ]
+  },
+  {
+    "id": "6f69c0e3",
+    "started": "2026-05-27T16:35:39",
+    "title": "Hola orion como estas",
+    "messages": [
+      {
+        "role": "sys",
+        "text": "ORION en línea.",
+        "ts": "2026-05-27T16:35:41"
+      },
+      {
+        "role": "sys",
+        "text": "Micrófono silenciado.",
+        "ts": "2026-05-27T16:37:11"
+      },
+      {
+        "role": "user",
+        "text": "Hola orion como estas",
+        "ts": "2026-05-27T16:40:06"
+      },
+      {
+        "role": "ai",
+        "text": "Hola! Estoy funcionando perfectamente. ¿En qué puedo ayudarte hoy?",
+        "ts": "2026-05-27T16:40:11"
+      }
+    ]
+  },
+  {
+    "id": "0a74adc2",
+    "started": "2026-05-27T16:51:03",
+    "title": "Conversación",
+    "messages": [
+      {
+        "role": "sys",
+        "text": "ORION en línea.",
+        "ts": "2026-05-27T16:51:07"
+      }
+    ]
+  },
+  {
+    "id": "afa1887f",
+    "started": "2026-05-27T16:51:43",
+    "title": "elim ina me el ar chi vo in form e que está en el e scri tor…",
+    "messages": [
+      {
+        "role": "sys",
+        "text": "ORION en línea.",
+        "ts": "2026-05-27T16:51:48"
+      },
+      {
+        "role": "sys",
+        "text": "[file] delete informe",
+        "ts": "2026-05-27T16:53:06"
+      },
+      {
+        "role": "user",
+        "text": "elim ina me el ar chi vo in form e que está en el e scri tori o, por favor.",
+        "ts": "2026-05-27T16:53:18"
+      },
+      {
+        "role": "ai",
+        "text": "Voy a buscar el archivo \"informe\" en el escritorio y procederé a eliminarlo. He encontrado un archivo de proyecto de Proteus y un archivo de espacio de trabajo con un nombre similar. ¿Cuál de ellos deseas eliminar, o ambos?",
+        "ts": "2026-05-27T16:53:18"
+      },
+      {
+        "role": "sys",
+        "text": "[file] delete informe",
+        "ts": "2026-05-27T16:53:23"
+      },
+      {
+        "role": "user",
+        "text": "Ambos eliminaron.",
+        "ts": "2026-05-27T16:53:27"
+      },
+      {
+        "role": "ai",
+        "text": "Entendido. Eliminando ambos archivos. Archivos eliminados correctamente.",
+        "ts": "2026-05-27T16:53:27"
+      },
+      {
+        "role": "sys",
+        "text": "[file] delete circuito",
+        "ts": "2026-05-27T16:53:35"
+      },
+      {
+        "role": "user",
+        "text": "Ta mbién este de circuito, por favor.",
+        "ts": "2026-05-27T16:53:46"
+      },
+      {
+        "role": "ai",
+        "text": "Buscando y eliminando el archivo \"circuito\" en el escritorio. También he encontrado un archivo de proyecto de Proteus y un archivo de espacio de trabajo con el nombre \"circuito\". ¿Cuál de ellos deseas eliminar, o ambos?",
+        "ts": "2026-05-27T16:53:46"
+      },
+      {
+        "role": "sys",
+        "text": "[file] delete circuito",
+        "ts": "2026-05-27T16:53:50"
+      },
+      {
+        "role": "user",
+        "text": "Ambos, por favor.",
+        "ts": "2026-05-27T16:53:54"
+      },
+      {
+        "role": "ai",
+        "text": "De acuerdo, eliminando ambos archivos. Archivos eliminados correctamente.",
+        "ts": "2026-05-27T16:53:54"
+      },
+      {
+        "role": "sys",
+        "text": "[file] delete titulo de trabajo de investigacion",
+        "ts": "2026-05-27T16:54:29"
+      },
+      {
+        "role": "user",
+        "text": "Eli mí name el ar chivo , tí tulo de traba jo de inve stiga ción la car peta PD F",
+        "ts": "2026-05-27T16:54:38"
+      },
+      {
+        "role": "ai",
+        "text": "Buscando el archivo \"titulo de trabajo de de investigacion\" para eliminarlo. Archivo \"Título del Trabajo de Investigación.docx\" enviado a la papelera. ¿Hay algo más?",
+        "ts": "2026-05-27T16:54:38"
+      },
+      {
+        "role": "user",
+        "text": "En la carpeta",
+        "ts": "2026-05-27T16:54:43"
+      },
+      {
+        "role": "sys",
+        "text": "[file] delete PDF",
+        "ts": "2026-05-27T16:54:46"
+      },
+      {
+        "role": "user",
+        "text": "PDF también.",
+        "ts": "2026-05-27T16:54:51"
+      },
+      {
+        "role": "ai",
+        "text": "Buscando y eliminando la carpeta \"PDF\". Carpeta \"PDF\" a la papelera.",
+        "ts": "2026-05-27T16:54:51"
+      },
+      {
+        "role": "sys",
+        "text": "[file] delete proyecto backup",
+        "ts": "2026-05-27T16:55:21"
+      },
+      {
+        "role": "user",
+        "text": "proyecto.",
+        "ts": "2026-05-27T16:55:28"
+      },
+      {
+        "role": "ai",
+        "text": "Buscando y eliminando la carpeta \"proyecto backup\". Carpeta \"Project Backups\" a la papelera.",
+        "ts": "2026-05-27T16:55:28"
+      },
+      {
+        "role": "sys",
+        "text": "Micrófono silenciado.",
+        "ts": "2026-05-27T16:55:57"
+      },
+      {
+        "role": "sys",
+        "text": "ORION en línea.",
+        "ts": "2026-05-27T17:51:53"
+      },
+      {
+        "role": "sys",
+        "text": "ORION en línea.",
+        "ts": "2026-05-27T18:18:57"
+      }
+    ]
+  },
+  {
+    "id": "a746432a",
+    "started": "2026-05-27T22:33:22",
+    "title": "Conversación",
+    "messages": [
+      {
+        "role": "sys",
+        "text": "ORION en línea.",
+        "ts": "2026-05-27T22:33:29"
+      }
+    ]
+  },
+  {
+    "id": "4ebcd47a",
+    "started": "2026-05-30T18:36:05",
+    "title": "Al.",
+    "messages": [
+      {
+        "role": "sys",
+        "text": "ORION en línea.",
+        "ts": "2026-05-30T18:36:11"
+      },
+      {
+        "role": "user",
+        "text": "Al.",
+        "ts": "2026-05-30T18:36:20"
+      },
+      {
+        "role": "ai",
+        "text": "Hola, ¿en qué puedo ayudarte esta noche?",
+        "ts": "2026-05-30T18:36:20"
+      },
+      {
+        "role": "user",
+        "text": "¿Cómo estás?",
+        "ts": "2026-05-30T18:36:32"
+      },
+      {
+        "role": "ai",
+        "text": "Estoy bien, gracias. ¿Necesitas algo en específico?",
+        "ts": "2026-05-30T18:36:32"
+      },
+      {
+        "role": "user",
+        "text": "Pue des ab rirme Clash Ron, por favor.",
+        "ts": "2026-05-30T18:36:45"
+      },
+      {
+        "role": "ai",
+        "text": "Claro que sí, abriendo Google Classroom en tu cuenta personal.",
+        "ts": "2026-05-30T18:36:45"
+      },
+      {
+        "role": "sys",
+        "text": "[classroom] personal",
+        "ts": "2026-05-30T18:37:02"
+      },
+      {
+        "role": "user",
+        "text": "अ रे मैं एक लाख नंबर फोर",
+        "ts": "2026-05-30T18:37:06"
+      },
+      {
+        "role": "ai",
+        "text": "Listo, ya está abierto Google Classroom.",
+        "ts": "2026-05-30T18:37:06"
+      },
+      {
+        "role": "sys",
+        "text": "[classroom] institucional",
+        "ts": "2026-05-30T18:37:16"
+      },
+      {
+        "role": "user",
+        "text": "Ab re mi classrooming institucional.",
+        "ts": "2026-05-30T18:37:20"
+      },
+      {
+        "role": "ai",
+        "text": "Abriendo Google Classroom en la cuenta institucional.",
+        "ts": "2026-05-30T18:37:20"
+      },
+      {
+        "role": "sys",
+        "text": "Micrófono silenciado.",
+        "ts": "2026-05-30T18:37:26"
+      }
+    ]
+  }
+]

@@ -12,9 +12,75 @@ except ImportError:
 
 _OS = platform.system()  # "Windows" | "Darwin" | "Linux"
 
-_SAFE_ROOTS: list[Path] = [
-    Path.home(),
-]
+
+def _windows_known_folder(name: str) -> Path | None:
+    """Devuelve la ruta real de una carpeta conocida de Windows (Desktop,
+    Documents, Downloads, etc.). En equipos con OneDrive sincronizado, la
+    carpeta real vive dentro de ``%USERPROFILE%\\OneDrive\\``, no en
+    ``%USERPROFILE%\\``. Lee el registro y, si falla, cae en el fallback
+    OneDrive/local.
+    """
+    if _OS != "Windows":
+        return None
+    # Mapeo a las claves del registro Shell Folders
+    reg_key_map = {
+        "Desktop":   "Desktop",
+        "Personal":  "Personal",     # Documents
+        "Documents": "Personal",
+        "Downloads": "{374DE290-123F-4565-9164-39C4925E467B}",
+        "My Pictures": "My Pictures",
+        "Pictures": "My Pictures",
+        "My Music": "My Music",
+        "Music": "My Music",
+        "My Video": "My Video",
+        "Videos": "My Video",
+    }
+    sub = reg_key_map.get(name)
+    if not sub:
+        return None
+    try:
+        import winreg
+        with winreg.OpenKey(
+            winreg.HKEY_CURRENT_USER,
+            r"Software\Microsoft\Windows\CurrentVersion\Explorer\Shell Folders",
+        ) as k:
+            val, _ = winreg.QueryValueEx(k, sub)
+            # Expandir %USERPROFILE% u %OneDrive% si aparecen
+            val = os.path.expandvars(val)
+            p = Path(val)
+            if p.exists():
+                return p
+    except Exception:
+        pass
+    # Fallback: OneDrive\Folder o ~\Folder
+    one = os.environ.get("OneDrive") or os.environ.get("OneDriveConsumer")
+    folder_name = {
+        "Personal": "Documents",
+        "My Pictures": "Pictures",
+        "My Music": "Music",
+        "My Video": "Videos",
+    }.get(name, name)
+    if one:
+        cand = Path(one) / folder_name
+        if cand.exists():
+            return cand
+    cand = Path.home() / folder_name
+    return cand if cand.exists() else None
+
+
+def _safe_roots() -> list[Path]:
+    """Conjunto de carpetas raíz consideradas 'seguras' para operaciones
+    de archivos. Incluye ``~`` y la raíz de OneDrive si está activo."""
+    roots: list[Path] = [Path.home()]
+    one = os.environ.get("OneDrive") or os.environ.get("OneDriveConsumer")
+    if one:
+        p = Path(one)
+        if p.exists():
+            roots.append(p)
+    return roots
+
+
+_SAFE_ROOTS: list[Path] = _safe_roots()
 
 def _is_safe_path(target: Path) -> bool:
     """¿La ruta proporcionada está dentro de _SAFE_ROOTS? Si no, rechazar la operación."""
@@ -32,6 +98,10 @@ def _get_desktop() -> Path:
         xdg = os.environ.get("XDG_DESKTOP_DIR", "")
         if xdg and Path(xdg).exists():
             return Path(xdg)
+    if _OS == "Windows":
+        p = _windows_known_folder("Desktop")
+        if p:
+            return p
     return Path.home() / "Desktop"
 
 def _get_downloads() -> Path:
@@ -39,6 +109,10 @@ def _get_downloads() -> Path:
         xdg = os.environ.get("XDG_DOWNLOAD_DIR", "")
         if xdg and Path(xdg).exists():
             return Path(xdg)
+    if _OS == "Windows":
+        p = _windows_known_folder("Downloads")
+        if p:
+            return p
     return Path.home() / "Downloads"
 
 def _get_documents() -> Path:
@@ -46,6 +120,10 @@ def _get_documents() -> Path:
         xdg = os.environ.get("XDG_DOCUMENTS_DIR", "")
         if xdg and Path(xdg).exists():
             return Path(xdg)
+    if _OS == "Windows":
+        p = _windows_known_folder("Documents")
+        if p:
+            return p
     return Path.home() / "Documents"
 
 def _get_pictures() -> Path:
@@ -53,6 +131,10 @@ def _get_pictures() -> Path:
         xdg = os.environ.get("XDG_PICTURES_DIR", "")
         if xdg and Path(xdg).exists():
             return Path(xdg)
+    if _OS == "Windows":
+        p = _windows_known_folder("Pictures")
+        if p:
+            return p
     return Path.home() / "Pictures"
 
 def _get_music() -> Path:
@@ -60,6 +142,10 @@ def _get_music() -> Path:
         xdg = os.environ.get("XDG_MUSIC_DIR", "")
         if xdg and Path(xdg).exists():
             return Path(xdg)
+    if _OS == "Windows":
+        p = _windows_known_folder("Music")
+        if p:
+            return p
     return Path.home() / "Music"
 
 def _get_videos() -> Path:
@@ -67,6 +153,10 @@ def _get_videos() -> Path:
         xdg = os.environ.get("XDG_VIDEOS_DIR", "")
         if xdg and Path(xdg).exists():
             return Path(xdg)
+    if _OS == "Windows":
+        p = _windows_known_folder("Videos")
+        if p:
+            return p
     return Path.home() / "Videos"
 
 
@@ -84,6 +174,232 @@ def _resolve_path(raw: str) -> Path:
     if lower in shortcuts:
         return shortcuts[lower]
     return Path(raw).expanduser()
+
+
+# ── Extensiones legibles para el usuario ──────────────────────────────────
+_EXT_LABELS: dict[str, str] = {
+    ".pdf": "PDF", ".doc": "Word", ".docx": "Word",
+    ".xls": "Excel", ".xlsx": "Excel", ".csv": "CSV",
+    ".ppt": "PowerPoint", ".pptx": "PowerPoint",
+    ".txt": "Texto", ".rtf": "RTF", ".odt": "OpenDocument",
+    ".py": "Python", ".js": "JavaScript", ".html": "HTML", ".css": "CSS",
+    ".java": "Java", ".cpp": "C++", ".cs": "C#", ".go": "Go",
+    ".zip": "ZIP", ".rar": "RAR", ".7z": "7-Zip",
+    ".jpg": "Imagen JPEG", ".jpeg": "Imagen JPEG", ".png": "Imagen PNG",
+    ".gif": "GIF", ".bmp": "Bitmap", ".svg": "SVG", ".webp": "WebP",
+    ".mp3": "Audio MP3", ".wav": "Audio WAV", ".flac": "Audio FLAC",
+    ".mp4": "Video MP4", ".avi": "Video AVI", ".mkv": "Video MKV",
+    ".exe": "Ejecutable", ".msi": "Instalador",
+    ".pdsprj": "Proteus Project", ".workspace": "Workspace",
+    ".json": "JSON", ".xml": "XML", ".yaml": "YAML",
+    ".md": "Markdown", ".log": "Log",
+    ".iso": "Imagen ISO", ".torrent": "Torrent",
+    ".apk": "Android APK", ".deb": "Paquete Debian", ".rpm": "Paquete RPM",
+    ".sql": "SQL", ".db": "Base de datos", ".sqlite": "SQLite",
+    ".psd": "Photoshop", ".ai": "Illustrator", ".fig": "Figma",
+    ".blend": "Blender", ".dwg": "AutoCAD", ".stl": "Modelo 3D",
+}
+
+
+def _friendly_ext(ext: str) -> str:
+    """Devuelve un nombre amigable para la extensión del archivo."""
+    return _EXT_LABELS.get(ext.lower(), ext.upper().lstrip(".") if ext else "Sin extensión")
+
+
+def _normalize(s: str) -> str:
+    """Normaliza un texto para comparación: minúsculas, sin acentos, sin separadores."""
+    import unicodedata
+    s = unicodedata.normalize("NFKD", s)
+    s = "".join(c for c in s if not unicodedata.combining(c))
+    return s.lower().replace("_", " ").replace("-", " ").replace(".", " ").strip()
+
+
+def _primary_stem(item: Path) -> str:
+    """Devuelve el primer 'tramo' del nombre, antes del primer punto.
+    Útil para archivos con sufijos extra tipo
+    ``Informe.pdsprj.DESKTOP-XX.zahir.workspace``."""
+    return item.name.split(".")[0]
+
+
+def _resolve_file(
+    base: Path,
+    name: str,
+    *,
+    recursive: bool = False,
+) -> "Path | list[dict] | str":
+    """Busca un archivo/carpeta de forma inteligente en ``base``.
+
+    Estrategia de resolución (en orden de prioridad):
+      1. Coincidencia exacta  (base / name)
+      2. Coincidencia por stem normalizado (sin acentos, sin separadores)
+      3. Coincidencia parcial  (substring tras normalización)
+      4. Fuzzy matching con difflib (tolerancia a errores de dictado)
+
+    Si ``recursive=True``, explora subcarpetas hasta una profundidad razonable.
+
+    Returns
+    -------
+    Path         — si hay exactamente 1 coincidencia
+    list[dict]   — si hay múltiples coincidencias (para desambiguación)
+    str          — mensaje de error si no se encontró nada
+    """
+    if not name:
+        return "No se especificó el nombre del archivo."
+
+    target = _normalize(name)
+    # Quita extensiones del nombre buscado para comparar contra el stem
+    target_no_ext = target
+    for ext in _EXT_LABELS:
+        if target_no_ext.endswith(_normalize(ext)):
+            target_no_ext = target_no_ext[: -len(_normalize(ext))].strip()
+            break
+
+    # 1) Coincidencia exacta
+    exact = base / name
+    if exact.exists():
+        return exact
+
+    # Escanear el directorio
+    try:
+        if recursive:
+            items = [p for p in base.rglob("*") if not any(
+                part.startswith(".") for part in p.relative_to(base).parts
+            )]
+        else:
+            items = list(base.iterdir())
+    except PermissionError:
+        return f"Permiso denegado: {base}"
+    except FileNotFoundError:
+        return f"Directorio no encontrado: {base}"
+
+    # 2) Coincidencia por stem normalizado (nombre o primer tramo antes del primer punto)
+    stem_matches = []
+    for item in items:
+        primary = _normalize(_primary_stem(item))
+        stem_norm = _normalize(item.stem)
+        if primary == target_no_ext or stem_norm == target_no_ext:
+            stem_matches.append(item)
+    # Eliminar duplicados manteniendo el orden
+    stem_matches = list(dict.fromkeys(stem_matches))
+    if len(stem_matches) == 1:
+        return stem_matches[0]
+    if len(stem_matches) > 1:
+        return _build_disambiguation(stem_matches)
+
+    # 3) Coincidencia parcial (substring tras normalización)
+    partial_matches = []
+    for item in items:
+        primary = _normalize(_primary_stem(item))
+        stem_norm = _normalize(item.stem)
+        # El nombre buscado está contenido en el stem o primary
+        if target_no_ext and (target_no_ext in primary or target_no_ext in stem_norm):
+            partial_matches.append(item)
+            continue
+        # O el primary del archivo está contenido en el nombre buscado
+        if primary and len(primary) > 2 and primary in target_no_ext:
+            partial_matches.append(item)
+    partial_matches = list(dict.fromkeys(partial_matches))
+    if len(partial_matches) == 1:
+        return partial_matches[0]
+    if len(partial_matches) > 1:
+        return _build_disambiguation(partial_matches)
+
+    # 4) Fuzzy matching (tolerancia a errores de voz/escritura)
+    from difflib import SequenceMatcher
+    scored = []
+    for item in items:
+        primary = _normalize(_primary_stem(item))
+        stem_norm = _normalize(item.stem)
+        ratio = max(
+            SequenceMatcher(None, target_no_ext, primary).ratio(),
+            SequenceMatcher(None, target_no_ext, stem_norm).ratio(),
+        )
+        if ratio >= 0.6:
+            scored.append((ratio, item))
+    scored.sort(key=lambda x: x[0], reverse=True)
+    fuzzy_matches = [item for _, item in scored[:10]]
+
+    if len(fuzzy_matches) == 1:
+        return fuzzy_matches[0]
+    if len(fuzzy_matches) > 1:
+        return _build_disambiguation(fuzzy_matches)
+
+    return f"No se encontró ningún archivo o carpeta con nombre similar a '{name}' en {base.name}/"
+
+
+def _build_disambiguation(matches: list[Path]) -> list[dict]:
+    """Construye una lista de coincidencias para desambiguación."""
+    results = []
+    for item in matches:
+        kind = "📁 Carpeta" if item.is_dir() else "📄 Archivo"
+        ext = _friendly_ext(item.suffix) if not item.is_dir() else "Carpeta"
+        try:
+            size = _format_size(item.stat().st_size) if item.is_file() else ""
+        except Exception:
+            size = ""
+        results.append({
+            "path": item,
+            "name": item.name,
+            "stem": item.stem,
+            "ext": ext,
+            "kind": kind,
+            "size": size,
+        })
+    return results
+
+
+def _format_disambiguation(matches: list[dict], action_verb: str = "procesar") -> str:
+    """Formatea la lista de coincidencias para que Gemini pregunte al usuario.
+
+    Agrupa carpetas y archivos por tipo legible (Word, PDF, Proteus, Workspace…)
+    para que ORION pueda preguntar de forma natural:
+    ``He encontrado un PDF, una carpeta y un proyecto de Proteus, ¿cuál
+    quieres eliminar o quieres todos?``.
+    """
+    folders = [m for m in matches if m["kind"].startswith("📁")]
+    files = [m for m in matches if not m["kind"].startswith("📁")]
+
+    # Resumen amigable agrupado por tipo (lo que ORION debe leer al usuario)
+    summary_parts: list[str] = []
+    if folders:
+        summary_parts.append(
+            "una carpeta" if len(folders) == 1
+            else f"{len(folders)} carpetas"
+        )
+    # Agrupar archivos por extensión legible
+    by_ext: dict[str, int] = {}
+    for f in files:
+        by_ext[f["ext"]] = by_ext.get(f["ext"], 0) + 1
+    for ext, count in by_ext.items():
+        if count == 1:
+            summary_parts.append(f"un archivo {ext}")
+        else:
+            summary_parts.append(f"{count} archivos {ext}")
+
+    if len(summary_parts) > 1:
+        natural = ", ".join(summary_parts[:-1]) + " y " + summary_parts[-1]
+    elif summary_parts:
+        natural = summary_parts[0]
+    else:
+        natural = f"{len(matches)} coincidencias"
+
+    lines = [
+        f"He encontrado {natural} con nombre similar. "
+        f"Pregúntale al usuario CUÁL quiere {action_verb} (o si quiere TODOS).",
+        "",
+        "Coincidencias detalladas:",
+    ]
+    for i, m in enumerate(matches, 1):
+        size_part = f" ({m['size']})" if m['size'] else ""
+        lines.append(f"  {i}. {m['kind']} — {m['name']} [{m['ext']}]{size_part}")
+    lines.append("")
+    lines.append(
+        f"IMPORTANTE: di al usuario las opciones en lenguaje natural "
+        f"(ej. 'tengo un PDF y una carpeta') y pregunta cuál {action_verb} "
+        f"o si quiere todos. NO leas la ruta completa."
+    )
+    return "\n".join(lines)
+
 
 def _format_size(b: int) -> str:
     for unit in ["B", "KB", "MB", "GB", "TB"]:
@@ -160,21 +476,49 @@ def create_folder(path: str, name: str = "") -> str:
         return f"No se pudo crear la carpeta: {e}"
 
 
-def delete_file(path: str, name: str = "") -> str:
-    try:
-        base   = _resolve_path(path)
-        target = (base / name) if name else base
-        if not _is_safe_path(target):
-            return f"Acceso denegado: {target}"
-        if not target.exists():
-            return f"No encontrado: {target.name}"
+_PROTECTED_DIRS = lambda: {
+    _get_desktop(), _get_downloads(), _get_documents(),
+    _get_pictures(), _get_music(), _get_videos(), Path.home()
+}
 
-        # Comprobación de directorio seguro — proteger carpetas críticas del usuario
-        protected = {
-            _get_desktop(), _get_downloads(), _get_documents(),
-            _get_pictures(), _get_music(), _get_videos(), Path.home()
-        }
-        if target.resolve() in {p.resolve() for p in protected}:
+
+def delete_file(path: str, name: str = "", confirm_all: bool = False) -> str:
+    try:
+        base = _resolve_path(path)
+        if not name:
+            return "No se especificó qué eliminar."
+        if not _is_safe_path(base):
+            return f"Acceso denegado: {base}"
+
+        # Resolución inteligente del nombre
+        resolved = _resolve_file(base, name)
+
+        # Múltiples coincidencias → preguntar al usuario (o eliminar todas si confirm_all)
+        if isinstance(resolved, list):
+            if confirm_all:
+                deleted, errors = [], []
+                protected = {p.resolve() for p in _PROTECTED_DIRS()}
+                for m in resolved:
+                    t = m["path"]
+                    if t.resolve() in protected:
+                        errors.append(f"{t.name} (protegido)")
+                        continue
+                    try:
+                        _safe_trash(t)
+                        deleted.append(t.name)
+                    except Exception as e:
+                        errors.append(f"{t.name} ({e})")
+                msg = f"Eliminados {len(deleted)} elemento(s) a la papelera."
+                if errors:
+                    msg += f" No eliminados: {', '.join(errors)}."
+                return msg
+            return _format_disambiguation(resolved, action_verb="eliminar")
+
+        if isinstance(resolved, str):
+            return resolved
+
+        target = resolved
+        if target.resolve() in {p.resolve() for p in _PROTECTED_DIRS()}:
             return f"Directorio protegido, no se puede eliminar: {target.name}"
 
         return _safe_trash(target)
@@ -187,12 +531,17 @@ def delete_file(path: str, name: str = "") -> str:
 
 def move_file(path: str, name: str = "", destination: str = "") -> str:
     try:
-        base   = _resolve_path(path)
-        src    = (base / name) if name else base
-        dst    = _resolve_path(destination) if destination else None
+        base = _resolve_path(path)
+        dst = _resolve_path(destination) if destination else None
+        if not name:
+            return "No se especificó el archivo a mover."
+        resolved = _resolve_file(base, name)
+        if isinstance(resolved, list):
+            return _format_disambiguation(resolved, action_verb="mover")
+        if isinstance(resolved, str):
+            return resolved
+        src = resolved
 
-        if not src.exists():
-            return f"Origen no encontrado: {src.name}"
         if dst is None:
             return "No se especificó destino."
         if not _is_safe_path(src):
@@ -214,11 +563,16 @@ def move_file(path: str, name: str = "", destination: str = "") -> str:
 def copy_file(path: str, name: str = "", destination: str = "") -> str:
     try:
         base = _resolve_path(path)
-        src  = (base / name) if name else base
-        dst  = _resolve_path(destination) if destination else None
+        dst = _resolve_path(destination) if destination else None
+        if not name:
+            return "No se especificó el archivo a copiar."
+        resolved = _resolve_file(base, name)
+        if isinstance(resolved, list):
+            return _format_disambiguation(resolved, action_verb="copiar")
+        if isinstance(resolved, str):
+            return resolved
+        src = resolved
 
-        if not src.exists():
-            return f"Origen no encontrado: {src.name}"
         if dst is None:
             return "No se especificó destino."
         if not _is_safe_path(src):
@@ -244,12 +598,18 @@ def copy_file(path: str, name: str = "", destination: str = "") -> str:
 
 def rename_file(path: str, name: str = "", new_name: str = "") -> str:
     try:
-        base     = _resolve_path(path)
-        target   = (base / name) if name else base
+        base = _resolve_path(path)
+        if not name:
+            return "No se especificó qué renombrar."
+        resolved = _resolve_file(base, name)
+        if isinstance(resolved, list):
+            return _format_disambiguation(resolved, action_verb="renombrar")
+        if isinstance(resolved, str):
+            return resolved
+        target = resolved
+
         if not _is_safe_path(target):
             return f"Acceso denegado: {target}"
-        if not target.exists():
-            return f"No encontrado: {target.name}"
         if not new_name:
             return "No se proporcionó nombre nuevo."
 
@@ -266,12 +626,19 @@ def rename_file(path: str, name: str = "", new_name: str = "") -> str:
 
 def read_file(path: str, name: str = "", max_chars: int = 4000) -> str:
     try:
-        base   = _resolve_path(path)
-        target = (base / name) if name else base
+        base = _resolve_path(path)
+        if name:
+            resolved = _resolve_file(base, name)
+            if isinstance(resolved, list):
+                return _format_disambiguation(resolved, action_verb="leer")
+            if isinstance(resolved, str):
+                return resolved
+            target = resolved
+        else:
+            target = base
+
         if not _is_safe_path(target):
             return f"Acceso denegado: {target}"
-        if not target.exists():
-            return f"Archivo no encontrado: {target.name}"
         if not target.is_file():
             return f"No es un archivo: {target.name}"
 
@@ -445,8 +812,16 @@ def organize_desktop() -> str:
 
 def get_file_info(path: str, name: str = "") -> str:
     try:
-        base   = _resolve_path(path)
-        target = (base / name) if name else base
+        base = _resolve_path(path)
+        if name:
+            resolved = _resolve_file(base, name)
+            if isinstance(resolved, list):
+                return _format_disambiguation(resolved, action_verb="consultar")
+            if isinstance(resolved, str):
+                return resolved
+            target = resolved
+        else:
+            target = base
         if not _is_safe_path(target):
             return f"Acceso denegado: {target}"
         if not target.exists():
@@ -491,8 +866,9 @@ def file_controller(
         elif action == "create_folder":
             return create_folder(path, name=name)
 
-        elif action == "delete":
-            return delete_file(path, name=name)
+        elif action in ("delete", "delete_all"):
+            confirm_all = action == "delete_all" or bool(params.get("confirm_all", False))
+            return delete_file(path, name=name, confirm_all=confirm_all)
 
         elif action == "move":
             return move_file(path, name=name, destination=params.get("destination", ""))

@@ -25,15 +25,12 @@ import tempfile
 from pathlib import Path
 from datetime import datetime
 
-import google.generativeai as genai
-
-
 from config import get_api_key
 
 
 def _gemini_client():
-    genai.configure(api_key=get_api_key())
-    return genai.GenerativeModel("gemini-2.5-flash")
+    from core import gemini
+    return gemini.model("gemini-2.5-flash")
 
 
 def _detect_type(path: Path) -> str:
@@ -531,9 +528,10 @@ def _process_audio(path: Path, action: str, params: dict, speak=None) -> str:
                 "ogg": "audio/ogg", "m4a": "audio/mp4",
                 "aac": "audio/aac", "flac": "audio/flac",
             }.get(path.suffix.lstrip(".").lower(), "audio/mpeg")
+            from google.genai import types as _gtypes
             response = model.generate_content([
                 "Transcribe all speech in this audio file accurately.",
-                {"mime_type": mime, "data": content}
+                _gtypes.Part.from_bytes(data=content, mime_type=mime),
             ])
             result = response.text.strip()
             if params.get("save", True):

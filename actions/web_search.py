@@ -1,11 +1,17 @@
 #web_search.py
 from config import get_api_key
+from utils.cache import ttl_cache
 
 
+# El cache se aplica a las funciones internas (no al wrapper público) para
+# que también beneficie a las llamadas internas de _compare(). 5 minutos es
+# suficiente para evitar repetir la misma búsqueda en una sesión.
+@ttl_cache(ttl_seconds=300, max_entries=64,
+           skip_if=lambda r: not r or len(str(r)) < 20)
 def _gemini_search(query: str) -> str:
-    from google import genai
+    from core import gemini
 
-    client   = genai.Client(api_key=get_api_key())
+    client   = gemini.get_client()
     response = client.models.generate_content(
         model="gemini-2.5-flash",
         contents=query,
@@ -23,6 +29,8 @@ def _gemini_search(query: str) -> str:
     return text
 
 
+@ttl_cache(ttl_seconds=300, max_entries=64,
+           skip_if=lambda r: not r)
 def _ddg_search(query: str, max_results: int = 6) -> list[dict]:
     try:
         from ddgs import DDGS

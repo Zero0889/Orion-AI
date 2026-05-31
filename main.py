@@ -74,11 +74,28 @@ def _load_system_prompt() -> str:
 
 # Limpieza de transcripciones (caracteres de control que a veces emite el modelo)
 _CTRL_RE = re.compile(r"<ctrl\d+>", re.IGNORECASE)
+# Tokens espurios que el modelo a veces transcribe a partir de ruido ambiental
+# (chasquidos, micro-ruido, etc.). Si la transcripción entera es uno de éstos,
+# se descarta.
+_TRANSCRIPT_NOISE = {
+    "noice", "noise", "[noise]", "[ruido]", "(noise)", "(ruido)",
+    "uh", "um", "uhm", "hmm", "mmh", "mm", "ah", "eh",
+    "...", "…", ".", "-",
+}
+# Limpieza de marcadores estilo [BLANK_AUDIO], (background noise), [música], etc.
+_BRACKET_RE = re.compile(r"[\[\(\<](?:blank[_ ]?audio|background|music|música|silencio|ruido|noise|inaudible|aplausos|applause)[^\]\)\>]*[\]\)\>]", re.IGNORECASE)
 
 def _clean_transcript(text: str) -> str:
     text = _CTRL_RE.sub("", text)
+    text = _BRACKET_RE.sub("", text)
     text = re.sub(r"[\x00-\x08\x0b-\x1f]", "", text)
-    return text.strip()
+    text = text.strip()
+    if text.lower() in _TRANSCRIPT_NOISE:
+        return ""
+    # Una sola palabra muy corta sin letras alfabéticas → ruido
+    if text and len(text) <= 2 and not any(c.isalpha() for c in text):
+        return ""
+    return text
 
 
 # ============================================================================
@@ -241,18 +258,26 @@ TOOL_DECLARATIONS = [
     },
     {
         "name": "file_controller",
-        "description": "Manages files and folders: list, create, delete, move, copy, rename, read, write, find, disk usage.",
+        "description": (
+            "Manages files and folders: list, create, delete, move, copy, rename, read, write, find, disk usage. "
+            "Recognizes files by partial/short names (e.g. 'informe teórico' matches both "
+            "'Informe-teorico.pdf' and a folder of the same name). "
+            "If multiple matches are found, the tool returns a disambiguation result — "
+            "ASK the user in natural language which one (or 'all') and call again with "
+            "confirm_all=true if they pick all."
+        ),
         "parameters": {
             "type": "OBJECT",
             "properties": {
-                "action":      {"type": "STRING", "description": "list | create_file | create_folder | delete | move | copy | rename | read | write | find | largest | disk_usage | organize_desktop | info"},
+                "action":      {"type": "STRING", "description": "list | create_file | create_folder | delete | delete_all | move | copy | rename | read | write | find | largest | disk_usage | organize_desktop | info"},
                 "path":        {"type": "STRING", "description": "File/folder path or shortcut: desktop, downloads, documents, home"},
                 "destination": {"type": "STRING", "description": "Destination path for move/copy"},
                 "new_name":    {"type": "STRING", "description": "New name for rename"},
                 "content":     {"type": "STRING", "description": "Content for create_file/write"},
-                "name":        {"type": "STRING", "description": "File name to search for"},
+                "name":        {"type": "STRING", "description": "File name (partial OK — the tool resolves stems, normalizes accents and matches both files and folders)"},
                 "extension":   {"type": "STRING", "description": "File extension to search (e.g. .pdf)"},
                 "count":       {"type": "INTEGER", "description": "Number of results for largest"},
+                "confirm_all": {"type": "BOOLEAN", "description": "When true on a delete with multiple matches, delete ALL of them. Use only after the user confirmed 'todos/all'."},
             },
             "required": ["action"]
         }
@@ -274,7 +299,12 @@ TOOL_DECLARATIONS = [
     },
     {
         "name": "code_helper",
-        "description": "Writes, edits, explains, runs, or builds code files.",
+        "description": (
+            "Writes, edits, explains, runs, or builds SOURCE CODE FILES "
+            "(Python, JavaScript, C++, etc). "
+            "NEVER use this for math questions, integrals, derivatives, "
+            "equations or formulas — answer math DIRECTLY with LaTeX in chat."
+        ),
         "parameters": {
             "type": "OBJECT",
             "properties": {
@@ -462,6 +492,31 @@ TOOL_DECLARATIONS = [
                 "destination": {"type": "STRING",  "description": "Output folder for archive extract"},
             },
             "required": []
+        }
+    },
+    {
+        "name": "quick_note",
+        "description": (
+            "Saves a quick note to the user's notes panel (notas rápidas). "
+            "USE THIS — not save_memory — when the user says any of: "
+            "'toma nota', 'tomar nota', 'apunta', 'anota', 'guarda esta nota', "
+            "'tomame una nota', 'añade una nota', or asks to write something down. "
+            "Notes are for ad-hoc reminders/ideas, NOT for personal facts about the user "
+            "(those use save_memory). After saving, briefly confirm verbally."
+        ),
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {
+                "text": {
+                    "type": "STRING",
+                    "description": "Full text of the note to save in Spanish. Required."
+                },
+                "pinned": {
+                    "type": "BOOLEAN",
+                    "description": "Pin the note at the top of the list (default: false)"
+                },
+            },
+            "required": ["text"]
         }
     },
     {
@@ -655,6 +710,10 @@ class OrionLive:
         self._turn_done_event: asyncio.Event | None = None
         # Tabla de despacho de herramientas (lazy init en _execute_tool)
         self._tool_handlers: dict | None = None
+        # Watchdog: marcas de tiempo para detectar cuelgues en PENSANDO
+        import time
+        self._pensando_since: float | None = None
+        self._last_activity_ts: float = time.time()
 
         # ── Plugins ──
         self._plugin_registry = PluginRegistry()
@@ -682,13 +741,23 @@ class OrionLive:
         except Exception as e:
             log.warning("on_text_command falló: %s", e)
 
+    def _ui_state(self, state: str):
+        """Cambia el estado UI y mantiene el contador del watchdog."""
+        import time
+        if state == "PENSANDO":
+            self._pensando_since = time.time()
+        else:
+            self._pensando_since = None
+        self._last_activity_ts = time.time()
+        self.ui.set_state(state)
+
     def set_speaking(self, value: bool):
         with self._speaking_lock:
             self._is_speaking = value
         if value:
-            self.ui.set_state("HABLANDO")
+            self._ui_state("HABLANDO")
         elif not self.ui.muted:
-            self.ui.set_state("ESCUCHANDO")
+            self._ui_state("ESCUCHANDO")
 
     def speak(self, text: str):
         """Hace que ORION diga algo (enviando el texto al modelo Live)."""
@@ -1037,7 +1106,43 @@ class OrionLive:
         args = dict(fc.args or {})
 
         log.info("Tool call: %s  %s", name, args)
-        self.ui.set_state("PENSANDO")
+        self._ui_state("PENSANDO")
+
+        # quick_note: guarda una nota en el panel de notas rápidas
+        if name == "quick_note":
+            text = (args.get("text") or "").strip()
+            pinned = bool(args.get("pinned", False))
+            if not text:
+                if not self.ui.muted:
+                    self.ui.set_state("ESCUCHANDO")
+                return types.FunctionResponse(
+                    id=fc.id, name=name,
+                    response={"result": "No se proporcionó texto para la nota."}
+                )
+            try:
+                from memory.quick_notes import add_note, update_note
+                n = add_note(text)
+                if pinned and n.get("id"):
+                    update_note(n["id"], pinned=True)
+                # Refresca el panel de notas si está abierto
+                try:
+                    win = getattr(self.ui, "_win", None)
+                    panel = getattr(win, "_notes_panel", None) if win else None
+                    if panel is not None and panel.isVisible():
+                        panel.reload()
+                except Exception:
+                    pass
+                self.ui.write_log(f"NOTA guardada: {text[:80]}")
+                result_msg = "Nota guardada en el panel de notas rápidas."
+            except Exception as e:
+                log.warning("quick_note falló: %s", e)
+                result_msg = f"No se pudo guardar la nota: {e}"
+            if not self.ui.muted:
+                self._ui_state("ESCUCHANDO")
+            return types.FunctionResponse(
+                id=fc.id, name=name,
+                response={"result": result_msg}
+            )
 
         # save_memory se ejecuta de forma silenciosa (caso especial)
         if name == "save_memory":
@@ -1048,7 +1153,7 @@ class OrionLive:
                 update_memory({category: {key: {"value": value}}})
                 log.info("Memoria guardada: %s/%s = %s", category, key, value)
             if not self.ui.muted:
-                self.ui.set_state("ESCUCHANDO")
+                self._ui_state("ESCUCHANDO")
             return types.FunctionResponse(
                 id=fc.id, name=name,
                 response={"result": "ok", "silent": True}
@@ -1103,7 +1208,7 @@ class OrionLive:
             self.speak_error(name, e)
 
         if not self.ui.muted:
-            self.ui.set_state("ESCUCHANDO")
+            self._ui_state("ESCUCHANDO")
 
         log.info("Tool result: %s → %s", name, str(result)[:80])
         return types.FunctionResponse(
@@ -1121,14 +1226,29 @@ class OrionLive:
         log.info("Micrófono iniciado")
         loop = asyncio.get_event_loop()
 
+        def _enqueue(payload):
+            """Encola el chunk. Si la cola está llena, descarta el más antiguo
+            (evita el bug en el que ``put_nowait`` lanzaba QueueFull y la
+            sesión quedaba ‘pensando’ sin recibir audio)."""
+            try:
+                self.out_queue.put_nowait(payload)
+            except asyncio.QueueFull:
+                try:
+                    self.out_queue.get_nowait()
+                except Exception:
+                    pass
+                try:
+                    self.out_queue.put_nowait(payload)
+                except Exception:
+                    pass
+
         def callback(indata, frames, time_info, status):
             with self._speaking_lock:
                 orion_speaking = self._is_speaking
             # No enviar audio mientras ORION habla (evita feedback)
             if not orion_speaking and not self.ui.muted:
                 data = indata.tobytes()
-                loop.call_soon_threadsafe(
-                    self.out_queue.put_nowait,
+                loop.call_soon_threadsafe(_enqueue,
                     {"data": data, "mime_type": "audio/pcm"}
                 )
 
@@ -1159,6 +1279,8 @@ class OrionLive:
                 async for response in self.session.receive():
 
                     if response.data:
+                        import time
+                        self._last_activity_ts = time.time()
                         if self._turn_done_event and self._turn_done_event.is_set():
                             self._turn_done_event.clear()
                         self.audio_in_queue.put_nowait(response.data)
@@ -1202,6 +1324,54 @@ class OrionLive:
         except Exception as e:
             log.error("Error en recepción de audio: %s", e, exc_info=True)
             raise
+
+    async def _watchdog(self):
+        """Detecta cuelgues: si ORION queda en PENSANDO sin actividad de
+        audio durante demasiado tiempo, fuerza ESCUCHANDO para que el usuario
+        pueda volver a hablar.
+
+        También resetea ``_is_speaking`` si no llega audio nuevo durante un
+        rato y el turno está marcado como terminado.
+        """
+        import time
+        STUCK_LIMIT_S = 12.0  # PENSANDO sin audio durante 12s → desbloquear
+        SPEAKING_TIMEOUT_S = 6.0  # _is_speaking sin audio en 6s → resetear
+        while True:
+            try:
+                await asyncio.sleep(2.0)
+                now = time.time()
+                # 1) Si _is_speaking sigue True pero la cola está vacía y el
+                #    turno terminó, resetea.
+                with self._speaking_lock:
+                    speaking = self._is_speaking
+                if speaking and self.audio_in_queue and self.audio_in_queue.empty():
+                    if (now - self._last_activity_ts) > SPEAKING_TIMEOUT_S:
+                        log.warning("Watchdog: _is_speaking stuck, reset.")
+                        self.set_speaking(False)
+                        if self._turn_done_event:
+                            try:
+                                self._turn_done_event.set()
+                            except Exception:
+                                pass
+                # 2) Si PENSANDO se prolonga sin actividad, vuelve a ESCUCHANDO
+                if self._pensando_since is not None:
+                    elapsed = now - self._pensando_since
+                    no_audio = (
+                        self.audio_in_queue is None
+                        or self.audio_in_queue.empty()
+                    )
+                    if elapsed > STUCK_LIMIT_S and no_audio:
+                        log.warning(
+                            "Watchdog: PENSANDO bloqueado %.1fs → ESCUCHANDO",
+                            elapsed,
+                        )
+                        self._pensando_since = None
+                        if not self.ui.muted:
+                            self.ui.set_state("ESCUCHANDO")
+            except asyncio.CancelledError:
+                raise
+            except Exception as e:
+                log.debug("watchdog tick error: %s", e)
 
     async def _play_audio(self):
         log.info("Reproducción de audio iniciada")
@@ -1264,7 +1434,7 @@ class OrionLive:
         while True:
             try:
                 log.info("Conectando a Gemini Live...")
-                self.ui.set_state("PENSANDO")
+                self._ui_state("PENSANDO")
                 config = self._build_config()
 
                 async with (
@@ -1278,7 +1448,7 @@ class OrionLive:
                     self._turn_done_event = asyncio.Event()
 
                     log.info("Conectado a Gemini Live.")
-                    self.ui.set_state("ESCUCHANDO")
+                    self._ui_state("ESCUCHANDO")
                     self.ui.write_log("SISTEMA: ORION en línea.")
 
                     # Conexión exitosa → reset del backoff
@@ -1288,12 +1458,13 @@ class OrionLive:
                     tg.create_task(self._listen_audio())
                     tg.create_task(self._receive_audio())
                     tg.create_task(self._play_audio())
+                    tg.create_task(self._watchdog())
 
             except Exception as e:
                 log.warning("Sesión desconectada: %s", e, exc_info=True)
 
             self.set_speaking(False)
-            self.ui.set_state("PENSANDO")
+            self._ui_state("PENSANDO")
             log.info("Reconectando en %ds...", backoff_s)
             await asyncio.sleep(backoff_s)
             # Crece el backoff para el siguiente intento si vuelve a fallar
