@@ -65,9 +65,8 @@ datas = [
     (str(ROOT / "config" / "browser.json"),           "config"),
     (str(ROOT / "config" / "hotkeys.json"),           "config"),
     (str(ROOT / "config" / "theme.json"),             "config"),
-    # Asset usado por la UI Qt (por si el bundle se reutiliza para
-    # modo "both"; en modo "web" no se necesita pero pesa poco).
-    (str(ROOT / "assets" / "github-logo.png"),  "assets"),
+    # Nota Fase 7: el asset github-logo.png se movió a web/public/ y va
+    # dentro del bundle del frontend (web/dist/).
 ]
 # Algunos paquetes (google-genai, opencv, etc.) traen sus propios data.
 for pkg in ("google.genai", "google.api_core"):

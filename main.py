@@ -8,6 +8,7 @@ audio bidireccional, ejecuta herramientas y se sincroniza con la UI.
 from __future__ import annotations
 
 import asyncio
+import os
 import re
 import sys
 import threading
@@ -18,15 +19,16 @@ import sounddevice as sd
 from google import genai
 from google.genai import types
 
-from config import get_api_key, get_ui_mode, PROMPT_PATH
+from config import get_api_key, PROMPT_PATH
 from core.logger import get_logger
 from plugins.base import PluginRegistry
 from memory.memory_manager import (
     load_memory, update_memory, format_memory_for_prompt,
 )
 
-# OrionUI se importa de forma perezosa dentro de cada modo (Fase 5):
-# así el modo "web" puede arrancar sin tener PyQt6 instalado.
+# Desde la Fase 7 Orion es web-only: la UI vive en web/ y el "player"
+# que reciben main.OrionLive y las acciones es el OrionEventBus
+# directamente (no hay UI Qt ni FanOut).
 
 # ── Acciones ────────────────────────────────────────────────────────────────
 from actions.file_processor   import file_processor
@@ -1485,16 +1487,10 @@ class OrionLive:
 
 
 # ============================================================================
-#  Punto de entrada
-# ============================================================================
-# ============================================================================
-#  Fase 5 — Switch de UI principal
+#  Punto de entrada — Fase 7: arquitectura web-only
 # ============================================================================
 def _build_uvicorn_server(bus):
-    """Devuelve un ``uvicorn.Server`` listo para servir el backend Orion.
-
-    Aislado para que los 3 modos lo reutilicen sin duplicación.
-    """
+    """Devuelve un ``uvicorn.Server`` listo para servir el backend Orion."""
     import uvicorn
     from server.app import DEFAULT_HOST, DEFAULT_PORT, build_app
 
@@ -1511,122 +1507,72 @@ def _build_uvicorn_server(bus):
     return uvicorn.Server(config), DEFAULT_HOST, DEFAULT_PORT
 
 
-def _spawn_orion_live(player, bus) -> None:
-    """Arranca ``OrionLive`` en un thread daemon. Se usa idéntico en los
-    modos qt y both — solo cambia quién bloquea el main thread."""
+def _spawn_orion_live(bus) -> None:
+    """Arranca ``OrionLive`` en un thread daemon usando el bus como player."""
     def runner():
-        player.wait_for_api_key()
-        orion = OrionLive(player)
-        if bus is not None:
-            def _attach_live_loop():
-                import time
-                for _ in range(100):
-                    if getattr(orion, "_loop", None) is not None:
-                        bus.set_live_loop(orion._loop)
-                        return
-                    time.sleep(0.05)
-            threading.Thread(target=_attach_live_loop, daemon=True).start()
+        bus.wait_for_api_key()
+        orion = OrionLive(bus)
+
+        def _attach_live_loop():
+            import time
+            for _ in range(100):
+                if getattr(orion, "_loop", None) is not None:
+                    bus.set_live_loop(orion._loop)
+                    return
+                time.sleep(0.05)
+        threading.Thread(target=_attach_live_loop, daemon=True).start()
+
         try:
             asyncio.run(orion.run())
         except KeyboardInterrupt:
             log.info("Cerrando ORION...")
 
-    threading.Thread(target=runner, daemon=True).start()
+    threading.Thread(target=runner, daemon=True, name="OrionLiveRunner").start()
 
 
-# ── Modo qt (legacy puro) ──────────────────────────────────────────────────
-def _run_qt() -> None:
-    """Solo PyQt6, sin backend web. Modo legacy original."""
-    from ui import OrionUI
-    log.info("Modo UI: qt (PyQt6 standalone)")
-    ui = OrionUI("face.png")
-    _spawn_orion_live(player=ui, bus=None)
-    ui.root.mainloop()
+def main() -> None:
+    """Arranca el backend FastAPI + frontend React.
 
-
-# ── Modo both (Qt + backend web en paralelo) ───────────────────────────────
-def _run_both() -> None:
-    """Qt + FastAPI/WS conviviendo (comportamiento desde Fase 1)."""
-    from ui import OrionUI
-    from server.event_bus import OrionEventBus
-    from server.fanout import FanOutUI
-
-    log.info("Modo UI: both (Qt + backend web)")
-    ui  = OrionUI("face.png")
-    bus = OrionEventBus()
-    player = FanOutUI(ui=ui, bus=bus)
-
-    # Backend web en thread daemon — Qt bloquea el main thread.
-    server, host, port = _build_uvicorn_server(bus)
-
-    def _serve():
-        try:
-            asyncio.run(server.serve())
-        except Exception as e:
-            log.warning("Backend web detenido: %s", e)
-
-    threading.Thread(target=_serve, daemon=True, name="OrionWebBackend").start()
-    log.info("Backend web escuchando en http://%s:%d", host, port)
-
-    _spawn_orion_live(player=player, bus=bus)
-    ui.root.mainloop()
-
-
-# ── Modo web (sin PyQt6) ───────────────────────────────────────────────────
-def _run_web() -> None:
-    """Solo backend FastAPI + frontend React. No carga PyQt6.
-
-    El main thread lo bloquea uvicorn; OrionLive corre en un daemon. El
-    wizard de API key se atiende desde el frontend vía
+    El main thread lo bloquea uvicorn; ``OrionLive`` corre en un thread
+    daemon. El wizard de API key se atiende desde el frontend vía
     ``POST /api/settings/api_key``.
     """
     from server.event_bus import OrionEventBus
 
-    log.info("Modo UI: web (sin PyQt6)")
+    log.info("Iniciando Orion (modo web)")
     bus = OrionEventBus()
 
     # Si la API key ya está configurada (env o archivo), desbloquea el
     # wait_for_api_key() del bus de inmediato. Si no, el frontend mostrará
     # el wizard y POST /api/settings/api_key llamará a bus.mark_ready().
     try:
-        from config import get_api_key
-        try:
-            get_api_key()
-            bus.mark_ready()
-        except RuntimeError:
-            log.info("API key no configurada — esperando wizard web")
+        get_api_key()
+        bus.mark_ready()
+    except RuntimeError:
+        log.info("API key no configurada — esperando wizard web")
     except Exception:
         pass
 
-    _spawn_orion_live(player=bus, bus=bus)
+    _spawn_orion_live(bus)
 
     server, host, port = _build_uvicorn_server(bus)
     url = f"http://{host}:{port}"
     log.info("Frontend disponible en %s", url)
 
-    # Abre el navegador automáticamente (mejor experiencia primer arranque).
-    try:
-        import webbrowser
-        webbrowser.open(url, new=2)
-    except Exception:
-        pass
+    # Abrir el navegador automáticamente (mejor primera experiencia).
+    # En entornos sin GUI (Tauri / sidecar / servidor) esto es no-op.
+    if not os.environ.get("ORION_NO_BROWSER"):
+        try:
+            import webbrowser
+            webbrowser.open(url, new=2)
+        except Exception:
+            pass
 
     # uvicorn bloquea el main thread hasta Ctrl+C
     try:
         asyncio.run(server.serve())
     except KeyboardInterrupt:
-        log.info("Cerrando ORION (web)...")
-
-
-# ── Despachador ────────────────────────────────────────────────────────────
-def main() -> None:
-    mode = get_ui_mode()
-    if mode == "qt":
-        _run_qt()
-    elif mode == "web":
-        _run_web()
-    else:
-        _run_both()
+        log.info("Cerrando ORION...")
 
 
 if __name__ == "__main__":

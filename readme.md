@@ -48,28 +48,20 @@ python main.py
 
 ---
 
-## 🖥️ Modos de UI
+## 🖥️ Interfaz web
 
-Desde la Fase 5 de la migración web, Orion puede arrancar en tres modos seleccionables con la variable de entorno **`ORION_UI`**:
-
-| Modo | Qué levanta | Cuándo usarlo |
-|---|---|---|
-| `both` *(default)* | UI Qt **+** backend FastAPI/WS en paralelo. Mismo proceso, mismo origen. | Día a día — tienes la ventana de escritorio y además puedes abrir `http://127.0.0.1:8765` en cualquier navegador. |
-| `web` | Solo backend + frontend React. **No carga PyQt6**. Abre el navegador automáticamente. | Servidores headless, Tauri, Raspberry Pi, o cuando prefieras solo la UI web. |
-| `qt` | Solo UI PyQt6 (modo legacy). Sin backend web. | Compatibilidad con flujos antiguos / debug aislado de la UI Qt. |
+Desde la **Fase 7** Orion es web-only: la UI vive en `web/` (React + TypeScript + Tailwind) y la sirve FastAPI desde el mismo puerto que la API. La antigua interfaz PyQt6 fue retirada — su código está en el historial de la rama `migration/web-ui` por si alguien necesita rescatar algo.
 
 ```powershell
-# Windows PowerShell
-$env:ORION_UI = "web"
 python main.py
 ```
 
-```bash
-# macOS / Linux
-ORION_UI=web python main.py
-```
+Esto:
+1. Arranca el backend FastAPI en `http://127.0.0.1:8765`.
+2. Lanza `OrionLive` en un thread daemon (Gemini Live + audio).
+3. Abre tu navegador apuntando a la UI.
 
-Si prefieres dejarlo fijo, edita `config/api_keys.json` y añade `"ui_mode": "web"`. La variable de entorno siempre tiene prioridad.
+Para procesos sidecar (Tauri) o despliegues sin GUI, define `ORION_NO_BROWSER=1` y nada se autoabre.
 
 **Desarrollo del frontend** (hot reload sobre cambios en `web/src/`):
 

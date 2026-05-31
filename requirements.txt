@@ -4,32 +4,34 @@ pillow
 requests
 beautifulsoup4
 duckduckgo-search
-playwright          
+playwright
 pyautogui
 pyperclip
-pygetwindow       
+pygetwindow
 opencv-python
 numpy
 mss
 Pillow
 psutil
 comtypes
-pycaw               
-win10toast          
+pycaw
+win10toast
 send2trash
 youtube-transcript-api
 pywinauto
 python-pptx
-pyqt6
 pyserial
 paho-mqtt  # opcional: solo si usas dispositivos IoT por WiFi/MQTT
 google-auth
 google-auth-oauthlib
 google-api-python-client
-matplotlib
 
-# ── Backend web (migración a React + Tauri, ver migration/web-ui) ──
+# ── Backend web (Fase 1-6, arquitectura final web-only desde Fase 7) ──
 fastapi
 uvicorn[standard]
 websockets
 python-multipart
+
+# ── Eliminadas en Fase 7 (UI Qt deprecada): pyqt6, keyboard, matplotlib ──
+# Si necesitas reactivar el modo Qt (no soportado oficialmente desde la
+# Fase 7), restaura estas líneas y revisa el git log de migration/web-ui.

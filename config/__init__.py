@@ -83,23 +83,8 @@ def is_mac()     -> bool: return get_os() == "mac"
 def is_linux()   -> bool: return get_os() == "linux"
 
 
-# ── Modo de UI (Fase 5: switch web/qt/both) ─────────────────────────────────
-#
-# La variable de entorno ``ORION_UI`` tiene prioridad sobre el archivo de
-# config. Valores admitidos:
-#
-#   - "qt"   : solo PyQt6 (modo legacy, sin backend web).
-#   - "web"  : solo backend FastAPI + frontend React. Abre el navegador
-#              automáticamente. NO carga PyQt6.
-#   - "both" : ambos a la vez (default — comportamiento desde Fase 1).
-#
-# Cualquier otro valor cae a "both" con un warning silencioso.
-_ENV_UI_MODE = "ORION_UI"
-_VALID_UI_MODES = {"qt", "web", "both"}
-
-
-def get_ui_mode() -> str:
-    raw = (os.environ.get(_ENV_UI_MODE) or "").strip().lower()
-    if not raw:
-        raw = (load_config().get("ui_mode") or "both").strip().lower()
-    return raw if raw in _VALID_UI_MODES else "both"
+# Nota Fase 7: la antigua función ``get_ui_mode()`` se eliminó al
+# completarse la migración web. Orion ahora es web-only — la UI vive en
+# ``web/`` y se sirve desde FastAPI. La variable de entorno
+# ``ORION_NO_BROWSER`` sigue siendo útil (Tauri / sidecar la usan para
+# no abrir el navegador del sistema).
