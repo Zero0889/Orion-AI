@@ -1,0 +1,8 @@
+# Dependencias solo para desarrollo / empaquetado (Fase 6).
+# No las necesita el usuario final.
+
+# Tests
+pytest
+
+# Empaquetado nativo (Tauri sidecar + ejecutable standalone)
+pyinstaller
