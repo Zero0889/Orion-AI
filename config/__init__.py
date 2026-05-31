@@ -81,3 +81,25 @@ def get_os() -> str:
 def is_windows() -> bool: return get_os() == "windows"
 def is_mac()     -> bool: return get_os() == "mac"
 def is_linux()   -> bool: return get_os() == "linux"
+
+
+# ── Modo de UI (Fase 5: switch web/qt/both) ─────────────────────────────────
+#
+# La variable de entorno ``ORION_UI`` tiene prioridad sobre el archivo de
+# config. Valores admitidos:
+#
+#   - "qt"   : solo PyQt6 (modo legacy, sin backend web).
+#   - "web"  : solo backend FastAPI + frontend React. Abre el navegador
+#              automáticamente. NO carga PyQt6.
+#   - "both" : ambos a la vez (default — comportamiento desde Fase 1).
+#
+# Cualquier otro valor cae a "both" con un warning silencioso.
+_ENV_UI_MODE = "ORION_UI"
+_VALID_UI_MODES = {"qt", "web", "both"}
+
+
+def get_ui_mode() -> str:
+    raw = (os.environ.get(_ENV_UI_MODE) or "").strip().lower()
+    if not raw:
+        raw = (load_config().get("ui_mode") or "both").strip().lower()
+    return raw if raw in _VALID_UI_MODES else "both"
