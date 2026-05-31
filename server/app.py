@@ -64,9 +64,22 @@ def build_app(bus: Any) -> FastAPI:
         start = getattr(app.state, "ws_start_drain", None)
         if start is not None:
             await start()
+
+        # Telemetría periódica (CPU/RAM/disco) — Fase 3b
+        from server.telemetry import run as run_telemetry
+        app.state.telemetry_task = asyncio.create_task(run_telemetry(bus))
+
         try:
             yield
         finally:
+            t = getattr(app.state, "telemetry_task", None)
+            if t is not None:
+                t.cancel()
+                try:
+                    await t
+                except (asyncio.CancelledError, Exception):
+                    pass
+
             stop = getattr(app.state, "ws_stop_drain", None)
             if stop is not None:
                 await stop()
@@ -109,12 +122,17 @@ def build_app(bus: Any) -> FastAPI:
             "muted": bool(bus.muted),
         })
 
-    # ── Routers de lectura ───────────────────────────────────────────────
-    from server.routes import memory, notes, conversations, settings as settings_route
+    # ── Routers ───────────────────────────────────────────────────────────
+    from server.routes import (
+        agent, conversations, iot, memory, notes,
+        settings as settings_route,
+    )
     app.include_router(memory.router,            prefix="/api/memory",        tags=["memory"])
     app.include_router(notes.router,             prefix="/api/notes",         tags=["notes"])
     app.include_router(conversations.router,     prefix="/api/conversations", tags=["conversations"])
     app.include_router(settings_route.router,    prefix="/api/settings",      tags=["settings"])
+    app.include_router(agent.router,             prefix="/api/agent",         tags=["agent"])
+    app.include_router(iot.router,               prefix="/api/iot",           tags=["iot"])
 
     # ── WebSocket hub ────────────────────────────────────────────────────
     from server.ws import register_ws

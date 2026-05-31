@@ -12,11 +12,14 @@ interface Item {
 }
 
 const ITEMS: Item[] = [
-  { id: "chat",     label: "Chat",      icon: "◉" },
-  { id: "notes",    label: "Notas",     icon: "✎" },
-  { id: "memory",   label: "Memoria",   icon: "▤" },
-  { id: "history",  label: "Historial", icon: "⟲" },
-  { id: "settings", label: "Ajustes",   icon: "⚙" },
+  { id: "chat",      label: "Chat",       icon: "◉" },
+  { id: "notes",     label: "Notas",      icon: "✎" },
+  { id: "memory",    label: "Memoria",    icon: "▤" },
+  { id: "history",   label: "Historial",  icon: "⟲" },
+  { id: "telemetry", label: "Telemetría", icon: "▲" },
+  { id: "agents",    label: "Agentes",    icon: "◈" },
+  { id: "iot",       label: "IoT",        icon: "⌂" },
+  { id: "settings",  label: "Ajustes",    icon: "⚙" },
 ];
 
 export function Sidebar() {
