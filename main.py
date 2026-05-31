@@ -1137,13 +1137,11 @@ class OrionLive:
                 n = add_note(text)
                 if pinned and n.get("id"):
                     update_note(n["id"], pinned=True)
-                # Refresca el panel de notas si está abierto
+                # Refresca el panel de notas (Qt) o emite evento WS (bus).
+                # Sustituye el reach-in previo a ``_win._notes_panel`` (R-02).
                 try:
-                    win = getattr(self.ui, "_win", None)
-                    panel = getattr(win, "_notes_panel", None) if win else None
-                    if panel is not None and panel.isVisible():
-                        panel.reload()
-                except Exception:
+                    self.ui.notes_changed()
+                except AttributeError:
                     pass
                 self.ui.write_log(f"NOTA guardada: {text[:80]}")
                 result_msg = "Nota guardada en el panel de notas rápidas."
