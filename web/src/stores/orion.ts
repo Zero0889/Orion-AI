@@ -28,6 +28,15 @@ interface State {
   messages:  ChatMessage[];
   currentFile: string | null;
 
+  // Contadores por tipo de evento — los paneles los observan para
+  // refrescar sus datos cuando algo cambia en el backend.
+  rev: {
+    notes:    number;
+    memory:   number;
+    convs:    number;
+    theme:    number;
+  };
+
   // Acciones
   applyEvent:  (evt: ServerEvent) => void;
   setConnected: (v: boolean) => void;
@@ -66,6 +75,7 @@ export const useOrionStore = create<State>((set, get) => ({
   connected:    false,
   messages:     [],
   currentFile:  null,
+  rev: { notes: 0, memory: 0, convs: 0, theme: 0 },
 
   applyEvent(evt) {
     const { type, payload } = evt;
@@ -94,6 +104,27 @@ export const useOrionStore = create<State>((set, get) => ({
       case "file.attached": {
         const path = (payload?.path as string) ?? null;
         set({ currentFile: path });
+        break;
+      }
+      case "note.changed":
+      case "note.created":
+      case "note.updated":
+      case "note.deleted": {
+        set((s) => ({ rev: { ...s.rev, notes: s.rev.notes + 1 } }));
+        break;
+      }
+      case "memory.updated":
+      case "memory.deleted": {
+        set((s) => ({ rev: { ...s.rev, memory: s.rev.memory + 1 } }));
+        break;
+      }
+      case "conversation.deleted":
+      case "conversation.load": {
+        set((s) => ({ rev: { ...s.rev, convs: s.rev.convs + 1 } }));
+        break;
+      }
+      case "settings.theme": {
+        set((s) => ({ rev: { ...s.rev, theme: s.rev.theme + 1 } }));
         break;
       }
       default:

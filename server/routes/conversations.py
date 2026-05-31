@@ -8,9 +8,11 @@ Endpoints:
 
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 
-from memory.conversations import get_conversation, list_conversations
+from memory.conversations import (
+    delete_conversation, get_conversation, list_conversations,
+)
 
 router = APIRouter()
 
@@ -41,3 +43,16 @@ async def get_one_conversation(conv_id: str) -> dict:
     if conv is None:
         raise HTTPException(status_code=404, detail=f"Conversación '{conv_id}' no encontrada")
     return conv
+
+
+@router.delete("/{conv_id}", status_code=204)
+async def remove_conversation(conv_id: str, request: Request) -> None:
+    ok = delete_conversation(conv_id)
+    if not ok:
+        raise HTTPException(status_code=404, detail=f"Conversación '{conv_id}' no encontrada")
+    bus = getattr(request.app.state, "bus", None)
+    if bus is not None:
+        try:
+            bus.publish("conversation.deleted", {"id": conv_id})
+        except Exception:
+            pass
