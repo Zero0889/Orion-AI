@@ -1,17 +1,15 @@
 """
 tests.test_ui_mode
 ===================
-Fase 5 — switch ORION_UI=qt|web|both.
+Post Fase 7 — Orion es web-only. Este test ya no valida el switch
+ORION_UI=qt|web|both (eliminado); en su lugar verifica que:
 
-Verifica:
-  - get_ui_mode() lee ORION_UI con prioridad sobre el archivo.
-  - Default es "both" cuando nada está configurado.
-  - Valores inválidos caen a "both".
-  - main.py NO importa PyQt6 al ser cargado (pereza confirmada).
-  - main.main() despacha al runner correcto sin llegar a ejecutar nada
-    pesado (mockeamos _run_qt/_run_web/_run_both para no abrir UI ni
-    arrancar uvicorn de verdad).
-  - El modo web puede importar TODO el grafo de server.* sin PyQt6.
+  - ``main`` se importa sin arrastrar PyQt6.
+  - ``main.main`` existe y es la única entrada.
+  - El grafo de ``server.*`` es 100% headless (sin Qt).
+  - El bus es un player completo (cubierto también por
+    ``tests/test_event_bus_contract.py``).
+  - ``ORION_NO_BROWSER`` desactiva la apertura automática del navegador.
 """
 
 from __future__ import annotations
@@ -27,115 +25,96 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 
-# ── get_ui_mode ─────────────────────────────────────────────────────────
-def test_default_is_both(monkeypatch):
-    monkeypatch.delenv("ORION_UI", raising=False)
-    import config
-    # Asegúrate de que el archivo de config tampoco fija ui_mode.
-    monkeypatch.setattr(config, "load_config", lambda: {})
-    assert config.get_ui_mode() == "both"
-
-
-def test_env_var_wins(monkeypatch):
-    import config
-    monkeypatch.setenv("ORION_UI", "web")
-    assert config.get_ui_mode() == "web"
-    monkeypatch.setenv("ORION_UI", "qt")
-    assert config.get_ui_mode() == "qt"
-    monkeypatch.setenv("ORION_UI", "BOTH")  # case-insensitive
-    assert config.get_ui_mode() == "both"
-
-
-def test_invalid_falls_back_to_both(monkeypatch):
-    import config
-    monkeypatch.setenv("ORION_UI", "no-existe")
-    assert config.get_ui_mode() == "both"
-
-
-def test_config_file_used_if_env_missing(monkeypatch):
-    import config
-    monkeypatch.delenv("ORION_UI", raising=False)
-    monkeypatch.setattr(config, "load_config", lambda: {"ui_mode": "web"})
-    assert config.get_ui_mode() == "web"
-
-
-# ── main.py: no carga PyQt6 ─────────────────────────────────────────────
+# ── main.py es web-only y no arrastra Qt ────────────────────────────────
 def test_main_module_does_not_import_pyqt():
-    # Forzar reimport limpio.
     for mod in list(sys.modules):
         if mod == "main" or mod.startswith("PyQt6"):
             sys.modules.pop(mod, None)
     import main  # noqa: F401
     assert "PyQt6" not in sys.modules, (
-        "main.py NO debe importar PyQt6 al cargar (los modos deben "
-        "hacerlo lazy)."
+        "main.py no debe importar PyQt6 — la UI Qt fue eliminada en Fase 7."
     )
+    # Solo queda main() como entry point
+    assert callable(main.main)
 
 
-# ── Despachador ─────────────────────────────────────────────────────────
-def test_main_dispatches_to_qt(monkeypatch):
+def test_main_has_no_legacy_runners():
+    """Fase 7: ya no existen _run_qt / _run_both."""
     import main
-    monkeypatch.setattr(main, "get_ui_mode", lambda: "qt")
-    with patch.object(main, "_run_qt") as qt, \
-         patch.object(main, "_run_web") as web, \
-         patch.object(main, "_run_both") as both:
-        main.main()
-    qt.assert_called_once()
-    web.assert_not_called()
-    both.assert_not_called()
+    assert not hasattr(main, "_run_qt"),   "_run_qt debe estar eliminado"
+    assert not hasattr(main, "_run_both"), "_run_both debe estar eliminado"
+    assert not hasattr(main, "_run_web"),  "_run_web se inlineó en main()"
 
 
-def test_main_dispatches_to_web(monkeypatch):
-    import main
-    monkeypatch.setattr(main, "get_ui_mode", lambda: "web")
-    with patch.object(main, "_run_qt") as qt, \
-         patch.object(main, "_run_web") as web, \
-         patch.object(main, "_run_both") as both:
-        main.main()
-    web.assert_called_once()
-    qt.assert_not_called()
-    both.assert_not_called()
+def test_no_get_ui_mode_anymore():
+    """El helper get_ui_mode se eliminó porque ya no hay multimodo."""
+    import config
+    assert not hasattr(config, "get_ui_mode")
 
 
-def test_main_dispatches_to_both_by_default(monkeypatch):
-    import main
-    monkeypatch.setattr(main, "get_ui_mode", lambda: "both")
-    with patch.object(main, "_run_qt") as qt, \
-         patch.object(main, "_run_web") as web, \
-         patch.object(main, "_run_both") as both:
-        main.main()
-    both.assert_called_once()
-    qt.assert_not_called()
-    web.assert_not_called()
-
-
-# ── server.* es headless puro ───────────────────────────────────────────
+# ── server.* sigue siendo headless puro ─────────────────────────────────
 def test_server_imports_without_pyqt():
-    """Modo web debe poder importar todo el grafo de server.* sin Qt."""
     for mod in list(sys.modules):
         if mod.startswith("PyQt6") or mod.startswith("server"):
             sys.modules.pop(mod, None)
-    import server.app  # noqa: F401
-    import server.event_bus  # noqa: F401
-    import server.fanout  # noqa: F401
-    import server.ws  # noqa: F401
-    from server.routes import agent, conversations, files, iot, memory, notes  # noqa: F401
-    from server.routes import settings as settings_route  # noqa: F401
-    assert "PyQt6" not in sys.modules, (
-        "server.* no debe arrastrar PyQt6. Si este test falla, alguien "
-        "metió un import Qt en el backend."
+    import server.app          # noqa: F401
+    import server.event_bus    # noqa: F401
+    import server.ws           # noqa: F401
+    from server.routes import (  # noqa: F401
+        agent, conversations, files, iot, memory, notes,
+        settings as settings_route,
     )
+    assert "PyQt6" not in sys.modules
 
 
+def test_no_fanout_module():
+    """server.fanout fue eliminado en Fase 7 (ya no hace falta sin UI Qt)."""
+    with pytest.raises(ImportError):
+        import server.fanout  # noqa: F401
+
+
+# ── ORION_NO_BROWSER desactiva la apertura automática ───────────────────
+def test_no_browser_env_var_skips_webbrowser_open(monkeypatch):
+    """En modo Tauri / sidecar / servidor remoto, no queremos abrir el
+    navegador del SO. La variable ``ORION_NO_BROWSER`` lo desactiva.
+    Verificamos que main() respeta el flag — sin llegar a arrancar uvicorn.
+    """
+    import main
+    monkeypatch.setenv("ORION_NO_BROWSER", "1")
+
+    # Cortamos antes de que main() bloquee con uvicorn.serve(). Para eso
+    # mockeamos _spawn_orion_live, _build_uvicorn_server y asyncio.run.
+    with patch.object(main, "_spawn_orion_live"), \
+         patch.object(main, "_build_uvicorn_server", return_value=(_DummyServer(), "h", 1)), \
+         patch.object(main.asyncio, "run"), \
+         patch("webbrowser.open") as wb:
+        main.main()
+    wb.assert_not_called()
+
+
+def test_browser_opens_by_default(monkeypatch):
+    monkeypatch.delenv("ORION_NO_BROWSER", raising=False)
+    import main
+    with patch.object(main, "_spawn_orion_live"), \
+         patch.object(main, "_build_uvicorn_server", return_value=(_DummyServer(), "h", 1)), \
+         patch.object(main.asyncio, "run"), \
+         patch("webbrowser.open") as wb:
+        main.main()
+    wb.assert_called_once()
+
+
+# ── Bus es un player completo (cross-check con el contrato) ─────────────
 def test_event_bus_can_be_player_for_actions():
-    """Modo web pasa el bus directo como player. Cumple las superficies
-    que main.OrionLive y las actions consumen."""
     from server.event_bus import OrionEventBus
     bus = OrionEventBus()
-    # Mismo set verificado en tests/test_event_bus_contract.py.
     for name in (
         "write_log", "set_state", "muted", "current_file",
         "on_text_command", "on_interrupt", "wait_for_api_key",
         "start_speaking", "stop_speaking", "notes_changed",
     ):
         assert hasattr(bus, name), f"OrionEventBus no expone '{name}'"
+
+
+# ── Helper ──────────────────────────────────────────────────────────────
+class _DummyServer:
+    async def serve(self): pass

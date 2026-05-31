@@ -164,24 +164,12 @@ def test_subscribe_unsubscribe():
     bus.unsubscribe(sub)
 
 
-def test_signatures_match_orion_ui():
-    """Si la UI Qt está disponible (entorno con PyQt6), comprobamos que las
-    firmas mínimas coinciden. En CI/entornos sin PyQt6 simplemente se omite."""
-    try:
-        from ui import OrionUI  # noqa: F401
-    except Exception:
-        pytest.skip("PyQt6 no disponible en este entorno")
-        return
-
+def test_bus_exposes_full_contract():
+    """Tras la Fase 7 la UI Qt fue eliminada. El bus es el único player —
+    debe seguir cumpliendo la superficie completa que consumen
+    main.OrionLive y las 21 acciones."""
     from server.event_bus import OrionEventBus
-
-    # PROPERTIES_RW + METHODS son descriptores de clase y se comprueban en
-    # la clase directamente. ATTRIBUTES como ``root`` son atributos de
-    # instancia (asignados en __init__); su existencia ya se valida en
-    # ``test_event_bus_root_compat`` para el bus, y no se instancia
-    # OrionUI aquí porque requiere QApplication.
     for name in PROPERTIES_RW | METHODS:
-        assert hasattr(OrionUI, name), f"OrionUI no expone '{name}'"
         assert hasattr(OrionEventBus, name), f"OrionEventBus no expone '{name}'"
 
 
