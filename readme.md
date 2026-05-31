@@ -83,6 +83,69 @@ Para producción / Tauri, `npm run build` deja el bundle en `web/dist/`. El back
 
 ---
 
+## 📦 Empaquetado nativo (Tauri + PyInstaller)
+
+Desde la **Fase 6** Orion puede distribuirse como aplicación de escritorio firmada con instalador `.msi` / `.dmg` / `.deb` / `.AppImage`. La estructura:
+
+```
+┌─────────────── Tauri app (~5 MB Rust) ────────────────┐
+│                                                       │
+│  WebView del SO (Edge/WebKit) ── http://127.0.0.1:8765│
+│                                          ▲            │
+│                                          │ spawn      │
+│                                          ▼            │
+│  Sidecar: orion-backend (PyInstaller) ──────────────  │
+│    ↳ main.py modo web                                 │
+│    ↳ FastAPI + uvicorn + WS + actions/ + IoT          │
+└───────────────────────────────────────────────────────┘
+```
+
+### Prerequisitos
+
+| Herramienta | Versión | Notas |
+|---|---|---|
+| Node.js | ≥ 18 | `npm` debe estar en el PATH |
+| Python  | 3.11  | virtualenv `.venv` activado |
+| Rust    | ≥ 1.70 | `rustup` lo más fácil — https://rustup.rs |
+| `cargo-tauri` | 1.x | `cargo install tauri-cli --version "^1.6"` |
+| Iconos | — | ver `src-tauri/icons/README.md` |
+
+Una vez tengas todo:
+
+```powershell
+# Windows
+./scripts/build.ps1
+```
+```bash
+# macOS / Linux
+./scripts/build.sh
+```
+
+El script hace los 4 pasos en orden:
+1. `npm run build` → `web/dist/`
+2. `pyinstaller packaging/orion_backend.spec` → `dist/orion-backend/`
+3. Renombra el binario a `orion-backend-<target-triple>` y lo copia a `src-tauri/binaries/`
+4. `cargo tauri build` → instalador final en `src-tauri/target/release/bundle/`
+
+### Qué se distribuye
+
+- **Windows**: `.msi` o `.exe` (NSIS)
+- **macOS**: `.dmg` con bundle `.app`
+- **Linux**: `.deb` y `.AppImage`
+
+El binario final lleva todo dentro: no necesita Python instalado en la máquina del usuario.
+
+### Troubleshooting
+
+| Síntoma | Causa habitual |
+|---|---|
+| `orion-backend sidecar no encontrado` | Olvidaste renombrar al target-triple. Verifica `src-tauri/binaries/orion-backend-<triple>`. |
+| Pantalla blanca al abrir | El backend tardó >30 s en responder. Mira los logs del sidecar (Tauri los reenvía a stderr). |
+| Falta icono al hacer `cargo tauri build` | Ejecuta `cargo tauri icon path/to/orion.png` con un PNG cuadrado 1024×1024. |
+| PyInstaller no encuentra módulos de plugins | Añade `--collect-submodules plugins` o regístralos en `hiddenimports` del spec. |
+
+---
+
 ## 📋 Requirements
 
 | Requirement | Details |
