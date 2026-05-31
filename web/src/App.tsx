@@ -14,6 +14,7 @@ import { useEffect, useState } from "react";
 
 import { AgentsPanel } from "@/components/AgentsPanel";
 import { ChatPanel } from "@/components/ChatPanel";
+import { DropZone } from "@/components/DropZone";
 import { HistoryPanel } from "@/components/HistoryPanel";
 import { IoTPanel } from "@/components/IoTPanel";
 import { MemoryPanel } from "@/components/MemoryPanel";
@@ -105,6 +106,9 @@ export default function App() {
 
       {/* Onboarding overlay si la API key no está configurada */}
       <Onboarding />
+
+      {/* Drop-zone global de archivos (Fase 4) */}
+      <DropZone />
     </div>
   );
 }

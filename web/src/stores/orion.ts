@@ -132,6 +132,10 @@ export const useOrionStore = create<State>((set, get) => ({
         set({ currentFile: path });
         break;
       }
+      case "file.cleared": {
+        set({ currentFile: null });
+        break;
+      }
       case "note.changed":
       case "note.created":
       case "note.updated":

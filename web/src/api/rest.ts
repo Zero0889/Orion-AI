@@ -71,6 +71,23 @@ export const api = {
       "POST", `/api/agent/tasks/${id}/cancel`,
     ),
 
+  // Files / drop-zone
+  uploadFile: async (file: File): Promise<FileUploadResult> => {
+    const { http } = inferBackendUrl();
+    const form = new FormData();
+    form.append("file", file);
+    const res = await fetch(`${http}/api/files/upload`, { method: "POST", body: form });
+    if (!res.ok) {
+      let detail: string;
+      try { detail = (await res.json())?.detail ?? res.statusText; }
+      catch { detail = res.statusText; }
+      throw new Error(`Upload failed: ${res.status} ${detail}`);
+    }
+    return (await res.json()) as FileUploadResult;
+  },
+  getCurrentFile:   () => request<{ current: CurrentFile | null }>("GET", "/api/files/current"),
+  clearCurrentFile: () => request<void>("DELETE", "/api/files/current"),
+
   // IoT
   iotDevices:  () => request<Array<IoTDevice>>("GET", "/api/iot/devices"),
   iotScenes:   () => request<Array<IoTScene>>("GET",  "/api/iot/scenes"),
@@ -167,4 +184,19 @@ export interface IoTSensor {
   value:   string;
   numeric: number | null;
   age_s:   number;
+}
+
+export interface FileUploadResult {
+  ok:       true;
+  path:     string;
+  name:     string;
+  original: string;
+  size:     number;
+}
+
+export interface CurrentFile {
+  path:   string;
+  name:   string;
+  size:   number | null;
+  exists: boolean;
 }

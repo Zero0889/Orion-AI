@@ -124,7 +124,7 @@ def build_app(bus: Any) -> FastAPI:
 
     # ── Routers ───────────────────────────────────────────────────────────
     from server.routes import (
-        agent, conversations, iot, memory, notes,
+        agent, conversations, files, iot, memory, notes,
         settings as settings_route,
     )
     app.include_router(memory.router,            prefix="/api/memory",        tags=["memory"])
@@ -133,6 +133,7 @@ def build_app(bus: Any) -> FastAPI:
     app.include_router(settings_route.router,    prefix="/api/settings",      tags=["settings"])
     app.include_router(agent.router,             prefix="/api/agent",         tags=["agent"])
     app.include_router(iot.router,               prefix="/api/iot",           tags=["iot"])
+    app.include_router(files.router,             prefix="/api/files",         tags=["files"])
 
     # ── WebSocket hub ────────────────────────────────────────────────────
     from server.ws import register_ws
