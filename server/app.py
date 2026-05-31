@@ -26,12 +26,15 @@ from __future__ import annotations
 
 import asyncio
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
 
+from config import BASE_DIR
 from core.logger import get_logger
 
 log = get_logger("server.app")
@@ -116,5 +119,37 @@ def build_app(bus: Any) -> FastAPI:
     # ── WebSocket hub ────────────────────────────────────────────────────
     from server.ws import register_ws
     register_ws(app, bus)
+
+    # ── Frontend estático (Fase 2: si web/dist existe, se sirve aquí) ────
+    # En modo dev (Vite en :5173) este bloque no aplica — el usuario abre
+    # http://localhost:5173 directamente. En modo prod (Tauri / portable)
+    # FastAPI sirve los archivos generados por ``npm run build``.
+    dist_dir = (Path(BASE_DIR) / "web" / "dist").resolve()
+    if dist_dir.is_dir() and (dist_dir / "index.html").is_file():
+        assets_dir = dist_dir / "assets"
+        if assets_dir.is_dir():
+            app.mount("/assets", StaticFiles(directory=str(assets_dir)), name="assets")
+
+        @app.get("/")
+        async def root_spa() -> FileResponse:
+            return FileResponse(str(dist_dir / "index.html"))
+
+        # SPA fallback: cualquier ruta no /api/* ni /ws devuelve index.html
+        # para que el router del frontend tome el control.
+        @app.get("/{full_path:path}")
+        async def spa_fallback(full_path: str) -> FileResponse:
+            # Si es un archivo real bajo dist, lo servimos directo.
+            candidate = (dist_dir / full_path).resolve()
+            try:
+                candidate.relative_to(dist_dir)
+            except ValueError:
+                return FileResponse(str(dist_dir / "index.html"))
+            if candidate.is_file():
+                return FileResponse(str(candidate))
+            return FileResponse(str(dist_dir / "index.html"))
+
+        log.info("Frontend estatico servido desde %s", dist_dir)
+    else:
+        log.info("web/dist no presente: ejecuta `npm run build` en web/ para empaquetar el frontend")
 
     return app
