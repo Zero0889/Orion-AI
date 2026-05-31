@@ -155,6 +155,9 @@ class OrionEventBus:
         if path:
             self._current_files = [path]
             self.publish("file.attached", {"path": path})
+        else:
+            self._current_files = []
+            self.publish("file.cleared", {})
 
     @property
     def current_files(self) -> list[str]:

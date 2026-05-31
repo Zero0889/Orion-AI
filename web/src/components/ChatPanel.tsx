@@ -7,6 +7,7 @@
 
 import { useEffect, useRef, useState } from "react";
 
+import { AttachmentChip } from "@/components/AttachmentChip";
 import { useOrionStore } from "@/stores/orion";
 import type { LogRole } from "@/types";
 
@@ -82,6 +83,7 @@ export function ChatPanel({ onSend }: Props) {
 
       {/* Input */}
       <div className="border-t border-border-b bg-panel p-3">
+        <div className="mb-2"><AttachmentChip /></div>
         <div className="flex gap-2 items-end">
           <textarea
             value={draft}
