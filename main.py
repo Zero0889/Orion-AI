@@ -1485,12 +1485,75 @@ class OrionLive:
 # ============================================================================
 #  Punto de entrada
 # ============================================================================
+def _start_web_backend(bus) -> None:
+    """Arranca uvicorn + FastAPI en un thread daemon (Loop A).
+
+    Aislado en función para que un fallo importando ``server.*`` (p. ej.
+    si el usuario no instaló fastapi) no impida arrancar la UI Qt:
+    simplemente se loguea el error y Orion sigue funcionando como antes.
+    """
+    try:
+        import uvicorn
+        from server.app import DEFAULT_HOST, DEFAULT_PORT, build_app
+    except Exception as e:
+        log.warning("Backend web no disponible (%s). UI Qt en modo standalone.", e)
+        return
+
+    app = build_app(bus)
+    config = uvicorn.Config(
+        app,
+        host=DEFAULT_HOST,
+        port=DEFAULT_PORT,
+        log_level="warning",  # uvicorn no debe ahogar los logs del asistente
+        access_log=False,
+        loop="asyncio",
+        lifespan="on",
+    )
+    server = uvicorn.Server(config)
+
+    def _serve():
+        try:
+            asyncio.run(server.serve())
+        except Exception as e:
+            log.warning("Backend web detenido: %s", e)
+
+    threading.Thread(target=_serve, daemon=True, name="OrionWebBackend").start()
+    log.info("Backend web escuchando en http://%s:%d", DEFAULT_HOST, DEFAULT_PORT)
+
+
 def main():
     ui = OrionUI("face.png")
 
+    # ── Bus + FanOut (Fase 1) ─────────────────────────────────────────────
+    # OrionLive y las acciones reciben un FanOutUI que duplica eventos a la
+    # UI Qt y al OrionEventBus. La UI Qt sigue siendo la activa; el bus
+    # alimenta el frontend web cuando lo conectemos.
+    try:
+        from server.event_bus import OrionEventBus
+        from server.fanout import FanOutUI
+        bus    = OrionEventBus()
+        player = FanOutUI(ui=ui, bus=bus)
+        _start_web_backend(bus)
+    except Exception as e:
+        log.warning("Bus no disponible (%s). Usando OrionUI directo.", e)
+        bus    = None
+        player = ui
+
     def runner():
-        ui.wait_for_api_key()
-        orion = OrionLive(ui)
+        player.wait_for_api_key()
+        orion = OrionLive(player)
+        # Informar al bus el loop B en cuanto exista, para submit_user_text
+        if bus is not None:
+            def _attach_live_loop():
+                # OrionLive crea su loop dentro de run(); esperamos un poco
+                # y leemos orion._loop.
+                import time
+                for _ in range(100):
+                    if getattr(orion, "_loop", None) is not None:
+                        bus.set_live_loop(orion._loop)
+                        return
+                    time.sleep(0.05)
+            threading.Thread(target=_attach_live_loop, daemon=True).start()
         try:
             asyncio.run(orion.run())
         except KeyboardInterrupt:
