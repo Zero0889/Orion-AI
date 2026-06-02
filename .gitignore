@@ -23,3 +23,16 @@ config/gdrive_token.json
 
 # ── Drop-zone web (Fase 4): archivos subidos por el usuario ─────────────────
 uploads/
+
+# ── Build artifacts (Fase 6: Tauri + PyInstaller) ──────────────────────────
+build/
+dist/
+src-tauri/target/
+src-tauri/binaries/
+web/node_modules/
+web/dist/
+
+# ── Herramientas del entorno (no son parte del producto) ────────────────────
+.agents/
+.claude/
+skills-lock.json

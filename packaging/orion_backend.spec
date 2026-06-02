@@ -102,27 +102,19 @@ pyz = PYZ(a.pure)  # noqa: F821
 exe = EXE(  # noqa: F821
     pyz,
     a.scripts,
+    a.binaries,
+    a.datas,
     [],
-    exclude_binaries=True,
     name="orion-backend",
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
     upx=False,
+    runtime_tmpdir=None,
     console=True,        # mantiene logs visibles en stderr/stdout
     disable_windowed_traceback=False,
     argv_emulation=False,
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-)
-
-coll = COLLECT(  # noqa: F821
-    exe,
-    a.binaries,
-    a.datas,
-    strip=False,
-    upx=False,
-    upx_exclude=[],
-    name="orion-backend",
 )

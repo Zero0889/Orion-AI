@@ -37,6 +37,11 @@ fn main() {
             let app_handle = app.handle();
             let sidecar = app.state::<SidecarHandle>().0.clone();
 
+            // Evitar que el backend abra el navegador del sistema:
+            // Tauri ya muestra la UI en su propia ventana embebida.
+            // El backend hereda esta var de entorno al spawnearse.
+            std::env::set_var("ORION_NO_BROWSER", "1");
+
             // Lanzar el backend.
             let (mut rx, child) = Command::new_sidecar("orion-backend")
                 .expect("orion-backend sidecar no encontrado en binaries/")
