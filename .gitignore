@@ -9,6 +9,7 @@ logs/
 # ── Backups locales (versiones viejas; git ya guarda el historial) ──────────
 ui_backup.py
 *.bak
+*.bak.json
 
 # ── Configuración local del usuario ────────────────────────────────────────
 config/theme.json

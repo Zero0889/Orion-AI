@@ -53,6 +53,21 @@ class IoTSystem:
         self._init_transports()
         self._wire_sensors()
 
+    # ── Hot reload ────────────────────────────────────────────────────────
+    def reload(self) -> None:
+        """Recarga el config desde disco y reconstruye transports + sensores.
+
+        Cierra todos los transports existentes antes de instanciar los nuevos
+        (necesario para que MQTT desconecte limpio y serial libere el COM).
+        Pensado para llamarse después de un POST/PUT/DELETE de la API admin.
+        """
+        from .transports import close_all
+
+        close_all()
+        self.cfg = load_config()
+        self._init_transports()
+        self._wire_sensors()
+
     # ── Setup interno ────────────────────────────────────────────────────
     def _init_transports(self) -> None:
         for tid, tcfg in self.cfg.transports.items():
@@ -72,9 +87,19 @@ class IoTSystem:
             t = get_transport(dev.transport, self.cfg.transports.get(dev.transport, {}))
             if t is None:
                 continue
+            def make_callback(d_id):
+                def _sensor_callback(device_id: str, raw_value: str) -> None:
+                    val = raw_value.strip()
+                    cache.update(d_id, val)
+                    from server.event_bus import OrionEventBus
+                    bus = OrionEventBus.get_instance()
+                    if bus:
+                        bus.publish("iot.sensor", {"device": d_id, "value": val})
+                return _sensor_callback
+
             t.register_sensor_listener(
                 dev.id,
-                lambda dev_id, raw: cache.update(dev_id, raw),
+                make_callback(dev.id),
             )
             if isinstance(t, SerialTransport):
                 prefix = (dev.serial or {}).get("sensor_prefix") or dev.id.upper()

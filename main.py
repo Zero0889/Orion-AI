@@ -1556,8 +1556,14 @@ def main() -> None:
     _spawn_orion_live(bus)
 
     server, host, port = _build_uvicorn_server(bus)
-    url = f"http://{host}:{port}"
+    # `host` puede ser "0.0.0.0" (bindea todas las interfaces para que
+    # Tailscale alcance), pero los navegadores no pueden navegar a esa
+    # dirección. Para el log y el auto-open usamos siempre 127.0.0.1.
+    browse_host = "127.0.0.1" if host in ("0.0.0.0", "::") else host
+    url = f"http://{browse_host}:{port}"
     log.info("Frontend disponible en %s", url)
+    if host in ("0.0.0.0", "::"):
+        log.info("Backend escucha en %s:%d (Tailscale + localhost)", host, port)
 
     # Abrir el navegador automáticamente (mejor primera experiencia).
     # En entornos sin GUI (Tauri / sidecar / servidor) esto es no-op.

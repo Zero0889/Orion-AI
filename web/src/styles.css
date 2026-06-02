@@ -2,27 +2,211 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ──────────────────────────────────────────────────────────────────────
+   Design tokens — premium dark-first.
+   Backend `/api/settings/theme` may override these CSS variables at
+   runtime through `data-theme` on <html> or inline `style="--orion-…"`.
+   Channel format = "R G B" (so Tailwind can compose with /alpha).
+   ────────────────────────────────────────────────────────────────────── */
+:root,
+:root[data-theme="orion-night"] {
+  /* surfaces */
+  --orion-bg:        10 11 15;        /* #0A0B0F */
+  --orion-sunken:    8  9  13;
+  --orion-surface:   17 19 26;        /* #11131A */
+  --orion-elevated:  23 26 34;        /* #171A22 */
+
+  /* borders */
+  --orion-border:        255 255 255;  /* paired with alpha utilities */
+  --orion-border-strong: 255 255 255;
+
+  /* brand */
+  --orion-pri:       109 124 255;     /* #6D7CFF */
+  --orion-pri-dim:    72  84 188;
+  --orion-acc:       126 231 255;     /* #7EE7FF */
+
+  /* semantic */
+  --orion-ok:        34 197 94;       /* #22C55E */
+  --orion-warn:     245 158 11;       /* #F59E0B */
+  --orion-danger:   239  68  68;      /* #EF4444 */
+
+  /* text */
+  --orion-text:     245 247 250;      /* #F5F7FA */
+  --orion-text-dim: 170 179 197;      /* #AAB3C5 */
+  --orion-muted:    107 114 128;      /* #6B7280 */
+
+  /* motion */
+  --orion-ease:      cubic-bezier(0.16, 1, 0.3, 1);
+  --orion-ease-soft: cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+/* fallback palettes for the backend-controlled themes the user already had.
+   Backend may still PATCH /api/settings/theme — we react by setting
+   data-theme on <html> from the App effect (Settings panel). */
+:root[data-theme="orion-violet"] {
+  --orion-pri: 167 139 250;
+  --orion-pri-dim: 124  58 237;
+  --orion-acc: 232 121 249;
+}
+:root[data-theme="orion-emerald"] {
+  --orion-pri:  52 211 153;
+  --orion-pri-dim: 16 185 129;
+  --orion-acc: 110 231 183;
+}
+:root[data-theme="orion-amber"] {
+  --orion-pri: 251 191  36;
+  --orion-pri-dim: 217 119   6;
+  --orion-acc: 252 211  77;
+}
+:root[data-theme="orion-red"] {
+  --orion-pri: 255  42  77;
+  --orion-pri-dim: 160  24  40;
+  --orion-acc: 255 107  26;
+  --orion-text: 255 196 204;
+  --orion-text-dim: 138  58  72;
+  --orion-bg:        10  2  5;
+  --orion-surface:   20  3  7;
+  --orion-elevated:  26  4 10;
+}
+
 @layer base {
   html, body, #root {
     height: 100%;
     overflow: hidden;
   }
+  html {
+    color-scheme: dark;
+  }
   body {
-    font-family: theme('fontFamily.sans');
-    background: theme('colors.bg');
-    color: theme('colors.text');
+    font-family: theme("fontFamily.sans");
+    background: rgb(var(--orion-bg));
+    color: rgb(var(--orion-text));
     -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    font-feature-settings: "ss01", "cv11";
   }
   ::selection {
-    background: theme('colors.pri');
-    color: theme('colors.bg');
+    background: rgb(var(--orion-pri) / 0.35);
+    color: rgb(var(--orion-text));
   }
+  /* premium focus rings (consistent everywhere) */
+  :where(button, a, input, textarea, select, [role="button"]):focus-visible {
+    outline: none;
+    box-shadow:
+      0 0 0 2px rgb(var(--orion-bg)),
+      0 0 0 4px rgb(var(--orion-pri) / 0.55);
+    border-radius: 8px;
+  }
+  input, textarea, select { color-scheme: dark; }
 }
 
 @layer utilities {
-  .scrollbar-thin::-webkit-scrollbar { width: 6px; }
-  .scrollbar-thin::-webkit-scrollbar-thumb {
-    background: theme('colors.border-b');
-    border-radius: 3px;
+  /* surfaces */
+  .surface-1 {
+    background: rgb(var(--orion-surface));
+    border: 1px solid rgb(var(--orion-border) / 0.06);
+  }
+  .surface-2 {
+    background: rgb(var(--orion-elevated));
+    border: 1px solid rgb(var(--orion-border) / 0.08);
+  }
+  .surface-glass {
+    background:
+      linear-gradient(180deg,
+        rgb(var(--orion-surface) / 0.65) 0%,
+        rgb(var(--orion-surface) / 0.45) 100%);
+    backdrop-filter: blur(18px) saturate(140%);
+    -webkit-backdrop-filter: blur(18px) saturate(140%);
+    border: 1px solid rgb(var(--orion-border) / 0.08);
+  }
+  .hairline   { border-color: rgb(var(--orion-border) / 0.08); }
+  .hairline-2 { border-color: rgb(var(--orion-border) / 0.14); }
+
+  /* scrollbars */
+  .scrollbar-thin::-webkit-scrollbar           { width: 8px; height: 8px; }
+  .scrollbar-thin::-webkit-scrollbar-thumb     {
+    background: rgb(var(--orion-border) / 0.12);
+    border-radius: 8px;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+  }
+  .scrollbar-thin:hover::-webkit-scrollbar-thumb {
+    background: rgb(var(--orion-border) / 0.22);
+    background-clip: padding-box;
+  }
+  .scrollbar-thin::-webkit-scrollbar-track     { background: transparent; }
+
+  /* shimmer skeleton */
+  .skeleton {
+    background: linear-gradient(
+      90deg,
+      rgb(var(--orion-elevated))     0%,
+      rgb(var(--orion-border) / 0.10) 50%,
+      rgb(var(--orion-elevated))     100%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 1.6s linear infinite;
+    border-radius: 8px;
+  }
+
+  /* grid dot background */
+  .bg-dots {
+    background-image: radial-gradient(rgb(var(--orion-border) / 0.07) 1px, transparent 1px);
+    background-size: 22px 22px;
+  }
+
+  /* edge fades */
+  .mask-fade-y {
+    -webkit-mask-image: linear-gradient(to bottom, transparent, #000 24px, #000 calc(100% - 24px), transparent);
+            mask-image: linear-gradient(to bottom, transparent, #000 24px, #000 calc(100% - 24px), transparent);
+  }
+
+  /* premium chip */
+  .chip {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 2px 8px;
+    border-radius: 999px;
+    border: 1px solid rgb(var(--orion-border) / 0.10);
+    background: rgb(var(--orion-elevated));
+    font-size: 11px;
+    letter-spacing: 0.04em;
+    color: rgb(var(--orion-text-dim));
+  }
+
+  /* divider with label */
+  .divider-label {
+    display: flex; align-items: center; gap: 10px;
+    color: rgb(var(--orion-muted));
+    font-size: 10px;
+    letter-spacing: 0.24em;
+    text-transform: uppercase;
+  }
+  .divider-label::before,
+  .divider-label::after {
+    content: ""; flex: 1; height: 1px;
+    background: rgb(var(--orion-border) / 0.08);
+  }
+}
+
+/* Number inputs — siempre sin spinners (los nativos saltan raro con
+   `step` decimales y nuestros quick-pick los reemplazan visualmente). */
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type="number"] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+/* respect reduced-motion users — disable infinite ambient loops only */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 60ms !important;
   }
 }

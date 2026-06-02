@@ -59,6 +59,9 @@ export const api = {
   getApiKeyStatus: () => request<ApiKeyStatus>("GET", "/api/settings/api_key"),
   setApiKey:       (key: string) =>
     request<{ ok: true; configured: true }>("POST", "/api/settings/api_key", { key }),
+  getSharing:      () => request<SharingState>("GET", "/api/settings/sharing"),
+  setSharing:      (enabled: boolean) =>
+    request<SharingState & { ok: true }>("POST", "/api/settings/sharing", { enabled }),
 
   // Agent / TaskQueue
   listTasks:   () => request<Array<AgentTask>>("GET", "/api/agent/tasks"),
@@ -103,6 +106,20 @@ export const api = {
     request<{ ok: true; scene: string; result: string }>(
       "POST", `/api/iot/scenes/${sceneId}/run`,
     ),
+
+  // ── IoT admin (mutaciones de iot_config.json) ─────────────────────
+  iotConfig:     () => request<IoTFullConfig>("GET", "/api/iot/config"),
+  iotCreateDevice: (body: IoTDeviceBody) =>
+    request<{ ok: true; id: string }>("POST", "/api/iot/admin/devices", body),
+  iotUpdateDevice: (id: string, body: IoTDeviceBody) =>
+    request<{ ok: true; id: string }>("PUT", `/api/iot/admin/devices/${id}`, body),
+  iotDeleteDevice: (id: string) =>
+    request<{ ok: true; id: string }>("DELETE", `/api/iot/admin/devices/${id}`),
+  iotUpsertTransport: (id: string, body: IoTTransportBody) =>
+    request<{ ok: true; id: string }>("PUT", `/api/iot/admin/transports/${id}`, body),
+  iotDeleteTransport: (id: string) =>
+    request<{ ok: true; id: string }>("DELETE", `/api/iot/admin/transports/${id}`),
+  iotReload:     () => request<{ ok: true }>("POST", "/api/iot/admin/reload"),
 };
 
 // ── Types ──────────────────────────────────────────────────────────────
@@ -152,6 +169,12 @@ export interface ApiKeyStatus {
   path:       string | null;
 }
 
+export interface SharingState {
+  enabled:      boolean;
+  tailscale_ip: string | null;
+  port:         number;
+}
+
 export interface AgentTask {
   task_id: string;
   goal:    string;
@@ -172,6 +195,38 @@ export interface IoTDevice {
   name:         string;
   transport:    string;
   capabilities: IoTCapabilities;
+  serial?:      Record<string, unknown> | null;
+  mqtt?:        Record<string, unknown> | null;
+}
+
+/** Lo que mandamos al POST/PUT de admin/devices. */
+export interface IoTDeviceBody {
+  id?:          string;          // solo en POST
+  name:         string;
+  transport:    string;
+  capabilities: IoTCapabilities;
+  serial?:      Record<string, unknown>;
+  mqtt?:        Record<string, unknown>;
+}
+
+/** Transport en disco. Discriminado por `type`. */
+export type IoTTransportBody =
+  | { type: "serial"; port: string; baud?: number }
+  | {
+      type: "mqtt";
+      host: string;
+      mqtt_port?: number;
+      username?: string;
+      password?: string;
+      client_id?: string;
+      tls?: boolean;
+    };
+
+export interface IoTFullConfig {
+  version:    number;
+  transports: Record<string, Record<string, unknown>>;
+  devices:    Record<string, Record<string, unknown>>;
+  scenes:     Record<string, unknown>;
 }
 
 export interface IoTScene {
