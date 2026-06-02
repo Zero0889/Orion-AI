@@ -34,7 +34,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from config import BASE_DIR
+from config import BASE_DIR, RESOURCES_DIR
 from core.logger import get_logger
 
 log = get_logger("server.app")
@@ -143,7 +143,7 @@ def build_app(bus: Any) -> FastAPI:
     # En modo dev (Vite en :5173) este bloque no aplica — el usuario abre
     # http://localhost:5173 directamente. En modo prod (Tauri / portable)
     # FastAPI sirve los archivos generados por ``npm run build``.
-    dist_dir = (Path(BASE_DIR) / "web" / "dist").resolve()
+    dist_dir = (Path(RESOURCES_DIR) / "web" / "dist").resolve()
     if dist_dir.is_dir() and (dist_dir / "index.html").is_file():
         assets_dir = dist_dir / "assets"
         if assets_dir.is_dir():

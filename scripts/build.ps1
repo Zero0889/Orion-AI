@@ -30,17 +30,13 @@ $triple = (rustc -vV | Select-String "host:" -SimpleMatch | ForEach-Object {
 })
 Write-Host "    target-triple: $triple"
 
-$src = "$repo/dist/orion-backend/orion-backend.exe"
+$src = "$repo/dist/orion-backend.exe"
 $dstDir = "$repo/src-tauri/binaries"
 New-Item -ItemType Directory -Force $dstDir | Out-Null
 Copy-Item $src "$dstDir/orion-backend-$triple.exe" -Force
 
-# Tauri también necesita la carpeta de _internal con los datos. La
-# copiamos como recurso para que el sidecar la encuentre al arrancar.
-# (Esto se hace fuera del manifest porque la carpeta puede pesar 100+ MB
-# y queremos comprimirla solo en el bundle final.)
-Copy-Item "$repo/dist/orion-backend/_internal" `
-    "$dstDir/_internal" -Recurse -Force
+# Modo onefile: PyInstaller mete Python + deps dentro del exe.
+# No hace falta copiar _internal/ por separado.
 
 Write-Host "==> 4/4  Tauri build" -ForegroundColor Cyan
 Push-Location "$repo/src-tauri"
@@ -48,6 +44,6 @@ cargo tauri build
 Pop-Location
 
 Write-Host ""
-Write-Host "✓ Listo. Instalador en:" -ForegroundColor Green
+Write-Host "[OK] Listo. Instalador en:" -ForegroundColor Green
 Get-ChildItem -Recurse "$repo/src-tauri/target/release/bundle/" -Filter "*.msi"  -ErrorAction SilentlyContinue
 Get-ChildItem -Recurse "$repo/src-tauri/target/release/bundle/" -Filter "*.exe" -ErrorAction SilentlyContinue

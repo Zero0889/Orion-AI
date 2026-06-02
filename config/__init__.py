@@ -14,16 +14,33 @@ from pathlib import Path
 # ── Ruta base del proyecto ──────────────────────────────────────────────────
 
 def get_base_dir() -> Path:
+    """User-writable root (config, memory). Next to exe in frozen mode."""
     if getattr(sys, "frozen", False):
         return Path(sys.executable).parent
     return Path(__file__).resolve().parent.parent
 
 
-BASE_DIR    = get_base_dir()
-CONFIG_DIR  = BASE_DIR / "config"
-MEMORY_DIR  = BASE_DIR / "memory"
-CORE_DIR    = BASE_DIR / "core"
-PLUGINS_DIR = BASE_DIR / "plugins"
+def get_resources_dir() -> Path:
+    """Read-only bundled assets (web/dist, prompt.txt, plugins).
+
+    En PyInstaller onefile las datas se extraen a ``sys._MEIPASS``,
+    no junto al exe. Para que el server encuentre el frontend
+    compilado hay que apuntar ahí.
+    """
+    if getattr(sys, "frozen", False):
+        meipass = getattr(sys, "_MEIPASS", None)
+        if meipass:
+            return Path(meipass)
+        return Path(sys.executable).parent
+    return Path(__file__).resolve().parent.parent
+
+
+BASE_DIR      = get_base_dir()
+RESOURCES_DIR = get_resources_dir()
+CONFIG_DIR    = BASE_DIR / "config"
+MEMORY_DIR    = BASE_DIR / "memory"
+CORE_DIR      = RESOURCES_DIR / "core"
+PLUGINS_DIR   = RESOURCES_DIR / "plugins"
 
 API_CONFIG_PATH    = CONFIG_DIR / "api_keys.json"
 BROWSER_CONFIG_PATH = CONFIG_DIR / "browser.json"
