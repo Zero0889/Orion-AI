@@ -39,7 +39,11 @@ from core.logger import get_logger
 
 log = get_logger("server.app")
 
-DEFAULT_HOST = "127.0.0.1"
+# Bindeamos a todas las interfaces para que dispositivos en la red privada
+# Tailscale (rango 100.64.0.0/10) puedan llegar al backend. El acceso real
+# se filtra por IP en server.sharing.SharingMiddleware — con "sharing OFF"
+# solo localhost pasa, así que bindear a 0.0.0.0 es seguro.
+DEFAULT_HOST = "0.0.0.0"
 DEFAULT_PORT = 8765
 
 
@@ -98,6 +102,8 @@ def build_app(bus: Any) -> FastAPI:
 
     # CORS: el frontend React (Vite dev en :5173 por defecto) debe poder
     # llamar al backend en :8765. Sin esto, fetch desde otro origen falla.
+    # Para acceso vía Tailscale, allow_origin_regex matchea cualquier host
+    # del rango 100.x.x.x (CGNAT que Tailscale usa).
     app.add_middleware(
         CORSMiddleware,
         allow_origins=[
@@ -106,10 +112,17 @@ def build_app(bus: Any) -> FastAPI:
             # Cuando empaquetemos con Tauri, el WebView carga desde
             # tauri://localhost — la añadiremos en su momento.
         ],
+        allow_origin_regex=r"^https?://100\.(6[4-9]|[789]\d|1[01]\d|12[0-7])\.\d+\.\d+(:\d+)?$",
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+    # ── Sharing (filtra por IP en cada request) ──────────────────────────
+    # Cargado desde config/sharing.json al arrancar; toggleable via API.
+    from server.sharing import init_state as init_sharing, install as install_sharing
+    init_sharing()
+    install_sharing(app)
 
     # ── Endpoint de salud (Fase 1, sin auth) ─────────────────────────────
     @app.get("/api/health")

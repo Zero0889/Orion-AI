@@ -243,10 +243,114 @@ def load_config(path: Path | None = None) -> IoTConfig:
 
 
 def save_config(cfg: IoTConfig, path: Path | None = None) -> None:
-    """Escribe el config en disco (formateado, UTF-8)."""
+    """Escribe el config en disco (formateado, UTF-8, atómico).
+
+    Estrategia atómica: escribe a ``<archivo>.tmp`` y luego ``os.replace`` —
+    así si el proceso muere a media escritura, el config original queda
+    intacto. Si ya existía un config válido, también deja un backup
+    ``iot_config.prev.bak.json`` con la versión anterior.
+    """
+    import os
+
     p = Path(path) if path else IOT_CONFIG_PATH
     p.parent.mkdir(parents=True, exist_ok=True)
-    p.write_text(
+
+    # Backup de la versión anterior (best-effort)
+    if p.exists():
+        try:
+            shutil.copy2(p, p.with_name("iot_config.prev.bak.json"))
+        except Exception as e:
+            print(f"[IoT-Config] ⚠️ No se pudo hacer backup previo: {e}")
+
+    tmp = p.with_suffix(p.suffix + ".tmp")
+    tmp.write_text(
         json.dumps(cfg.to_dict(), indent=2, ensure_ascii=False),
         encoding="utf-8",
     )
+    os.replace(tmp, p)
+
+
+# ── Validadores para mutaciones via API ─────────────────────────────────────
+
+
+def validate_transport(
+    tcfg: dict,
+    existing: dict[str, dict] | None = None,
+    self_id: str | None = None,
+) -> list[str]:
+    """Devuelve lista de errores (vacía = válido).
+
+    Si se pasa ``existing`` (mapa transport_id → config), también valida
+    que el puerto COM no esté ya en uso por otro transport serial — Windows
+    solo permite que UN proceso abra un puerto serial a la vez, así que
+    duplicar COMx entre dos transports siempre rompería uno de ellos.
+    """
+    errs: list[str] = []
+    ttype = (tcfg.get("type") or "").lower()
+    if ttype not in ("serial", "mqtt"):
+        errs.append(f"type debe ser 'serial' o 'mqtt' (recibido: '{ttype}')")
+        return errs
+
+    if ttype == "serial":
+        port = (tcfg.get("port") or "").strip()
+        if not port:
+            errs.append("serial.port es obligatorio (ej. 'COM1', '/dev/ttyUSB0')")
+        baud = tcfg.get("baud", 9600)
+        if not isinstance(baud, int) or baud <= 0:
+            errs.append("serial.baud debe ser un entero positivo")
+
+        # Detectar conflicto de COM con otros transports serial existentes
+        if port and existing:
+            for other_id, other_cfg in existing.items():
+                if other_id == self_id:
+                    continue
+                if (other_cfg.get("type") or "").lower() != "serial":
+                    continue
+                if (other_cfg.get("port") or "").strip().lower() == port.lower():
+                    errs.append(
+                        f"El puerto '{port}' ya lo usa el transport "
+                        f"'{other_id}'. Reasigna ese transport o elige "
+                        f"otro COM — Windows solo permite un proceso por puerto."
+                    )
+
+    if ttype == "mqtt":
+        if not tcfg.get("host"):
+            errs.append("mqtt.host es obligatorio (ej. 'broker.hivemq.com')")
+        port = tcfg.get("port", 1883)
+        if not isinstance(port, int) or not (0 < port < 65536):
+            errs.append("mqtt.port debe ser un entero 1..65535")
+
+    return errs
+
+
+def validate_device(dev_data: dict, transports: dict) -> list[str]:
+    """Devuelve lista de errores (vacía = válido)."""
+    errs: list[str] = []
+    if not dev_data.get("name"):
+        errs.append("name es obligatorio")
+    tr = dev_data.get("transport")
+    if not tr:
+        errs.append("transport es obligatorio")
+    elif tr not in transports:
+        errs.append(f"transport '{tr}' no existe en transports")
+
+    caps = dev_data.get("capabilities") or {}
+    if not any([caps.get("on_off"), caps.get("dimmable"),
+                caps.get("rgb"), caps.get("sensor")]):
+        errs.append("el dispositivo necesita al menos una capability "
+                    "(on_off / dimmable / rgb / sensor)")
+
+    # Validación específica por transporte
+    ttype = (transports.get(tr, {}).get("type") or "").lower() if tr else ""
+    if ttype == "mqtt":
+        mqtt = dev_data.get("mqtt") or {}
+        if caps.get("on_off") and not mqtt.get("topic_command"):
+            errs.append("mqtt.topic_command es obligatorio para dispositivos on/off")
+        if caps.get("sensor") and not mqtt.get("topic_state"):
+            errs.append("mqtt.topic_state es obligatorio para sensores")
+    elif ttype == "serial":
+        serial_cfg = dev_data.get("serial") or {}
+        if caps.get("on_off") and not (serial_cfg.get("cmd_on") and serial_cfg.get("cmd_off")):
+            errs.append("serial.cmd_on y serial.cmd_off son obligatorios para on/off")
+
+    return errs

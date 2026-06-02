@@ -1,18 +1,109 @@
 {
-  "serial_port": "COM1",
-  "baud_rate": 9600,
+  "version": 2,
+  "transports": {
+    "esp32_mqtt": {
+      "type": "serial",
+      "port": "COM1",
+      "baud": 9600,
+      "all_on": "TODOS_ON",
+      "all_off": "TODOS_OFF"
+    },
+    "main_arduino": {
+      "type": "mqtt",
+      "host": "broker.hivemq.com",
+      "port": 1883,
+      "client_id": "orion"
+    }
+  },
   "devices": {
     "foco_1": {
       "name": "foco 1",
-      "cmd_on": "FOCO1_ON",
-      "cmd_off": "FOCO1_OFF"
+      "transport": "esp32_mqtt",
+      "capabilities": {
+        "on_off": true,
+        "dimmable": false,
+        "rgb": false,
+        "sensor": null
+      },
+      "serial": {
+        "cmd_on": "FOCO1_ON",
+        "cmd_off": "FOCO1_OFF"
+      },
+      "mqtt": {
+        "topic_command": "orion/zahir/foco_1/set",
+        "topic_state": "orion/zahir/foco_1/state",
+        "payload_on": "ON",
+        "payload_off": "OFF"
+      }
     },
     "foco_2": {
       "name": "foco 2",
-      "cmd_on": "FOCO2_ON",
-      "cmd_off": "FOCO2_OFF"
+      "transport": "esp32_mqtt",
+      "capabilities": {
+        "on_off": true,
+        "dimmable": false,
+        "rgb": false,
+        "sensor": null
+      },
+      "serial": {
+        "cmd_on": "FOCO2_ON",
+        "cmd_off": "FOCO2_OFF"
+      },
+      "mqtt": {
+        "topic_command": "orion/zahir/foco_2/set",
+        "topic_state": "orion/zahir/foco_2/state",
+        "payload_on": "ON",
+        "payload_off": "OFF"
+      }
+    },
+    "sensor_temperatura": {
+      "name": "sensor de temperatura",
+      "transport": "esp32_mqtt",
+      "capabilities": {
+        "on_off": false,
+        "dimmable": false,
+        "rgb": false,
+        "sensor": "temperature"
+      },
+      "serial": {
+        "sensor_prefix": "TEMPERATURA"
+      },
+      "mqtt": {
+        "topic_state": "orion/zahir/esp_sensores/dht",
+        "sensor_field": "temperatura"
+      }
+    },
+    "sensor_humedad": {
+      "name": "sensor de humedad",
+      "transport": "main_arduino",
+      "capabilities": {
+        "on_off": false,
+        "dimmable": false,
+        "rgb": false,
+        "sensor": "humidity"
+      },
+      "mqtt": {
+        "topic_state": "orion/zahir/esp_sensores/dht",
+        "sensor_field": "humedad"
+      }
+    },
+    "sensor_luz": {
+      "name": "sensor de luz",
+      "transport": "main_arduino",
+      "capabilities": {
+        "on_off": false,
+        "dimmable": false,
+        "rgb": false,
+        "sensor": "light"
+      },
+      "mqtt": {
+        "topic_state": "orion/zahir/esp_sensores/ldr"
+      }
     }
   },
-  "cmd_all_on": "TODOS_ON",
-  "cmd_all_off": "TODOS_OFF"
+  "global_commands": {
+    "all_on": "TODOS_ON",
+    "all_off": "TODOS_OFF"
+  },
+  "scenes": {}
 }

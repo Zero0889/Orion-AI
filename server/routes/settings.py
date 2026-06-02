@@ -94,6 +94,42 @@ async def set_api_key(body: ApiKeyBody, request: Request) -> dict:
     return {"ok": True, "configured": True}
 
 
+class SharingBody(BaseModel):
+    enabled: bool
+
+
+@router.get("/sharing")
+async def get_sharing_endpoint() -> dict:
+    """Devuelve el estado del toggle 'Compartir vía Tailscale' + la IP
+    Tailscale detectada (si está) para mostrarla en la UI."""
+    from server.sharing import get_sharing, detect_tailscale_ip
+    return {
+        "enabled":     get_sharing(),
+        "tailscale_ip": detect_tailscale_ip(),
+        "port":        8765,
+    }
+
+
+@router.post("/sharing")
+async def post_sharing_endpoint(body: SharingBody, request: Request) -> dict:
+    """Activa/desactiva el filtro de IP. Persiste en config/sharing.json
+    y notifica via bus (settings.sharing) para que el frontend re-renderice."""
+    from server.sharing import set_sharing, detect_tailscale_ip
+    enabled = set_sharing(body.enabled)
+    bus = getattr(request.app.state, "bus", None)
+    if bus is not None:
+        try:
+            bus.publish("settings.sharing", {"enabled": enabled})
+        except Exception:
+            pass
+    return {
+        "ok":           True,
+        "enabled":      enabled,
+        "tailscale_ip": detect_tailscale_ip(),
+        "port":         8765,
+    }
+
+
 @router.patch("/theme")
 async def patch_theme(body: ThemePatch, request: Request) -> dict:
     if body.name not in THEMES:
