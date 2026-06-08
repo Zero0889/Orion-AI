@@ -41,3 +41,18 @@ skills-lock.json
 
 # CLI binarios auxiliares descargados por core.cli_installer
 tools/
+
+# ── Notas y auditorías locales (no son parte del producto) ──────────────────
+AUDIT*.md
+NOTES*.md
+
+# ── Estado runtime (flags, locks, pids) ─────────────────────────────────────
+config/*.flag
+*.pid
+*.lock
+
+# ── Atajos y artefactos del SO ──────────────────────────────────────────────
+*.lnk
+.DS_Store
+Thumbs.db
+desktop.ini
