@@ -82,6 +82,15 @@ export class OrionSocket {
     this.ws.onmessage = (ev) => {
       try {
         const data = JSON.parse(ev.data as string) as ServerEvent;
+        // El server manda un `ping` cada 30s para detectar clientes
+        // zombi. Respondemos con `pong` y no lo propagamos al store —
+        // no es un evento de dominio, es housekeeping.
+        if (data.type === "ping") {
+          if (this.ws?.readyState === WebSocket.OPEN) {
+            this.ws.send(JSON.stringify({ type: "pong", payload: {} }));
+          }
+          return;
+        }
         this.onEvent(data);
       } catch {
         // mensaje inválido: ignorar

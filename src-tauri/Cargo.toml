@@ -12,7 +12,7 @@ rust-version = "1.70"
 tauri-build = { version = "1.5", features = [] }
 
 [dependencies]
-tauri      = { version = "1.6", features = ["api-all", "shell-sidecar", "shell-open", "process-command-api", "process-exit"] }
+tauri      = { version = "1.6", features = [ "shell-sidecar", "shell-open", "process-command-api", "process-exit"] }
 serde      = { version = "1", features = ["derive"] }
 serde_json = "1"
 

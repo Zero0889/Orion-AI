@@ -60,7 +60,7 @@ def _save_config_key(key: str, value) -> None:
 def _get_os() -> str:
     return _load_config().get("os_system", "windows").lower()
 
-_LIVE_MODEL         = "models/gemini-2.5-flash-native-audio-preview-12-2025"
+_LIVE_MODEL         = "models/gemini-2.5-flash"
 _CHANNELS           = 1
 _RECEIVE_SAMPLE_RATE = 24_000
 _CHUNK_SIZE         = 1_024
@@ -306,7 +306,15 @@ class _VisionSession:
                 )
                 print(f"[Vision] 📤 Enviados {len(image_bytes):,} bytes — '{user_text[:60]}'")
             except Exception as e:
-                print(f"[Vision] ⚠️  Error de envío: {e}")
+                err_msg = str(e)[:200]
+                print(f"[Vision] ⚠️  Error de envío: {err_msg}")
+                if self._player:
+                    try:
+                        self._player.write_log(f"ERROR: No se pudo enviar la imagen al modelo Vision. {err_msg}")
+                    except Exception:
+                        pass
+                # Don't crash — continue processing next images
+                await asyncio.sleep(0.5)
 
     async def _recv_loop(self) -> None:
         transcript: list[str] = []
@@ -318,6 +326,14 @@ class _VisionSession:
                 sc = response.server_content
                 if not sc:
                     continue
+
+                # Handle model errors gracefully (e.g. unsupported input)
+                if sc.model_turn:
+                    for part in sc.model_turn.parts or []:
+                        if hasattr(part, "text") and part.text:
+                            chunk = part.text.strip()
+                            if chunk:
+                                transcript.append(chunk)
 
                 if sc.output_transcription and sc.output_transcription.text:
                     chunk = sc.output_transcription.text.strip()
@@ -333,7 +349,13 @@ class _VisionSession:
                     transcript = []
 
         except Exception as e:
-            print(f"[Vision] ⚠️  Error de recepción: {e}")
+            err_msg = str(e)[:200]
+            print(f"[Vision] ⚠️  Error de recepción: {err_msg}")
+            if self._player:
+                try:
+                    self._player.write_log(f"ERROR: Visión desconectada — {err_msg}")
+                except Exception:
+                    pass
             raise
 
     async def _play_loop(self) -> None:

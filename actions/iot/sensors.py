@@ -59,12 +59,20 @@ class SensorCache:
             self._values.clear()
 
 
-# Singleton del proceso (un solo cache para todo ORION)
+# Singleton del proceso (un solo cache para todo ORION).
+# Double-checked locking: la primera llamada concurrente desde dos threads
+# (típico: serial_tx y mqtt_tx arrancando en paralelo) creaba DOS instancias
+# distintas y las lecturas se perdían en la que no quedaba como singleton.
 _cache: Optional[SensorCache] = None
+_cache_lock = threading.Lock()
 
 
 def get_cache() -> SensorCache:
     global _cache
-    if _cache is None:
-        _cache = SensorCache()
-    return _cache
+    # Fast path sin lock para el 99.9% de las llamadas.
+    if _cache is not None:
+        return _cache
+    with _cache_lock:
+        if _cache is None:
+            _cache = SensorCache()
+        return _cache

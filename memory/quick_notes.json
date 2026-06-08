@@ -5,7 +5,7 @@
     "color": "",
     "pinned": true,
     "created": "2026-05-27T12:32:38",
-    "updated": "2026-05-27T22:33:29"
+    "updated": "2026-05-31T08:41:30"
   },
   {
     "id": "0650295b",
@@ -30,5 +30,13 @@
     "pinned": false,
     "created": "2026-05-27T16:52:12",
     "updated": "2026-05-27T22:35:30"
+  },
+  {
+    "id": "201a0f6b",
+    "text": "planear viaje a Cusco para julio",
+    "color": "",
+    "pinned": false,
+    "created": "2026-06-02T17:00:11",
+    "updated": "2026-06-02T17:00:11"
   }
 ]

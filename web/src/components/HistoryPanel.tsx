@@ -1,31 +1,16 @@
 /**
- * HistoryPanel — historial de conversaciones.
+ * HistoryPanel — conversation history.
  *
- * Lista izquierda con las conversaciones (más reciente arriba).
- * Click → muestra el detalle a la derecha con todos los mensajes.
- * Botón para borrar (con confirmación).
+ * Two-pane layout: list (left) + detail (right). Premium card list with
+ * hover affordances. Detail re-uses the chat presentation style.
  */
 
 import { useEffect, useState } from "react";
 
 import { api, type ConversationDetail, type ConversationSummary } from "@/api/rest";
 import { useOrionStore } from "@/stores/orion";
-
-const ROLE_STYLES: Record<string, string> = {
-  user: "self-end bg-pri-dim/40 border-pri/30",
-  ai:   "self-start bg-panel2 border-border-b",
-  sys:  "self-center bg-transparent border-border text-text-dim text-xs italic",
-  err:  "self-start bg-pri-dim/30 border-pri text-pri",
-  file: "self-center bg-panel2 border-acc text-acc text-xs",
-};
-
-const ROLE_LABEL: Record<string, string> = {
-  user: "Tú",
-  ai:   "ORION",
-  sys:  "Sistema",
-  err:  "Error",
-  file: "Archivo",
-};
+import { Icon } from "@/ui/Icon";
+import { Badge, Empty, SectionHeader, Surface } from "@/ui/primitives";
 
 export function HistoryPanel() {
   const rev = useOrionStore((s) => s.rev.convs);
@@ -61,75 +46,128 @@ export function HistoryPanel() {
 
   return (
     <div className="flex flex-col h-full">
-      <header className="px-6 py-4 border-b border-border-b">
-        <h2 className="text-sm uppercase tracking-[0.3em] text-text-dim">Historial</h2>
-        <p className="text-xs text-text-dim/70 mt-1">{list.length} conversación{list.length === 1 ? "" : "es"}</p>
-      </header>
+      <SectionHeader
+        eyebrow="Conocimiento"
+        title="Historial"
+        hint="Conversaciones pasadas con Orion, persistidas localmente."
+        action={<Badge tone="neutral">{list.length}</Badge>}
+      />
 
       {error && (
-        <div className="mx-4 mt-3 p-2 text-xs rounded border border-pri bg-pri/10 text-pri">
-          {error}
+        <div className="mx-6 mt-3 flex items-start gap-2 p-3 rounded-md border border-danger/30 bg-danger/10 text-xs text-danger">
+          <Icon name="alert" size={14} className="mt-0.5 shrink-0" /><span>{error}</span>
         </div>
       )}
 
-      <div className="grid grid-cols-[260px_1fr] flex-1 overflow-hidden">
-        {/* Lista */}
-        <aside className="border-r border-border-b overflow-y-auto scrollbar-thin">
+      <div className="grid grid-cols-[300px_1fr] flex-1 overflow-hidden">
+        {/* list */}
+        <aside className="border-r border-white/[0.06] overflow-y-auto scrollbar-thin p-3">
           {list.length === 0 && (
-            <p className="text-center text-text-dim text-sm italic mt-6 px-3">
-              Sin conversaciones guardadas.
-            </p>
+            <Empty icon="history" title="Sin conversaciones" hint="Cuando tengas tu primera charla con Orion aparecerá aquí." />
           )}
-          {list.map((c) => (
-            <button
-              key={c.id}
-              onClick={() => setActive(c.id)}
-              className={`group w-full text-left px-3 py-2 border-b border-border-b
-                transition flex flex-col gap-0.5
-                ${active === c.id
-                  ? "bg-pri-dim/20 border-l-2 border-l-pri"
-                  : "hover:bg-panel2"}`}
-            >
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-sm truncate">{c.title || "Conversación"}</span>
+          <div className="flex flex-col gap-1.5">
+            {list.map((c, i) => {
+              const isActive = active === c.id;
+              return (
                 <button
-                  onClick={(e) => { e.stopPropagation(); remove(c.id); }}
-                  className="opacity-0 group-hover:opacity-100 text-text-dim hover:text-pri"
-                  title="Borrar"
-                >×</button>
-              </div>
-              <div className="text-[10px] uppercase tracking-widest text-text-dim flex gap-2">
-                <span>{c.messages} msg</span>
-                <span>·</span>
-                <span>{c.started}</span>
-              </div>
-            </button>
-          ))}
+                  key={c.id}
+                  onClick={() => setActive(c.id)}
+                  style={{ animationDelay: `${i * 20}ms` }}
+                  className={[
+                    "group relative text-left rounded-lg px-3 py-2.5 border transition-all duration-200 ease-out-expo animate-fade-in",
+                    isActive
+                      ? "bg-pri/10 border-pri/35 shadow-glow-soft"
+                      : "bg-elevated/40 border-white/[0.05] hover:border-white/[0.12]",
+                  ].join(" ")}
+                >
+                  {isActive && (
+                    <span className="absolute left-0 top-2 bottom-2 w-[2px] rounded-full bg-pri shadow-[0_0_8px_rgb(var(--orion-pri))]" />
+                  )}
+                  <div className="flex items-center justify-between gap-2">
+                    <span className={`text-sm font-medium truncate ${isActive ? "text-text" : "text-text"}`}>
+                      {c.title || "Conversación"}
+                    </span>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); remove(c.id); }}
+                      title="Borrar"
+                      className="h-6 w-6 grid place-items-center rounded text-muted
+                                 opacity-0 group-hover:opacity-100 hover:text-danger hover:bg-danger/10"
+                    >
+                      <Icon name="close" size={12} />
+                    </button>
+                  </div>
+                  <div className="mt-1 flex items-center gap-2 text-[10px] uppercase tracking-[0.18em] text-muted">
+                    <span>{c.messages} msg</span>
+                    <span className="text-white/[0.10]">·</span>
+                    <span>{c.started}</span>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
         </aside>
 
-        {/* Detalle */}
-        <main className="overflow-y-auto scrollbar-thin p-4 flex flex-col gap-2">
-          {!detail && (
-            <p className="text-center text-text-dim text-sm italic mt-6">
-              Selecciona una conversación a la izquierda.
-            </p>
-          )}
-          {detail?.messages.map((m, i) => (
-            <div
-              key={i}
-              className={`max-w-[80%] rounded-lg border px-3 py-2 ${ROLE_STYLES[m.role] ?? ROLE_STYLES.sys}`}
-            >
-              {m.role !== "sys" && m.role !== "file" && (
-                <div className="text-[10px] uppercase tracking-widest text-text-dim mb-1">
-                  {ROLE_LABEL[m.role] ?? m.role}
-                </div>
-              )}
-              <div className="whitespace-pre-wrap leading-relaxed text-sm">{m.text}</div>
-              <div className="text-[10px] text-text-dim mt-1">{m.ts}</div>
+        {/* detail */}
+        <main className="overflow-y-auto scrollbar-thin">
+          {!detail ? (
+            <div className="h-full grid place-items-center">
+              <Empty icon="chat" title="Selecciona una conversación" hint="Haz clic en cualquier elemento de la lista para abrirla." />
             </div>
-          ))}
+          ) : (
+            <div className="mx-auto max-w-3xl px-6 py-6 flex flex-col gap-5 animate-fade-in">
+              <header className="border-b border-white/[0.06] pb-3 mb-1">
+                <div className="text-[10px] uppercase tracking-[0.22em] text-pri/80">Conversación</div>
+                <h3 className="text-base font-semibold text-text mt-0.5">{detail.title || detail.id}</h3>
+                <div className="text-[11px] text-muted mt-0.5">{detail.started}</div>
+              </header>
+              {detail.messages.map((m, i) => (
+                <DetailMessage key={i} role={m.role} text={m.text} ts={m.ts} />
+              ))}
+            </div>
+          )}
         </main>
       </div>
+    </div>
+  );
+}
+
+function DetailMessage({ role, text, ts }: { role: string; text: string; ts: string }) {
+  if (role === "sys" || role === "err") {
+    return (
+      <div className="flex items-center gap-2 my-1">
+        <span className={`h-1 w-1 rounded-full ${role === "err" ? "bg-danger" : "bg-muted"}`} />
+        <span className={`text-xs italic ${role === "err" ? "text-danger" : "text-text-dim"}`}>{text}</span>
+        <span className="text-[10px] text-muted ml-1">{ts}</span>
+      </div>
+    );
+  }
+  if (role === "file") {
+    return (
+      <div className="self-start">
+        <Surface level={2} className="inline-flex items-center gap-2 px-3 py-1.5 text-xs text-acc">
+          <Icon name="paperclip" size={13} /><span>{text}</span>
+        </Surface>
+      </div>
+    );
+  }
+  if (role === "user") {
+    return (
+      <div className="self-end max-w-[78%]">
+        <div className="rounded-2xl rounded-tr-md px-4 py-2.5 bg-pri/10 border border-pri/20">
+          <div className="whitespace-pre-wrap leading-relaxed text-sm text-text">{text}</div>
+        </div>
+        <div className="text-right text-[9px] uppercase tracking-[0.22em] text-muted mt-1">Tú · {ts}</div>
+      </div>
+    );
+  }
+  return (
+    <div className="self-start max-w-[90%]">
+      <div className="flex items-center gap-2 mb-1.5">
+        <span className="h-2 w-2 rounded-full bg-pri" />
+        <span className="text-[10px] uppercase tracking-[0.22em] text-pri/90 font-medium">Orion</span>
+        <span className="text-[10px] text-muted">{ts}</span>
+      </div>
+      <div className="whitespace-pre-wrap leading-[1.7] text-[15px] text-text">{text}</div>
     </div>
   );
 }

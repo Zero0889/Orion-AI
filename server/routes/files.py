@@ -38,14 +38,13 @@ from pathlib import Path
 
 from fastapi import APIRouter, File, HTTPException, Request, UploadFile
 
-from config import BASE_DIR
+from config import UPLOADS_DIR
 from core.logger import get_logger
 
 log = get_logger("server.routes.files")
 router = APIRouter()
 
 
-UPLOADS_DIR = Path(BASE_DIR) / "uploads"
 MAX_BYTES   = 50 * 1024 * 1024   # 50 MB
 _SAFE_NAME  = re.compile(r"[^A-Za-z0-9._-]+")
 

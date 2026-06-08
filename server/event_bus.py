@@ -41,7 +41,7 @@ from __future__ import annotations
 import asyncio
 import threading
 import time
-from typing import Any, Awaitable, Callable, Optional
+from typing import Any, Callable, Optional
 
 from core.logger import get_logger
 from memory.conversations import ConversationSession, get_conversation
@@ -52,7 +52,6 @@ log = get_logger("event_bus")
 # Tipos auxiliares
 TextCommandCallback = Callable[[str], None]
 InterruptCallback   = Callable[[], None]
-Subscriber          = Callable[[str, dict], Awaitable[None]]
 
 
 # ============================================================================
@@ -78,9 +77,15 @@ class OrionEventBus:
     """
 
     OUTBOUND_QUEUE_MAX = 512
+    _instance: Optional[OrionEventBus] = None
+
+    @classmethod
+    def get_instance(cls) -> Optional[OrionEventBus]:
+        return cls._instance
 
     # ── Constructor ──────────────────────────────────────────────────────
     def __init__(self) -> None:
+        OrionEventBus._instance = self
         # Estado equivalente a OrionUI
         self._muted: bool = False
         self._current_file: Optional[str] = None
@@ -94,10 +99,6 @@ class OrionEventBus:
 
         # Sincronización del wizard de API key (sustituye self._win._ready)
         self._api_key_ready = threading.Event()
-
-        # Hub WebSocket: lista de clientes suscritos
-        self._subscribers: set[Subscriber] = set()
-        self._subscribers_lock = threading.Lock()
 
         # Cola de salida fan-out → consumer async la drena en Loop A
         self._outbound_queue: Optional[asyncio.Queue] = None
@@ -122,15 +123,6 @@ class OrionEventBus:
         """OrionLive informa su loop B nada más arrancar. Necesario para
         :meth:`submit_user_text` y :meth:`trigger_interrupt`."""
         self._live_loop = loop
-
-    # ── Suscriptores (clientes WebSocket) ────────────────────────────────
-    def subscribe(self, callback: Subscriber) -> None:
-        with self._subscribers_lock:
-            self._subscribers.add(callback)
-
-    def unsubscribe(self, callback: Subscriber) -> None:
-        with self._subscribers_lock:
-            self._subscribers.discard(callback)
 
     # ── API pública compatible con OrionUI ───────────────────────────────
     # Propiedades R/W
@@ -200,6 +192,41 @@ class OrionEventBus:
             return
         self._persist_log(text)
         self.publish("log", {"text": text, "ts": time.time()})
+
+    def stream_chunk(
+        self,
+        role: str,
+        delta: str,
+        turn_id: str,
+        final: bool = False,
+    ) -> None:
+        """Publica un chunk parcial al frontend para streaming en el chat.
+
+        Usado para que el texto aparezca palabra-por-palabra a medida que
+        Gemini Live lo va generando, en sync con el audio. No persiste —
+        la persistencia se hace al cerrar el turno con :meth:`persist_log_only`.
+
+        Args:
+            role:    "orion" o "user".
+            delta:   texto nuevo a anexar al mensaje en construcción.
+            turn_id: identificador estable del turno (mismo en todos los chunks).
+            final:   True en el último chunk para marcar el mensaje como cerrado.
+        """
+        self.publish("chat.stream", {
+            "role":    role,
+            "delta":   delta,
+            "turn_id": turn_id,
+            "final":   final,
+            "ts":      time.time(),
+        })
+
+    def persist_log_only(self, text: str) -> None:
+        """Persiste un log SIN publicar al WS — útil al cerrar un turno
+        que ya se mandó al frontend vía stream_chunk. Evita duplicación de
+        mensajes en el chat."""
+        if not text:
+            return
+        self._persist_log(text)
 
     def wait_for_api_key(self) -> None:
         """Bloquea hasta que la UI/REST confirme que hay API key.

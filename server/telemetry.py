@@ -27,6 +27,7 @@ from typing import Any
 
 import psutil
 
+from config import BASE_DIR
 from core.logger import get_logger
 
 log = get_logger("server.telemetry")
@@ -55,12 +56,17 @@ async def run(bus: Any) -> None:
             log.debug("Telemetry tick error: %s", e)
 
 
+# Disco a medir: el que aloja el proyecto. En Windows con C: como sistema
+# y BASE_DIR en otra unidad, medir "/" daba un porcentaje irrelevante.
+_DISK_PATH = str(BASE_DIR)
+
+
 def _sample() -> dict | None:
     try:
         cpu  = psutil.cpu_percent(interval=None) / 100.0
         vmem = psutil.virtual_memory()
         ram  = vmem.percent / 100.0
-        disk = psutil.disk_usage("/").percent / 100.0
+        disk = psutil.disk_usage(_DISK_PATH).percent / 100.0
     except Exception as e:
         log.debug("psutil falló: %s", e)
         return None

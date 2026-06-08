@@ -21,6 +21,7 @@ config/theme.json
 config/api_keys.json
 config/credentials.json
 config/gdrive_token.json
+config/providers.json
 
 # ── Drop-zone web (Fase 4): archivos subidos por el usuario ─────────────────
 uploads/
@@ -37,3 +38,6 @@ web/dist/
 .agents/
 .claude/
 skills-lock.json
+
+# CLI binarios auxiliares descargados por core.cli_installer
+tools/

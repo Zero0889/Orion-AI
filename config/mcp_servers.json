@@ -1,0 +1,57 @@
+{
+  "_comment": "Servidores MCP (Model Context Protocol) que ORION conecta al arrancar. Cada entrada en 'servers' lanza un subprocess que ORION usa como fuente de tools adicionales. Las tools aparecen automáticamente en Gemini Live, el executor y el planner — namespaceadas como '<server_id>__<tool_name>' para no colisionar con builtins. Si este archivo está vacío o no existe, MCP queda deshabilitado y solo se usan las 22 tools builtin.",
+  "_example": {
+    "filesystem": {
+      "_comment_command": "En Windows usá 'npx.cmd', en Linux/macOS 'npx'. shutil.which() lo resuelve por vos si está en el PATH.",
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-filesystem",
+        "C:/Users/zahir"
+      ],
+      "enabled": false,
+      "startup_timeout": 15,
+      "call_timeout": 60
+    },
+    "github": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-github"
+      ],
+      "env": {
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "ghp_xxxxxxxxxxxx"
+      },
+      "enabled": false
+    }
+  },
+  "servers": {
+    "fetch": {
+      "_comment": "Descarga URLs y convierte a Markdown limpio. uvx lo instala/cachea automaticamente la primera vez.",
+      "command": "uvx",
+      "args": ["mcp-server-fetch"],
+      "enabled": true,
+      "startup_timeout": 30,
+      "call_timeout": 60
+    },
+    "memory": {
+      "_comment": "Knowledge graph persistente. Por defecto guarda en memory.json del cwd del subprocess; setea MEMORY_FILE_PATH para fijar la ruta.",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-memory"],
+      "env": {
+        "MEMORY_FILE_PATH": "C:/Users/zahir/OneDrive/Desktop/O.R.I.O.N/memory/mcp_knowledge_graph.json"
+      },
+      "enabled": true,
+      "startup_timeout": 30,
+      "call_timeout": 30
+    },
+    "thinking": {
+      "_comment": "Sequential thinking — habilita razonamiento estructurado paso a paso para tareas complejas.",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-sequential-thinking"],
+      "enabled": true,
+      "startup_timeout": 30,
+      "call_timeout": 60
+    }
+  }
+}

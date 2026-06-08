@@ -100,19 +100,29 @@ def build_app(bus: Any) -> FastAPI:
     )
     app.state.bus = bus
 
-    # CORS: el frontend React (Vite dev en :5173 por defecto) debe poder
-    # llamar al backend en :8765. Sin esto, fetch desde otro origen falla.
-    # Para acceso vía Tailscale, allow_origin_regex matchea cualquier host
-    # del rango 100.x.x.x (CGNAT que Tailscale usa).
+    # CORS: el frontend React (Vite dev en :5173) y el host servido por el
+    # propio backend (DEFAULT_PORT) son los orígenes confiables. Si la IP
+    # Tailscale del equipo está detectable, la añadimos como origen
+    # explícito en lugar de aceptar TODO el rango 100/10 — el CGNAT
+    # también lo usan otros ISP, y `credentials=true` con regex amplia
+    # amplificaba el riesgo (ver auditoría I-08).
+    from server.sharing import detect_tailscale_ip
+    allowed_origins = [
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        f"http://127.0.0.1:{DEFAULT_PORT}",
+        f"http://localhost:{DEFAULT_PORT}",
+        # Tauri WebView (modo empaquetado) servirá assets desde el propio
+        # backend, así que comparte origen — no necesita entrada aparte.
+    ]
+    ts_ip = detect_tailscale_ip()
+    if ts_ip:
+        allowed_origins.append(f"http://{ts_ip}:{DEFAULT_PORT}")
+        allowed_origins.append(f"http://{ts_ip}:5173")
+
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=[
-            "http://localhost:5173",
-            "http://127.0.0.1:5173",
-            # Cuando empaquetemos con Tauri, el WebView carga desde
-            # tauri://localhost — la añadiremos en su momento.
-        ],
-        allow_origin_regex=r"^https?://100\.(6[4-9]|[789]\d|1[01]\d|12[0-7])\.\d+\.\d+(:\d+)?$",
+        allow_origins=allowed_origins,
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
@@ -137,8 +147,8 @@ def build_app(bus: Any) -> FastAPI:
 
     # ── Routers ───────────────────────────────────────────────────────────
     from server.routes import (
-        agent, conversations, files, iot, memory, notes,
-        settings as settings_route,
+        agent, conversations, files, iot, mcp, memory, notes, notifications,
+        skills, settings as settings_route,
     )
     app.include_router(memory.router,            prefix="/api/memory",        tags=["memory"])
     app.include_router(notes.router,             prefix="/api/notes",         tags=["notes"])
@@ -146,11 +156,22 @@ def build_app(bus: Any) -> FastAPI:
     app.include_router(settings_route.router,    prefix="/api/settings",      tags=["settings"])
     app.include_router(agent.router,             prefix="/api/agent",         tags=["agent"])
     app.include_router(iot.router,               prefix="/api/iot",           tags=["iot"])
+    app.include_router(mcp.router,               prefix="/api/mcp",           tags=["mcp"])
+    app.include_router(skills.router,            prefix="/api/skills",        tags=["skills"])
+    app.include_router(notifications.router,     prefix="/api/notifications", tags=["notifications"])
     app.include_router(files.router,             prefix="/api/files",         tags=["files"])
 
     # ── WebSocket hub ────────────────────────────────────────────────────
     from server.ws import register_ws
     register_ws(app, bus)
+
+    # ── Notification poller (Gmail + Classroom en background) ─────────────
+    try:
+        from actions.notifications import get_poller, start_poller
+        get_poller().set_publish(bus.publish)
+        start_poller()
+    except Exception as e:
+        log.warning("Notification poller no arrancó: %s", e)
 
     # ── Frontend estático (Fase 2: si web/dist existe, se sirve aquí) ────
     # En modo dev (Vite en :5173) este bloque no aplica — el usuario abre

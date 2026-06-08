@@ -50,8 +50,20 @@ class IoTSystem:
 
     def __init__(self) -> None:
         self.cfg = load_config()
-        self._init_transports()
-        self._wire_sensors()
+        if not self._is_paused():
+            self._init_transports()
+            self._wire_sensors()
+        else:
+            print("[IoT] ⏸ Pausado por iot_paused.flag — no abro transports.")
+
+    @staticmethod
+    def _is_paused() -> bool:
+        """True si existe el flag de pausa que setea /api/iot/admin/disconnect."""
+        try:
+            from config import IOT_CONFIG_PATH
+            return (IOT_CONFIG_PATH.parent / "iot_paused.flag").exists()
+        except Exception:
+            return False
 
     # ── Hot reload ────────────────────────────────────────────────────────
     def reload(self) -> None:
@@ -65,8 +77,11 @@ class IoTSystem:
 
         close_all()
         self.cfg = load_config()
-        self._init_transports()
-        self._wire_sensors()
+        if not self._is_paused():
+            self._init_transports()
+            self._wire_sensors()
+        else:
+            print("[IoT] ⏸ Reload con flag de pausa activo — sigue desconectado.")
 
     # ── Setup interno ────────────────────────────────────────────────────
     def _init_transports(self) -> None:

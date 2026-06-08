@@ -146,9 +146,12 @@ class TaskQueue:
         with self._lock:
             return [
                 {
-                    "task_id": t.task_id,
-                    "goal":    t.goal[:50],
-                    "status":  t.status.value,
+                    "task_id":    t.task_id,
+                    "goal":       t.goal,        # completo, ya no cortamos a 50
+                    "status":     t.status.value,
+                    "result":     t.result,
+                    "error":      t.error,
+                    "created_at": t.created_at,
                 }
                 for t in self._tasks.values()
             ]
@@ -191,6 +194,8 @@ class TaskQueue:
 
     def _run_task(self, task: Task) -> None:
         print(f"[TaskQueue] ▶️ Running: [{task.task_id}] {task.goal[:60]}")
+        should_callback = False
+        callback_arg: Any = None
         try:
             executor = self._get_executor()
             result   = executor.execute(
@@ -198,32 +203,42 @@ class TaskQueue:
                 speak       = task.speak,
                 cancel_flag = task.cancel_flag,
             )
-
-            with self._lock:
-                if task.cancel_flag.is_set():
+            cancelled = task.cancel_flag.is_set()
+            # Mutamos estado + liberamos slot + notificamos al worker en
+            # un único paso atómico bajo _condition. Sin esto, el worker
+            # podía quedarse esperando hasta el timeout de 1s aunque el
+            # slot ya estuviera libre. Lo importante es notify() ANTES de
+            # ejecutar on_complete (que puede tardar).
+            with self._condition:
+                if cancelled:
                     task.status = TaskStatus.CANCELLED
                 else:
                     task.status = TaskStatus.COMPLETED
                     task.result = result
                 self._active_count -= 1
-
-            if task.on_complete and not task.cancel_flag.is_set():
-                try:
-                    task.on_complete(task.task_id, result)
-                except Exception as e:
-                    print(f"[TaskQueue] ⚠️ on_complete callback error: {e}")
-
+                self._condition.notify_all()
+            should_callback = not cancelled
+            callback_arg = result
             print(f"[TaskQueue] ✅ Completed: [{task.task_id}]")
 
         except Exception as e:
-            with self._lock:
+            err_msg = str(e)
+            with self._condition:
                 task.status = TaskStatus.FAILED
-                task.error  = str(e)
+                task.error  = err_msg
                 self._active_count -= 1
-            print(f"[TaskQueue] ❌ Failed: [{task.task_id}] {e}")
+                self._condition.notify_all()
+            should_callback = True
+            callback_arg = f"❌ Tarea falló: {err_msg}"
+            print(f"[TaskQueue] ❌ Failed: [{task.task_id}] {err_msg}")
 
-        with self._condition:
-            self._condition.notify()
+        # on_complete corre FUERA del lock — un callback lento no debe
+        # bloquear al worker de despachar la siguiente tarea.
+        if task.on_complete and should_callback:
+            try:
+                task.on_complete(task.task_id, callback_arg)
+            except Exception as cb_err:
+                print(f"[TaskQueue] ⚠️ on_complete callback error: {cb_err}")
 
 _queue        = TaskQueue()
 _queue_started = False

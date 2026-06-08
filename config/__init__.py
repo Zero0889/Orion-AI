@@ -49,6 +49,23 @@ IOT_CONFIG_PATH    = CONFIG_DIR / "iot_config.json"
 MEMORY_PATH        = MEMORY_DIR / "long_term.json"
 PROMPT_PATH        = CORE_DIR / "prompt.txt"
 
+# Carpetas de runtime overridables por env var. PROJECTS_DIR la usa
+# ``actions/dev_agent.py`` para clonar/scaffold proyectos generados por el
+# Coder; UPLOADS_DIR la usa ``server/routes/files.py`` para drop-zone.
+# Defaults pensados para Windows + OneDrive sin asumir que Desktop existe.
+def _default_projects_dir() -> Path:
+    env = os.environ.get("ORION_PROJECTS_DIR", "").strip()
+    if env:
+        return Path(env)
+    desktop = Path.home() / "Desktop"
+    if desktop.exists():
+        return desktop / "OrionProjects"
+    return BASE_DIR / "projects"
+
+
+PROJECTS_DIR = _default_projects_dir()
+UPLOADS_DIR  = Path(os.environ.get("ORION_UPLOADS_DIR", "").strip() or (BASE_DIR / "uploads"))
+
 
 # ── Carga de configuración ──────────────────────────────────────────────────
 
