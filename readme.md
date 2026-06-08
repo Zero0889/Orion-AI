@@ -1,38 +1,69 @@
-# 🤖 O.R.I.O.N
+<div align="center">
+
+# O.R.I.O.N
+
 ### Operador de Redes Inteligentes y Optimización Neural
 
-A real-time voice AI that can hear, see, understand, and control your computer — on any OS. Supporting Windows, macOS, and Linux. Local execution. Zero subscriptions. Engineered for total autonomy.
+**Asistente de IA personal multimodal — voz en tiempo real, visión, control del sistema. Local, multiplataforma, sin suscripciones.**
+
+[![License: CC BY-NC 4.0](https://img.shields.io/badge/license-CC%20BY--NC%204.0-blue.svg)](https://creativecommons.org/licenses/by-nc/4.0/)
+[![Python](https://img.shields.io/badge/python-3.11%20%7C%203.12-blue.svg)](https://www.python.org/)
+[![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey.svg)]()
+[![Stack](https://img.shields.io/badge/stack-FastAPI%20%7C%20React%20%7C%20Tauri-success.svg)]()
+[![Last commit](https://img.shields.io/github/last-commit/Zero0889/O.R.I.O.N---IA.svg)](https://github.com/Zero0889/O.R.I.O.N---IA/commits/master)
+
+<!-- Reemplaza esta línea con un GIF o screenshot de Orion en acción (assets/hero.gif) -->
+<!-- ![Orion demo](assets/hero.gif) -->
+
+</div>
 
 ---
 
-## ✨ Overview
+## Tabla de contenidos
 
-O.R.I.O.N es un asistente de IA personal avanzado y multiplataforma. Conecta el sistema operativo con la intención humana. A través de diálogo natural, O.R.I.O.N analiza tu pantalla, procesa documentos cargados y ejecuta flujos de trabajo complejos con una interfaz adaptativa.
-
-It's not just an assistant — it's an extension of your digital life.
+- [¿Qué es Orion?](#-qué-es-orion)
+- [Capacidades](#-capacidades)
+- [Novedades](#-novedades)
+- [Quick Start](#-quick-start)
+- [Interfaz web](#-interfaz-web)
+- [Arquitectura](#-arquitectura)
+- [Empaquetado nativo](#-empaquetado-nativo-tauri--pyinstaller)
+- [Requisitos](#-requisitos)
+- [Troubleshooting](#-troubleshooting)
+- [Licencia](#-licencia)
 
 ---
 
-## 🚀 Capabilities
+## 🧠 ¿Qué es Orion?
 
-### Core Features
-| Feature | Description |
+Orion es un asistente de IA personal avanzado y multiplataforma que conecta tu sistema operativo con la intención humana. A través de diálogo natural, analiza tu pantalla, procesa documentos cargados y ejecuta flujos de trabajo complejos sobre una interfaz web adaptativa servida en local.
+
+No es solo un asistente — es una extensión de tu vida digital.
+
+---
+
+## 🚀 Capacidades
+
+| Feature | Descripción |
 |---|---|
-| 🎙️ Real-time Voice | Ultra-low latency conversation in any language |
-| 🖥️ System Control | Launch apps, manage files, execute terminal commands |
-| 🧩 Autonomous Tasks | High-level planning for complex, multi-step goals |
-| 👁️ Visual Awareness | Real-time screen processing and webcam vision |
-| 🧠 Persistent Memory | Deeply remembers your projects, preferences, and personal context |
-| ⌨️ Hybrid Input | Seamlessly switch between keyboard typing and voice commands |
+| 🎙️ Voz en tiempo real | Conversación con latencia ultra-baja en cualquier idioma |
+| 🖥️ Control del sistema | Lanza apps, gestiona archivos, ejecuta comandos de terminal |
+| 🧩 Tareas autónomas | Planificación de alto nivel para objetivos multi-paso |
+| 👁️ Conciencia visual | Procesado de pantalla y webcam en tiempo real |
+| 🧠 Memoria persistente | Recuerda proyectos, preferencias y contexto personal |
+| ⌨️ Input híbrido | Cambia entre teclado y voz sin fricción |
+| 🏠 IoT integrado | Control de dispositivos Wokwi/Arduino con admin CRUD |
+| 🔌 Ecosistema MCP | Skills, Agents y Notifications conectables vía Model Context Protocol |
 
 ---
 
 ## 🆕 Novedades
 
-- 📂 **Advanced File Handling** — New support for direct file uploads. Drop PDFs, source code, or images into the assistant to have them analyzed, summarized, or edited instantly.
-- 🎨 **Adaptive & Flexible UI** — A complete overhaul of the interface. The new UI is fully resizable and responsive, featuring transparency controls and customizable layouts to fit your workspace perfectly.
-- 🐧🍎 **Refined Cross-Platform Stability** — Major fixes for macOS and Linux compatibility. Core system actions are now more consistent across all three major operating systems.
-- ⚡ **Optimized Core Engine** — Significant performance boost in tool-calling logic and response generation, resulting in a 40% faster interaction speed.
+- 📂 **Gestión avanzada de archivos** — Drop de PDFs, código o imágenes para análisis, resumen o edición instantánea.
+- 🎨 **UI adaptativa** — Interfaz redimensionable y responsive, con transparencias y layouts customizables.
+- 🐧🍎 **Estabilidad cross-platform** — Fixes mayores para macOS y Linux. Acciones del sistema consistentes en los tres OS.
+- ⚡ **Motor optimizado** — 40% más rápido en tool-calling y generación de respuestas.
+- 🔧 **Ecosistema MCP completo** — Skills + Agents + Notifications con paneles dedicados.
 
 ---
 
@@ -44,13 +75,13 @@ playwright install
 python main.py
 ```
 
-> ⚠️ **Installation Note:** To keep the repository lightweight, some OS-specific dependencies are not bundled in `requirements.txt`. If you run into a `ModuleNotFoundError`, simply install the missing package via `pip install <module_name>` for your specific system.
+> ⚠️ **Nota de instalación:** para mantener el repo ligero, algunas dependencias específicas del SO no están en `requirements.txt`. Si te aparece un `ModuleNotFoundError`, instala el paquete que falta con `pip install <module_name>`.
 
 ---
 
 ## 🖥️ Interfaz web
 
-Desde la **Fase 7** Orion es web-only: la UI vive en `web/` (React + TypeScript + Tailwind) y la sirve FastAPI desde el mismo puerto que la API. La antigua interfaz PyQt6 fue retirada — su código está en el historial de la rama `migration/web-ui` por si alguien necesita rescatar algo.
+Desde la **Fase 7** Orion es web-only: la UI vive en `web/` (React + TypeScript + Tailwind) y la sirve FastAPI desde el mismo puerto que la API. La antigua UI PyQt6 quedó en el historial de la rama `migration/web-ui`.
 
 ```powershell
 python main.py
@@ -63,7 +94,9 @@ Esto:
 
 Para procesos sidecar (Tauri) o despliegues sin GUI, define `ORION_NO_BROWSER=1` y nada se autoabre.
 
-**Desarrollo del frontend** (hot reload sobre cambios en `web/src/`):
+### Desarrollo del frontend
+
+Hot reload sobre cambios en `web/src/`:
 
 ```bash
 cd web
@@ -71,11 +104,11 @@ npm install      # solo la primera vez
 npm run dev      # http://localhost:5173 → backend en :8765
 ```
 
-Para producción / Tauri, `npm run build` deja el bundle en `web/dist/`. El backend lo sirve automáticamente bajo `/`.
+Para producción / Tauri: `npm run build` deja el bundle en `web/dist/` y el backend lo sirve bajo `/` automáticamente.
 
 ### Atajo `.bat` en el escritorio
 
-Para arrancar Orion con un doble click sin abrir terminal:
+Doble click sin abrir terminal:
 
 ```batch
 @echo off
@@ -85,13 +118,11 @@ python main.py
 pause
 ```
 
-Guarda eso como `Orion-Web.bat`. Para ponerle ícono: click derecho → **Crear acceso directo** → click derecho en el acceso directo → **Propiedades** → **Cambiar icono** → selecciona `src-tauri/icons/icon.ico`.
+Guárdalo como `Orion-Web.bat`. Para añadir ícono: click derecho → **Crear acceso directo** → **Propiedades** → **Cambiar icono** → `src-tauri/icons/icon.ico`.
 
 ---
 
-## 📦 Empaquetado nativo (Tauri + PyInstaller)
-
-Desde la **Fase 6** Orion puede distribuirse como aplicación de escritorio firmada con instalador `.msi` / `.dmg` / `.deb` / `.AppImage`. La estructura:
+## 🏗️ Arquitectura
 
 ```
 ┌─────────────── Tauri app (~5 MB Rust) ────────────────┐
@@ -106,6 +137,19 @@ Desde la **Fase 6** Orion puede distribuirse como aplicación de escritorio firm
 └───────────────────────────────────────────────────────┘
 ```
 
+**Stack principal:**
+- **Backend**: Python 3.11 · FastAPI · uvicorn · WebSocket
+- **Frontend**: React · TypeScript · Tailwind · Zustand
+- **Desktop**: Tauri 1.x (Rust) · PyInstaller (sidecar)
+- **LLM**: Gemini Live (multiprovedor vía abstracción)
+- **Extensiones**: MCP (Model Context Protocol) · Skills · Agents
+
+---
+
+## 📦 Empaquetado nativo (Tauri + PyInstaller)
+
+Desde la **Fase 6** Orion puede distribuirse como aplicación de escritorio firmada con instalador `.msi` / `.dmg` / `.deb` / `.AppImage`.
+
 ### Prerequisitos
 
 | Herramienta | Versión | Notas |
@@ -116,7 +160,7 @@ Desde la **Fase 6** Orion puede distribuirse como aplicación de escritorio firm
 | `cargo-tauri` | 1.x | `cargo install tauri-cli --version "^1.6"` |
 | Iconos | — | ver `src-tauri/icons/README.md` |
 
-Una vez tengas todo:
+### Build
 
 ```powershell
 # Windows
@@ -133,9 +177,9 @@ El script hace los 4 pasos en orden:
 3. Renombra el binario a `orion-backend-<target-triple>.exe` y lo copia a `src-tauri/binaries/`
 4. `cargo tauri build` → instalador final en `src-tauri/target/release/bundle/`
 
-> **Nota sobre onefile**: el backend va empaquetado como un único `.exe` autocontenido (~150 MB) con Python + todas las deps embebidas. PyInstaller lo extrae a `%TEMP%\_MEI*` la primera vez (3-5 s extra de arranque). Esto evita tener que distribuir una carpeta `_internal/` aparte, que Tauri 1.x no maneja bien junto al `externalBin`.
+> **Nota sobre onefile**: el backend va empaquetado como un único `.exe` autocontenido (~150 MB) con Python + todas las deps embebidas. PyInstaller lo extrae a `%TEMP%\_MEI*` la primera vez (3–5 s extra de arranque). Esto evita distribuir una carpeta `_internal/` aparte, que Tauri 1.x no maneja bien junto al `externalBin`.
 
-### Qué se distribuye
+### Distribución
 
 - **Windows**: `.msi` o `.exe` (NSIS)
 - **macOS**: `.dmg` con bundle `.app`
@@ -143,7 +187,23 @@ El script hace los 4 pasos en orden:
 
 El binario final lleva todo dentro: no necesita Python instalado en la máquina del usuario.
 
-### Troubleshooting
+---
+
+## 📋 Requisitos
+
+| Requisito | Detalle |
+|---|---|
+| **SO** | Windows 10/11, macOS o Linux |
+| **Python** | 3.11 o 3.12 |
+| **Micrófono** | Necesario para interacción por voz |
+| **API Key** | Clave gratuita de Gemini |
+
+---
+
+## 🐛 Troubleshooting
+
+<details>
+<summary>Problemas comunes de empaquetado y arranque</summary>
 
 | Síntoma | Causa habitual | Solución |
 |---|---|---|
@@ -151,30 +211,21 @@ El binario final lleva todo dentro: no necesita Python instalado en la máquina 
 | Ventana se abre <1 s y desaparece, Edge se abre solo | Sidecar muere por path roto + el backend abre el navegador por defecto. | Asegúrate de que `RESOURCES_DIR` apunte a `sys._MEIPASS` en modo frozen, y que Tauri setea `ORION_NO_BROWSER=1` antes de spawnear (ya en `main.rs`). |
 | `{"detail":"Not Found"}` al abrir | `web/dist/` no se encuentra dentro del bundle. | Mismo fix: usar `RESOURCES_DIR` (no `BASE_DIR`) para buscar el frontend. |
 | `Set-ExecutionPolicy no se reconoce` | Estás en CMD, no en PowerShell. | Abre **PowerShell** (prompt empieza con `PS`), no `cmd.exe`. |
-| `package.json not found` en step 4 | `beforeBuildCommand` resolvía mal el path (`../web` desde la raíz del proyecto). | Cambiado a `npm --prefix web run build` en `tauri.conf.json`. |
+| `package.json not found` en step 4 | `beforeBuildCommand` resolvía mal el path. | Cambiado a `npm --prefix web run build` en `tauri.conf.json`. |
 | `Acceso denegado` / `PermissionDenied` en `cargo tauri build` | Procesos viejos de Orion vivos, o OneDrive sincronizando `target/`. | `Stop-Process orion*`; pausa OneDrive; idealmente saca el proyecto de OneDrive. |
 | Falta icono al hacer `cargo tauri build` | No has generado los iconos. | `cargo tauri icon ruta\a\logo.png` (PNG cuadrado 1024×1024). |
 | PyInstaller no encuentra módulos de plugins | Carga dinámica que el análisis estático no detecta. | Ya añadido `collect_submodules("plugins")` en `packaging/orion_backend.spec`. |
-| `TerminatorExpectedAtEndOfString` al correr el build script | PowerShell 5.1 lee UTF-8 sin BOM como Windows-1252 y rompe caracteres especiales. | Usa solo ASCII en los scripts `.ps1`, o guárdalos con BOM, o actualiza a PowerShell 7 (`winget install Microsoft.PowerShell`). |
+| `TerminatorExpectedAtEndOfString` al correr el build script | PowerShell 5.1 lee UTF-8 sin BOM como Windows-1252 y rompe caracteres especiales. | Usa solo ASCII en los `.ps1`, guárdalos con BOM, o actualiza a PowerShell 7. |
 | Pantalla blanca >30 s | Backend tardó demasiado en arrancar. | Mira logs del sidecar (Tauri los reenvía a stderr). |
 
----
-
-## 📋 Requirements
-
-| Requirement | Details |
-|---|---|
-| **OS** | Windows 10/11, macOS, or Linux |
-| **Python** | 3.11 or 3.12 |
-| **Microphone** | Required for voice interaction |
-| **API Key** | Free Gemini API key |
+</details>
 
 ---
 
-## ⚠️ License
+## ⚠️ Licencia
 
-Personal and non-commercial use only.
-Licensed under **[Creative Commons BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/)**.
+Uso personal y no comercial.
+Bajo licencia **[Creative Commons BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/)**.
 
 ---
 
