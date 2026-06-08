@@ -63,15 +63,18 @@ export const api = {
   setSharing:      (enabled: boolean) =>
     request<SharingState & { ok: true }>("POST", "/api/settings/sharing", { enabled }),
 
-  // Agent / TaskQueue
-  listTasks:   () => request<Array<AgentTask>>("GET", "/api/agent/tasks"),
-  submitTask:  (goal: string, priority: "low" | "normal" | "high" = "normal") =>
-    request<{ task_id: string; status: string; goal: string }>(
-      "POST", "/api/agent/tasks", { goal, priority },
-    ),
-  cancelTask:  (id: string) =>
-    request<{ ok: true; id: string; status: string }>(
-      "POST", `/api/agent/tasks/${id}/cancel`,
+  // Agent — chat directo + orquesta CRUD
+  listOrchestra:   () => request<Array<OrchestraAgent>>("GET", "/api/agent/orchestra"),
+  listProviders:   () => request<Array<ProviderCatalog>>("GET", "/api/agent/providers"),
+  createAgent:     (spec: AgentSpec) =>
+    request<OrchestraAgent>("POST", "/api/agent/orchestra", spec),
+  updateAgent:     (id: string, patch: Partial<AgentSpec>) =>
+    request<OrchestraAgent>("PUT", `/api/agent/orchestra/${id}`, patch),
+  deleteAgent:     (id: string) =>
+    request<{ ok: true; id: string }>("DELETE", `/api/agent/orchestra/${id}`),
+  agentChat:       (agentId: string, message: string, history?: Array<{role: string; text: string}>) =>
+    request<{ agent_id: string; message: string; response: string }>(
+      "POST", `/api/agent/${agentId}/chat`, { message, history: history ?? [] },
     ),
 
   // Files / drop-zone
@@ -120,7 +123,150 @@ export const api = {
   iotDeleteTransport: (id: string) =>
     request<{ ok: true; id: string }>("DELETE", `/api/iot/admin/transports/${id}`),
   iotReload:     () => request<{ ok: true }>("POST", "/api/iot/admin/reload"),
+  iotPausedStatus: () => request<{ paused: boolean }>("GET", "/api/iot/admin/paused"),
+  iotDisconnect:   () => request<{ ok: true; paused: true }>("POST", "/api/iot/admin/disconnect"),
+  iotConnect:      () => request<{ ok: true; paused: false }>("POST", "/api/iot/admin/connect"),
+
+  // ── MCP (servidores externos) ─────────────────────────────────────
+  mcpListServers:   () => request<Array<MCPServerStatus>>("GET", "/api/mcp/servers"),
+  mcpListTools:     () => request<Array<MCPToolInfo>>("GET", "/api/mcp/tools"),
+  mcpCreateServer:  (body: MCPServerBody & { id: string }) =>
+    request<MCPServerStatus>("POST", "/api/mcp/servers", body),
+  mcpUpdateServer:  (id: string, body: MCPServerBody) =>
+    request<MCPServerStatus>("PUT", `/api/mcp/servers/${id}`, body),
+  mcpDeleteServer:  (id: string) =>
+    request<void>("DELETE", `/api/mcp/servers/${id}`),
+  mcpRestartServer: (id: string) =>
+    request<{ ok: true; server_id: string; tool_count: number }>(
+      "POST", `/api/mcp/servers/${id}/restart`,
+    ),
+  mcpReload:        () =>
+    request<{ ok: true; tool_count: number }>("POST", "/api/mcp/reload"),
+  mcpRegistrySearch: (q: string, limit = 20, cursor?: string) => {
+    const qs = new URLSearchParams({ q, limit: String(limit) });
+    if (cursor) qs.set("cursor", cursor);
+    return request<MCPRegistryPage>("GET", `/api/mcp/registry/search?${qs.toString()}`);
+  },
+  mcpRegistryStars: (repoUrl: string) => {
+    const qs = new URLSearchParams({ repo_url: repoUrl });
+    return request<{ repo_url: string; stars: number | null }>(
+      "GET", `/api/mcp/registry/stars?${qs.toString()}`,
+    );
+  },
+  mcpRecipes: () => request<MCPRecipe[]>("GET", "/api/mcp/recipes"),
+
+  // ── Skills (formato SKILL.md tipo OpenClaw/Anthropic) ─────────────
+  listSkills:   () => request<Array<SkillSummary>>("GET", "/api/skills/"),
+  getSkill:     (id: string) => request<SkillDetail>("GET", `/api/skills/${id}`),
+  reloadSkills: () => request<{ ok: true; count: number }>("POST", "/api/skills/reload"),
+  searchSkillRegistry: (q = "") =>
+    request<Array<SkillRegistryItem>>("GET", `/api/skills/registry/search?q=${encodeURIComponent(q)}`),
+  installSkill: (name: string, source = "openclaw") =>
+    request<{ ok: true; id: string; files: string[]; path: string; loaded: boolean }>(
+      "POST", "/api/skills/install", { name, source },
+    ),
+  // Legacy aliases (compat con código viejo del panel; usan los genéricos por debajo)
+  gogStatus:  () => request<CliStatus>("GET", "/api/skills/cli/gog/status"),
+  gogInstall: (force = false) =>
+    request<{ ok: true; name: string; path: string }>(
+      "POST", `/api/skills/cli/gog/install${force ? "?force=true" : ""}`,
+    ),
+  listCli:   () => request<Array<CliInfo>>("GET", "/api/skills/cli"),
+  cliStatus: (name: string) =>
+    request<CliStatus>("GET", `/api/skills/cli/${name}/status`),
+  cliInstall: (name: string, force = false) =>
+    request<{ ok: true; name: string; path: string }>(
+      "POST", `/api/skills/cli/${name}/install${force ? "?force=true" : ""}`,
+    ),
+
+  // ── Notificaciones (Gmail + Classroom) ──────────────────────────────
+  listNotifications: (opts: { source?: string; unread?: boolean } = {}) => {
+    const q = new URLSearchParams();
+    if (opts.source) q.set("source", opts.source);
+    if (opts.unread) q.set("unread", "true");
+    const qs = q.toString();
+    return request<Array<NotifItem>>("GET", `/api/notifications${qs ? "?" + qs : ""}`);
+  },
+  notificationsStatus: () =>
+    request<NotifPollerStatus>("GET", "/api/notifications/status"),
+  pollNotifications: (source?: string) =>
+    request<Record<string, unknown>>(
+      "POST", `/api/notifications/poll${source ? "?source=" + encodeURIComponent(source) : ""}`,
+    ),
+  markNotificationsRead: (uids: string[]) =>
+    request<{ ok: true; marked: number }>(
+      "POST", "/api/notifications/mark-read", { uids },
+    ),
+  markAllNotificationsRead: (source?: string) =>
+    request<{ ok: true; marked: number }>(
+      "POST", `/api/notifications/mark-all-read${source ? "?source=" + encodeURIComponent(source) : ""}`,
+    ),
+  authorizeClassroom: () =>
+    request<{ ok: true; token_path: string }>(
+      "POST", "/api/notifications/classroom/authorize",
+    ),
 };
+
+export interface NotifItem {
+  uid:         string;
+  source:      string;
+  title:       string;
+  summary:     string;
+  url:         string | null;
+  received_ts: number;
+  metadata:    Record<string, unknown>;
+}
+
+export interface NotifPollerStatus {
+  running:     boolean;
+  last_status: Record<string, { ok: boolean; ts: number; error?: string }>;
+  // Opcional para tolerar backends viejos que no expongan este campo.
+  is_configured?: Record<string, boolean>;
+  config:      {
+    enabled:          boolean;
+    interval_seconds: number;
+    max_per_source:   number;
+    sources:          Record<string, { enabled: boolean }>;
+  };
+}
+
+export interface SkillSummary {
+  id:             string;
+  name:           string;
+  description:    string;
+  user_invocable: boolean;
+  char_count:     number;
+  path:           string;
+}
+
+export interface SkillDetail extends SkillSummary {
+  body:        string;
+  frontmatter: Record<string, unknown>;
+  max_inject:  number;
+}
+
+export interface SkillRegistryItem {
+  id:       string;
+  html_url: string;
+  source:   "openclaw";
+}
+
+export interface CliInfo {
+  name:        string;
+  repo:        string;
+  version:     string;
+  description: string;
+  installed:   boolean;
+  path:        string | null;
+}
+
+export interface CliStatus {
+  name:      string;
+  installed: boolean;
+  path:      string | null;
+  managed:   boolean;
+  version:   string;
+}
 
 // ── Types ──────────────────────────────────────────────────────────────
 export interface NoteApi {
@@ -175,12 +321,50 @@ export interface SharingState {
   port:         number;
 }
 
-export interface AgentTask {
-  task_id: string;
-  goal:    string;
-  status:  "pending" | "running" | "completed" | "failed" | "cancelled";
-  result?: unknown;
-  error?:  string;
+export interface OrchestraAgent {
+  id:                string;
+  role:              string;
+  icon:              string;
+  description:       string;
+  provider:          string;
+  model:             string;
+  temperature:       number;
+  tools:             string[];
+  system:            string;
+  enabled:           boolean;
+  fallback_provider: string | null;
+  fallback_model:    string | null;
+  available:         boolean;
+}
+
+/** Lo que mandamos al POST (crear) y PUT (patch parcial) de /api/agent/orchestra. */
+export interface AgentSpec {
+  id?:                string;   // solo en POST
+  role?:              string;
+  icon?:              string;
+  description?:       string;
+  provider?:          string;
+  model?:             string;
+  temperature?:       number;
+  tools?:             string[];
+  system?:            string;
+  enabled?:           boolean;
+  fallback_provider?: string | null;
+  fallback_model?:    string | null;
+}
+
+export interface ProviderModel {
+  id:    string;
+  label: string;
+}
+
+export interface ProviderCatalog {
+  id:        string;          // "gemini", "openrouter", "groq", ...
+  label:     string;          // "Gemini", "OpenRouter", ...
+  free:      boolean;         // ¿tier gratuito?
+  auth_hint: string;          // dónde poner la key
+  models:    ProviderModel[]; // sugeridos en dropdown
+  available: boolean;         // ¿key configurada?
 }
 
 export interface IoTCapabilities {
@@ -254,4 +438,110 @@ export interface CurrentFile {
   name:   string;
   size:   number | null;
   exists: boolean;
+}
+
+// ── MCP ─────────────────────────────────────────────────────────────────
+export interface MCPServerBody {
+  command:          string;
+  args?:            string[];
+  env?:             Record<string, string>;
+  enabled?:         boolean;
+  cwd?:             string | null;
+  startup_timeout?: number;
+  call_timeout?:    number;
+}
+
+export interface MCPToolBrief {
+  name:        string;
+  description: string;
+}
+
+export interface MCPServerStatus {
+  id:               string;
+  command:          string;
+  args:             string[];
+  env:              Record<string, string>;
+  enabled:          boolean;
+  cwd:              string | null;
+  startup_timeout:  number;
+  call_timeout:     number;
+  running:          boolean;
+  tool_count:       number;
+  tools:            MCPToolBrief[];
+  error?:           string | null;
+}
+
+export interface MCPToolInfo {
+  name:        string;
+  server_id:   string;
+  description: string;
+  timeout:     number;
+}
+
+// ── Registry (catálogo público) ─────────────────────────────────────────
+export interface MCPRegistryEnvVar {
+  name:        string;
+  description: string;
+  required:    boolean;
+}
+
+export interface MCPRegistryPackage {
+  command:       string;
+  args:          string[];
+  env_required:  MCPRegistryEnvVar[];
+  registry_type: string;
+  identifier:    string;
+  version:       string;
+}
+
+export interface MCPRegistryServer {
+  name:         string;
+  title:        string;
+  description:  string;
+  version:      string;
+  repository:   string | null;
+  packages:     MCPRegistryPackage[];
+  installable:  boolean;
+  /** True si el server solo expone transports HTTP/SSE (remote-only).
+   *  El cliente MCP actual de ORION es stdio, así que no son instalables
+   *  hoy — pero los mostramos diferenciados para que se sepa que existen. */
+  remote:       boolean;
+  remote_kinds: string[];
+}
+
+export interface MCPRegistryPage {
+  servers:     MCPRegistryServer[];
+  next_cursor: string | null;
+  count:       number;
+}
+
+// ── Recetas curadas (servers populares pre-armados) ────────────────────
+export type MCPRecipeCategory = "files" | "dev" | "web" | "ai" | "system";
+
+export interface MCPRecipePrompt {
+  key:         string;
+  label:       string;
+  description: string;
+  default:     string;
+  required:    boolean;
+}
+
+export interface MCPRecipeEnv {
+  name:        string;
+  description: string;
+  required:    boolean;
+}
+
+export interface MCPRecipe {
+  recipe_id:     string;
+  title:         string;
+  description:   string;
+  category:      MCPRecipeCategory;
+  command:       string;
+  args_template: string[];
+  suggested_id:  string;
+  repo_url:      string;
+  prompts:       MCPRecipePrompt[];
+  env_required:  MCPRecipeEnv[];
+  official:      boolean;
 }

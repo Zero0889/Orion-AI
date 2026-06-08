@@ -36,6 +36,9 @@ log = get_logger("server.ws")
 
 # Si un send tarda más que esto, asumimos que el cliente murió.
 SEND_TIMEOUT_S = 2.0
+# Heartbeat: cada 30s mandamos un ping para detectar clientes "zombi"
+# (navegador cerró la pestaña pero el socket sigue medio abierto).
+HEARTBEAT_INTERVAL_S = 30.0
 
 
 # ============================================================================
@@ -86,6 +89,33 @@ def register_ws(app: FastAPI, bus: Any) -> None:
                     for ws in dead:
                         clients.discard(ws)
 
+    # ── Heartbeat ─────────────────────────────────────────────────────────
+    # Manda un ping aplicativo cada 30s. _safe_send detecta clientes
+    # zombi (navegador cerró sin cerrar el socket) por el timeout; los
+    # purgamos igual que en el drain loop.
+    async def _heartbeat_loop() -> None:
+        log.info("WS heartbeat loop iniciado (cada %.0fs)", HEARTBEAT_INTERVAL_S)
+        while True:
+            try:
+                await asyncio.sleep(HEARTBEAT_INTERVAL_S)
+            except asyncio.CancelledError:
+                raise
+            ping = {"type": "ping", "payload": {"ts": asyncio.get_event_loop().time()}}
+            async with clients_lock:
+                snapshot = list(clients)
+            if not snapshot:
+                continue
+            results = await asyncio.gather(
+                *[_safe_send(ws, ping) for ws in snapshot],
+                return_exceptions=True,
+            )
+            dead = [ws for ws, ok in zip(snapshot, results) if ok is not True]
+            if dead:
+                async with clients_lock:
+                    for ws in dead:
+                        clients.discard(ws)
+                log.info("WS heartbeat: purgados %d clientes zombi", len(dead))
+
     async def _safe_send(ws: WebSocket, msg: dict) -> bool:
         try:
             if ws.client_state != WebSocketState.CONNECTED:
@@ -102,15 +132,17 @@ def register_ws(app: FastAPI, bus: Any) -> None:
     # (ver build_app). Exponemos las coroutines necesarias:
     async def _start_drain() -> None:
         app.state.ws_drain_task = asyncio.create_task(_drain_loop())
+        app.state.ws_heartbeat_task = asyncio.create_task(_heartbeat_loop())
 
     async def _stop_drain() -> None:
-        t = getattr(app.state, "ws_drain_task", None)
-        if t is not None:
-            t.cancel()
-            try:
-                await t
-            except (asyncio.CancelledError, Exception):
-                pass
+        for attr in ("ws_drain_task", "ws_heartbeat_task"):
+            t = getattr(app.state, attr, None)
+            if t is not None:
+                t.cancel()
+                try:
+                    await t
+                except (asyncio.CancelledError, Exception):
+                    pass
 
     # Guardamos referencias para que app.py las pueda invocar.
     app.state.ws_start_drain = _start_drain
@@ -176,5 +208,11 @@ async def _handle_client_message(bus: Any, msg: dict) -> None:
         if path:
             bus.current_file = path
 
+    elif msg_type == "pong":
+        # Respuesta del cliente a un ping; nada que hacer, llegó vivo.
+        pass
+
     else:
-        log.debug("WS mensaje ignorado: %s", msg_type)
+        # Subimos a warning para detectar drift frontend/backend tras
+        # refactors (un cliente que manda un type que el server no conoce).
+        log.warning("WS mensaje con type desconocido: %r", msg_type)

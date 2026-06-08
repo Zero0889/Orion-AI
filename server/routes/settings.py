@@ -34,8 +34,11 @@ class ThemePatch(BaseModel):
     name: str = Field(..., min_length=1)
 
 
+# Handlers con I/O sincrónico (load_theme_name, load_api_config) van como
+# `def` para que FastAPI los despache al threadpool y no bloqueen el loop.
+
 @router.get("/theme")
-async def get_theme_endpoint() -> dict:
+def get_theme_endpoint() -> dict:
     name = load_theme_name() or DEFAULT_THEME
     return {
         "name":      name,
@@ -49,7 +52,7 @@ class ApiKeyBody(BaseModel):
 
 
 @router.get("/api_key")
-async def get_api_key_status() -> dict:
+def get_api_key_status() -> dict:
     """No expone la key, sólo si está configurada (en env var o archivo).
 
     Esto es lo que el wizard del frontend usa para decidir si mostrarse
@@ -67,7 +70,7 @@ async def get_api_key_status() -> dict:
 
 
 @router.post("/api_key")
-async def set_api_key(body: ApiKeyBody, request: Request) -> dict:
+def set_api_key(body: ApiKeyBody, request: Request) -> dict:
     """Guarda la API key de Gemini en ``config/api_keys.json``.
 
     Si la key entra por env var ``ORION_GEMINI_KEY`` siempre toma
@@ -99,7 +102,7 @@ class SharingBody(BaseModel):
 
 
 @router.get("/sharing")
-async def get_sharing_endpoint() -> dict:
+def get_sharing_endpoint() -> dict:
     """Devuelve el estado del toggle 'Compartir vía Tailscale' + la IP
     Tailscale detectada (si está) para mostrarla en la UI."""
     from server.sharing import get_sharing, detect_tailscale_ip
@@ -111,7 +114,7 @@ async def get_sharing_endpoint() -> dict:
 
 
 @router.post("/sharing")
-async def post_sharing_endpoint(body: SharingBody, request: Request) -> dict:
+def post_sharing_endpoint(body: SharingBody, request: Request) -> dict:
     """Activa/desactiva el filtro de IP. Persiste en config/sharing.json
     y notifica via bus (settings.sharing) para que el frontend re-renderice."""
     from server.sharing import set_sharing, detect_tailscale_ip
@@ -131,7 +134,7 @@ async def post_sharing_endpoint(body: SharingBody, request: Request) -> dict:
 
 
 @router.patch("/theme")
-async def patch_theme(body: ThemePatch, request: Request) -> dict:
+def patch_theme(body: ThemePatch, request: Request) -> dict:
     if body.name not in THEMES:
         raise HTTPException(
             status_code=400,

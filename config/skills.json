@@ -1,0 +1,6 @@
+{
+  "_comment": "Skills cargadas por SkillLoader. 'search_paths' = carpetas relativas a la raíz donde buscar subcarpetas con SKILL.md. 'enabled' = lista blanca por id (vacío = todas las encontradas). 'max_inject_chars' = corte duro al inyectar el cuerpo en un system prompt (evita reventar contexto). Las skills NO son MCP servers — son markdown que el LLM lee para componer tools que ya tiene (shell, files, web).",
+  "search_paths":     ["skills"],
+  "enabled":          [],
+  "max_inject_chars": 8000
+}

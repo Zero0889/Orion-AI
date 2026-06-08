@@ -4,158 +4,162 @@ import sys
 from pathlib import Path
 
 from config import get_api_key
+from core.tool_registry  import ToolRegistry
+from core.tools_bootstrap import register_builtin_tools
+
+# Asegura que el registry esté poblado antes de renderizar el prompt.
+register_builtin_tools()
 
 
-PLANNER_PROMPT = """You are the planning module of O.R.I.O.N, a personal AI assistant.
-Your job: break any user goal into a sequence of steps using ONLY the tools listed below.
+def _build_agents_text() -> str:
+    """Renderiza la orquesta de agentes para el prompt del Director.
+
+    Import perezoso para evitar ciclos (registry → llm → config → ...).
+    Si agents.json no existe o no hay agentes, devuelve string vacío y el
+    Director sigue trabajando en modo single-agent como antes.
+    """
+    try:
+        from agent.registry import list_agents
+        agents = list_agents()
+    except Exception as e:
+        print(f"[Planner] ⚠️ Sin registro de agentes: {e}")
+        return ""
+
+    if not agents:
+        return ""
+
+    lines = ["AVAILABLE AGENTS (assign one to each step):", ""]
+    for a in agents:
+        tools = "all" if "*" in a.tools else ", ".join(a.tools)
+        lines.append(f"- {a.id} ({a.role}): {a.description} [tools: {tools}]")
+    lines.append("")
+    return "\n".join(lines)
+
+
+def _build_skills_text() -> str:
+    """Cataloga las skills instaladas para que el Director sepa cuándo
+    invocar ``use_skill``. Vacío si no hay skills."""
+    try:
+        from core.skills import build_skill_catalog_prompt
+        cat = build_skill_catalog_prompt()
+    except Exception as e:
+        print(f"[Planner] ⚠️ Sin catálogo de skills: {e}")
+        return ""
+    if not cat:
+        return ""
+    return (
+        "AVAILABLE SKILLS (load with use_skill BEFORE the step that needs them):\n"
+        f"{cat}\n\n"
+        "When a goal matches a skill description, plan TWO steps:\n"
+        "  1) any agent | use_skill | skill_id: \"<id>\"   (loads the recipe)\n"
+        "  2) coder | generated_code | description: \"<execute as the skill says>\"\n\n"
+    )
+
+
+def _build_planner_prompt() -> str:
+    """Renderiza el system prompt del planner con la lista de tools
+    autogenerada desde el ``ToolRegistry`` y la orquesta de agentes
+    desde ``agent.registry``. Si añades una tool al bootstrap o un
+    agente a ``config/agents.json``, aparece aquí sin tocar nada más.
+    """
+    tools_text  = ToolRegistry().to_planner_text()
+    agents_text = _build_agents_text()
+    skills_text = _build_skills_text()
+
+    return f"""You are the Director of O.R.I.O.N, a personal AI assistant orchestra.
+Your job: break any user goal into a sequence of steps using ONLY the tools
+listed below, and assign the right SPECIALIST AGENT to each step.
 
 ABSOLUTE RULES:
-- NEVER use generated_code or write Python scripts. It does not exist.
+- NEVER use generated_code unless the assigned agent has it in its tools list.
 - NEVER reference previous step results in parameters. Every step is independent.
 - Use web_search for ANY information retrieval, research, or current data.
 - Use file_controller to save content to disk.
 - Max 5 steps. Use the minimum steps needed.
+- Each step MUST include an "agent" field with the id of the specialist that runs it.
 
-AVAILABLE TOOLS AND THEIR PARAMETERS:
+{agents_text}{skills_text}AVAILABLE TOOLS AND THEIR PARAMETERS:
 
-open_app
-  app_name: string (required)
-
-web_search
-  query: string (required) — write a clear, focused search query
-  mode: "search" or "compare" (optional, default: search)
-  items: list of strings (optional, for compare mode)
-  aspect: string (optional, for compare mode)
-
-game_updater
-  action: "update" | "install" | "list" | "download_status" | "schedule" (required)
-  platform: "steam" | "epic" | "both" (optional, default: both)
-  game_name: string (optional)
-  app_id: string (optional)
-  shutdown_when_done: boolean (optional)
-
-browser_control
-  action: "go_to" | "search" | "click" | "type" | "scroll" | "get_text" | "press" | "close" (required)
-  url: string (for go_to)
-  query: string (for search)
-  text: string (for click/type)
-  direction: "up" | "down" (for scroll)
-
-file_controller
-  action: "write" | "create_file" | "read" | "list" | "delete" | "move" | "copy" | "find" | "disk_usage" (required)
-  path: string — use "desktop" for Desktop folder
-  name: string — filename
-  content: string — file content (for write/create_file)
-
-computer_settings
-  action: string (required)
-  description: string — natural language description
-  value: string (optional)
-
-computer_control
-  action: "type" | "click" | "hotkey" | "press" | "scroll" | "screenshot" | "screen_find" | "screen_click" (required)
-  text: string (for type)
-  x, y: int (for click)
-  keys: string (for hotkey, e.g. "ctrl+c")
-  key: string (for press)
-  direction: "up" | "down" (for scroll)
-  description: string (for screen_find/screen_click)
-
-screen_process
-  text: string (required) — what to analyze or ask about the screen
-  angle: "screen" | "camera" (optional)
-
-send_message
-  receiver: string (required)
-  message_text: string (required)
-  platform: string (required)
-
-reminder
-  date: string YYYY-MM-DD (required)
-  time: string HH:MM (required)
-  message: string (required)
-
-desktop_control
-  action: "wallpaper" | "organize" | "clean" | "list" | "task" (required)
-  path: string (optional)
-  task: string (optional)
-
-youtube_video
-  action: "play" | "summarize" | "trending" (required)
-  query: string (for play)
-
-weather_report
-  city: string (required)
-
-flight_finder
-  origin: string (required)
-  destination: string (required)
-  date: string (required)
-
-code_helper
-  action: "write" | "edit" | "run" | "explain" (required)
-  description: string (required)
-  language: string (optional)
-  output_path: string (optional)
-  file_path: string (optional)
-
-dev_agent
-  description: string (required)
-  language: string (optional)
-EXAMPLES:
+{tools_text}EXAMPLES:
 
 Goal: "research mechanical engineering and save it to a notepad file"
 Steps:
 
-web_search | query: "mechanical engineering overview definition history"
-web_search | query: "mechanical engineering applications and future trends"
-file_controller | action: write, path: desktop, name: mechanical_engineering.txt, content: "MECHANICAL ENGINEERING RESEARCH\n\nThis file will be filled with web research results."
+researcher | web_search   | query: "mechanical engineering overview definition history"
+researcher | web_search   | query: "mechanical engineering applications and future trends"
+fileops    | file_controller | action: write, path: desktop, name: mechanical_engineering.txt, content: "MECHANICAL ENGINEERING RESEARCH\\n\\nThis file will be filled with web research results."
 
 Goal: "What is the price of Bitcoin"
 Steps:
 
-web_search | query: "Bitcoin price today USD"
+researcher | web_search | query: "Bitcoin price today USD"
 
 Goal: "List the files on the desktop and find the largest 5 files"
 Steps:
 
-file_controller | action: list, path: desktop
-file_controller | action: largest, path: desktop, count: 5
+fileops | file_controller | action: list, path: desktop
+fileops | file_controller | action: largest, path: desktop, count: 5
 
 Goal: "Install PUBG from Steam"
 Steps:
 
-game_updater | action: install, platform: steam, game_name: "PUBG"
-
-Goal: "Update all my Steam games"
-Steps:
-
-game_updater | action: update, platform: steam
+director | game_updater | action: install, platform: steam, game_name: "PUBG"
 
 Goal: "Send John a message on WhatsApp saying there is a meeting tomorrow"
 Steps:
 
-send_message | receiver: John, message_text: "There is a meeting tomorrow", platform: WhatsApp
+director | send_message | receiver: John, message_text: "There is a meeting tomorrow", platform: WhatsApp
 
-Goal: "Open the clock and set a reminder for 30 minutes later"
+Goal: "Solve 17x^2 - 4x + 9 = 0 and explain"
 Steps:
 
-reminder | date: [today], time: [now+30min], message: "Reminder"
+mathematician | generated_code | description: "Solve quadratic 17*x**2 - 4*x + 9 = 0 with sympy, print roots and discriminant"
 
 OUTPUT — return ONLY valid JSON, no markdown, no explanation, no code blocks:
-{
+{{
   "goal": "...",
   "steps": [
-    {
+    {{
       "step": 1,
+      "agent": "researcher",
       "tool": "tool_name",
       "description": "what this step does",
-      "parameters": {},
+      "parameters": {{}},
       "critical": true
-    }
+    }}
   ]
-}
+}}
 """
+
+
+# Compatibilidad: expone PLANNER_PROMPT como antes para los call sites
+# que ya lo importaban como constante.
+PLANNER_PROMPT = _build_planner_prompt()
+
+
+def _normalize_agent(step: dict) -> None:
+    """Asegura que el paso tenga un campo ``agent`` válido. Si el Director
+    omitió el campo o asignó un agente inexistente/inhabilitado, cae al
+    primer agente habilitado capaz de usar la tool, y si no, al director."""
+    try:
+        from agent.registry import agent_for_tool, has_agent, agent_can_use, list_agents
+    except Exception:
+        return  # sin registro de agentes → modo legacy
+
+    tool = step.get("tool", "")
+    agent = step.get("agent")
+
+    if agent and has_agent(agent) and agent_can_use(agent, tool):
+        return
+
+    fallback = agent_for_tool(tool)
+    if fallback:
+        step["agent"] = fallback
+        return
+
+    enabled = list_agents()
+    if enabled:
+        step["agent"] = enabled[0].id
 
 
 def create_plan(goal: str, context: str = "") -> dict:
@@ -163,7 +167,7 @@ def create_plan(goal: str, context: str = "") -> dict:
 
     model = gemini.model(
         "gemini-2.5-flash-lite",
-        system_instruction=PLANNER_PROMPT
+        system_instruction=_build_planner_prompt()
     )
 
     user_input = f"Goal: {goal}"
@@ -182,14 +186,21 @@ def create_plan(goal: str, context: str = "") -> dict:
 
         for step in plan["steps"]:
             if step.get("tool") in ("generated_code",):
-                print(f"[Planner] ⚠️ generated_code detected in step {step.get('step')} — replacing with web_search")
-                desc = step.get("description", goal)
-                step["tool"] = "web_search"
-                step["parameters"] = {"query": desc[:200]}
+                # Solo lo permitimos si el agente asignado lo tiene en su lista.
+                from agent.registry import has_agent, agent_can_use
+                agent_id = step.get("agent", "")
+                allowed  = has_agent(agent_id) and agent_can_use(agent_id, "generated_code")
+                if not allowed:
+                    print(f"[Planner] ⚠️ generated_code rechazado en step {step.get('step')} (agente {agent_id!r}) — replacing with web_search")
+                    desc = step.get("description", goal)
+                    step["tool"] = "web_search"
+                    step["parameters"] = {"query": desc[:200]}
+                    step["agent"] = "researcher"
+            _normalize_agent(step)
 
         print(f"[Planner] ✅ Plan: {len(plan['steps'])} steps")
         for s in plan["steps"]:
-            print(f"  Step {s['step']}: [{s['tool']}] {s['description']}")
+            print(f"  Step {s['step']}: <{s.get('agent','?')}> [{s['tool']}] {s['description']}")
 
         return plan
 
@@ -203,18 +214,15 @@ def create_plan(goal: str, context: str = "") -> dict:
 
 def _fallback_plan(goal: str) -> dict:
     print("[Planner] 🔄 Fallback plan")
-    return {
-        "goal": goal,
-        "steps": [
-            {
-                "step": 1,
-                "tool": "web_search",
-                "description": f"Search for: {goal}",
-                "parameters": {"query": goal},
-                "critical": True
-            }
-        ]
+    step = {
+        "step": 1,
+        "tool": "web_search",
+        "description": f"Search for: {goal}",
+        "parameters": {"query": goal},
+        "critical": True
     }
+    _normalize_agent(step)
+    return {"goal": goal, "steps": [step]}
 
 
 def replan(goal: str, completed_steps: list, failed_step: dict, error: str) -> dict:
@@ -222,11 +230,11 @@ def replan(goal: str, completed_steps: list, failed_step: dict, error: str) -> d
 
     model = gemini.model(
         "gemini-2.5-flash",
-        system_instruction=PLANNER_PROMPT
+        system_instruction=_build_planner_prompt()
     )
 
     completed_summary = "\n".join(
-        f"  - Step {s['step']} ({s['tool']}): DONE" for s in completed_steps
+        f"  - Step {s['step']} <{s.get('agent','?')}> ({s['tool']}): DONE" for s in completed_steps
     )
 
     prompt = f"""Goal: {goal}
@@ -234,7 +242,7 @@ def replan(goal: str, completed_steps: list, failed_step: dict, error: str) -> d
 Already completed:
 {completed_summary if completed_summary else '  (none)'}
 
-Failed step: [{failed_step.get('tool')}] {failed_step.get('description')}
+Failed step: <{failed_step.get('agent','?')}> [{failed_step.get('tool')}] {failed_step.get('description')}
 Error: {error}
 
 Create a REVISED plan for the remaining work only. Do not repeat completed steps."""
@@ -247,8 +255,13 @@ Create a REVISED plan for the remaining work only. Do not repeat completed steps
 
         for step in plan.get("steps", []):
             if step.get("tool") == "generated_code":
-                step["tool"] = "web_search"
-                step["parameters"] = {"query": step.get("description", goal)[:200]}
+                from agent.registry import has_agent, agent_can_use
+                agent_id = step.get("agent", "")
+                if not (has_agent(agent_id) and agent_can_use(agent_id, "generated_code")):
+                    step["tool"] = "web_search"
+                    step["parameters"] = {"query": step.get("description", goal)[:200]}
+                    step["agent"] = "researcher"
+            _normalize_agent(step)
 
         print(f"[Planner] 🔄 Revised plan: {len(plan['steps'])} steps")
         return plan

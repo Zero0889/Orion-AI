@@ -1,0 +1,14 @@
+{
+  "enabled": true,
+  "interval_seconds": 600,
+  "max_per_source": 20,
+  "sources": {
+    "gmail": {
+      "enabled": true
+    },
+    "classroom": {
+      "enabled": true,
+      "user_index": 2
+    }
+  }
+}

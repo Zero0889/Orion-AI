@@ -8,8 +8,9 @@
 import { create } from "zustand";
 
 export type View =
+  | "home"
   | "chat" | "notes" | "memory" | "history"
-  | "telemetry" | "agents" | "iot" | "settings";
+  | "telemetry" | "agents" | "iot" | "mcp" | "skills" | "notifications" | "settings";
 
 interface ViewState {
   view: View;
@@ -17,6 +18,6 @@ interface ViewState {
 }
 
 export const useViewStore = create<ViewState>((set) => ({
-  view: "chat",
+  view: "home",
   setView: (view) => set({ view }),
 }));

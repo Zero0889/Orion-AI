@@ -1,0 +1,22 @@
+{
+  "_comment": "EJEMPLO de config/providers.json. Copia este archivo a config/providers.json y pega tus keys reales. El real está en .gitignore; este ejemplo sí se commitea para que cualquiera sepa qué estructura usar.",
+
+  "openrouter":   "sk-or-v1-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+  "groq":         "gsk_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+  "openai":       "sk-proj-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+  "anthropic":    "sk-ant-api03-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+  "mistral":      "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+  "ollama":       "",
+  "ollama_cloud": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx.xxxxxxxxxxxxxxxxxxxxxxxx",
+  "deepseek":     "sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+
+  "_endpoints": {
+    "openrouter":   "https://openrouter.ai/api/v1",
+    "groq":         "https://api.groq.com/openai/v1",
+    "openai":       "https://api.openai.com/v1",
+    "mistral":      "https://api.mistral.ai/v1",
+    "ollama":       "http://localhost:11434/v1",
+    "ollama_cloud": "https://ollama.com/v1",
+    "deepseek":     "https://api.deepseek.com/v1"
+  }
+}

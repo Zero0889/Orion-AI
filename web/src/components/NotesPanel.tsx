@@ -1,18 +1,16 @@
 /**
- * NotesPanel — CRUD de notas rápidas.
+ * NotesPanel — quick notes CRUD.
  *
- * Lista de notas ordenadas por (pinned desc, updated desc).
- * Crear desde un textarea + botón. Editar inline (click sobre el texto).
- * Pin / unpin con un toggle. Borrar con confirmación.
- *
- * Refresca al recibir bus.event `note.*` (incrementa `rev.notes` en el
- * store, este componente observa ese contador y vuelve a fetch).
+ * Sorted (pinned first → updated desc). Inline edit, pin toggle, delete.
+ * Refresh reactively on `note.*` bus events via `rev.notes`.
  */
 
 import { useEffect, useMemo, useState } from "react";
 
 import { api, type NoteApi } from "@/api/rest";
 import { useOrionStore } from "@/stores/orion";
+import { Icon } from "@/ui/Icon";
+import { Badge, Button, Empty, SectionHeader, Surface } from "@/ui/primitives";
 
 export function NotesPanel() {
   const rev = useOrionStore((s) => s.rev.notes);
@@ -23,7 +21,6 @@ export function NotesPanel() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingText, setEditingText] = useState("");
 
-  // Carga inicial y cada vez que rev.notes cambia (eventos WS).
   useEffect(() => {
     let alive = true;
     setLoading(true);
@@ -34,38 +31,28 @@ export function NotesPanel() {
     return () => { alive = false; };
   }, [rev]);
 
-  const sorted = useMemo(() => {
-    return [...notes].sort((a, b) => {
-      if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
-      return (b.updated ?? "").localeCompare(a.updated ?? "");
-    });
-  }, [notes]);
+  const sorted = useMemo(() => [...notes].sort((a, b) => {
+    if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
+    return (b.updated ?? "").localeCompare(a.updated ?? "");
+  }), [notes]);
 
   async function add() {
     const t = draft.trim();
     if (!t) return;
-    try {
-      await api.createNote(t);
-      setDraft("");
-    } catch (e) { setError(String(e)); }
+    try { await api.createNote(t); setDraft(""); }
+    catch (e) { setError(String(e)); }
   }
-
   async function togglePin(n: NoteApi) {
     try { await api.updateNote(n.id, { pinned: !n.pinned }); }
     catch (e) { setError(String(e)); }
   }
-
   async function saveEdit() {
     if (!editingId) return;
     const t = editingText.trim();
     if (!t) { setEditingId(null); return; }
-    try {
-      await api.updateNote(editingId, { text: t });
-      setEditingId(null);
-      setEditingText("");
-    } catch (e) { setError(String(e)); }
+    try { await api.updateNote(editingId, { text: t }); setEditingId(null); setEditingText(""); }
+    catch (e) { setError(String(e)); }
   }
-
   async function remove(id: string) {
     if (!confirm("¿Borrar esta nota?")) return;
     try { await api.deleteNote(id); }
@@ -74,125 +61,165 @@ export function NotesPanel() {
 
   return (
     <div className="flex flex-col h-full">
-      <header className="px-6 py-4 border-b border-border-b">
-        <h2 className="text-sm uppercase tracking-[0.3em] text-text-dim">Notas rápidas</h2>
-        <p className="text-xs text-text-dim/70 mt-1">{notes.length} nota{notes.length === 1 ? "" : "s"}</p>
-      </header>
+      <SectionHeader
+        eyebrow="Conocimiento"
+        title="Notas rápidas"
+        hint="Pensamientos sueltos, recordatorios, ideas. Se sincronizan en vivo."
+        action={<Badge tone="neutral">{notes.length}</Badge>}
+      />
 
-      {/* Editor de nueva nota */}
-      <div className="p-4 border-b border-border-b bg-panel">
-        <div className="flex gap-2 items-end">
+      <div className="px-6 py-4 border-b border-white/[0.06]">
+        <div className="rounded-xl border border-white/[0.08] bg-elevated/60
+                        focus-within:border-pri/40 focus-within:shadow-glow-soft
+                        transition-all duration-200 ease-out-expo">
           <textarea
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             placeholder="Nueva nota…"
             rows={2}
-            className="flex-1 resize-none rounded-md bg-panel2 border border-border-b
-                       px-3 py-2 text-sm placeholder-text-dim
-                       focus:outline-none focus:border-pri"
+            className="block w-full resize-none bg-transparent rounded-xl
+                       px-4 pt-3 pb-2 text-sm leading-relaxed placeholder-muted
+                       focus:outline-none"
             onKeyDown={(e) => {
               if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); add(); }
             }}
           />
-          <button
-            onClick={add}
-            disabled={!draft.trim()}
-            className="rounded-md bg-pri text-bg text-sm font-medium px-4 py-2
-                       disabled:opacity-30 hover:brightness-110 transition"
-          >
-            Añadir
-          </button>
+          <div className="flex items-center justify-between px-3 pb-2.5">
+            <span className="text-[10px] uppercase tracking-[0.18em] text-muted">Ctrl/⌘ + Enter</span>
+            <Button
+              variant="primary" size="sm" icon="plus"
+              onClick={add} disabled={!draft.trim()}
+            >
+              Añadir nota
+            </Button>
+          </div>
         </div>
-        <p className="text-[10px] text-text-dim mt-2">Ctrl/Cmd+Enter para guardar</p>
       </div>
 
-      {error && (
-        <div className="mx-4 mt-3 p-2 text-xs rounded border border-pri bg-pri/10 text-pri">
-          {error}
-        </div>
-      )}
+      {error && <Inline error={error} />}
 
-      {/* Lista */}
-      <div className="flex-1 overflow-y-auto scrollbar-thin p-4 flex flex-col gap-2">
+      <div className="flex-1 overflow-y-auto scrollbar-thin px-6 py-4">
         {loading && notes.length === 0 && (
-          <div className="text-center text-text-dim text-sm">Cargando…</div>
-        )}
-        {!loading && notes.length === 0 && (
-          <div className="text-center text-text-dim text-sm italic mt-8">
-            Aún no hay notas. Crea la primera arriba.
+          <div className="space-y-2">
+            <div className="skeleton h-16" /><div className="skeleton h-16" /><div className="skeleton h-16" />
           </div>
         )}
-        {sorted.map((n) => {
-          const isEditing = editingId === n.id;
-          return (
-            <article
+        {!loading && notes.length === 0 && (
+          <Empty
+            icon="notes"
+            title="Aún sin notas"
+            hint="Crea la primera arriba o pídele a Orion que la guarde por ti."
+          />
+        )}
+        <div className="flex flex-col gap-2.5">
+          {sorted.map((n, i) => (
+            <NoteCard
               key={n.id}
-              className={`group rounded-lg border p-3 transition
-                ${n.pinned
-                  ? "border-pri/60 bg-pri/5"
-                  : "border-border-b bg-panel2 hover:border-pri/40"}`}
-            >
-              <header className="flex items-center justify-between text-[10px] uppercase tracking-widest text-text-dim mb-1">
-                <span>{n.pinned ? "★ Anclada" : "Nota"}</span>
-                <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition">
-                  <button
-                    onClick={() => togglePin(n)}
-                    className="hover:text-pri"
-                    title={n.pinned ? "Desanclar" : "Anclar"}
-                  >
-                    {n.pinned ? "☆" : "★"}
-                  </button>
-                  {!isEditing && (
-                    <button
-                      onClick={() => { setEditingId(n.id); setEditingText(n.text); }}
-                      className="hover:text-pri"
-                      title="Editar"
-                    >
-                      ✎
-                    </button>
-                  )}
-                  <button
-                    onClick={() => remove(n.id)}
-                    className="hover:text-pri"
-                    title="Borrar"
-                  >
-                    ×
-                  </button>
-                </div>
-              </header>
-
-              {isEditing ? (
-                <div className="flex flex-col gap-2">
-                  <textarea
-                    value={editingText}
-                    onChange={(e) => setEditingText(e.target.value)}
-                    rows={3}
-                    autoFocus
-                    className="resize-none rounded-md bg-panel border border-border-b
-                               px-2 py-1 text-sm focus:outline-none focus:border-pri"
-                  />
-                  <div className="flex gap-2 justify-end">
-                    <button
-                      onClick={() => { setEditingId(null); setEditingText(""); }}
-                      className="text-xs px-2 py-1 text-text-dim hover:text-text"
-                    >Cancelar</button>
-                    <button
-                      onClick={saveEdit}
-                      className="text-xs px-3 py-1 rounded bg-pri text-bg hover:brightness-110"
-                    >Guardar</button>
-                  </div>
-                </div>
-              ) : (
-                <p className="whitespace-pre-wrap text-sm leading-relaxed">{n.text}</p>
-              )}
-
-              <footer className="text-[10px] text-text-dim mt-2">
-                {n.updated}
-              </footer>
-            </article>
-          );
-        })}
+              note={n}
+              delay={i * 30}
+              isEditing={editingId === n.id}
+              editingText={editingText}
+              onStartEdit={() => { setEditingId(n.id); setEditingText(n.text); }}
+              onCancelEdit={() => { setEditingId(null); setEditingText(""); }}
+              onChangeEdit={setEditingText}
+              onSaveEdit={saveEdit}
+              onTogglePin={() => togglePin(n)}
+              onRemove={() => remove(n.id)}
+            />
+          ))}
+        </div>
       </div>
+    </div>
+  );
+}
+
+function NoteCard({
+  note, delay,
+  isEditing, editingText,
+  onStartEdit, onCancelEdit, onChangeEdit, onSaveEdit,
+  onTogglePin, onRemove,
+}: {
+  note: NoteApi; delay: number;
+  isEditing: boolean; editingText: string;
+  onStartEdit: () => void; onCancelEdit: () => void;
+  onChangeEdit: (v: string) => void; onSaveEdit: () => void;
+  onTogglePin: () => void; onRemove: () => void;
+}) {
+  return (
+    <Surface
+      level={2}
+      className={[
+        "group p-3.5 animate-fade-in-up transition-colors duration-200",
+        note.pinned && "ring-1 ring-pri/30",
+      ].filter(Boolean).join(" ")}
+      style={{ animationDelay: `${delay}ms` }}
+    >
+      <header className="flex items-center justify-between gap-2 mb-1.5">
+        {note.pinned
+          ? <Badge tone="info" dot>Anclada</Badge>
+          : <span className="text-[10px] uppercase tracking-[0.18em] text-muted">Nota</span>}
+        <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
+          <IconBtn icon="pin"  active={note.pinned} onClick={onTogglePin}
+                   title={note.pinned ? "Desanclar" : "Anclar"} />
+          {!isEditing && <IconBtn icon="edit" onClick={onStartEdit} title="Editar" />}
+          <IconBtn icon="trash" danger onClick={onRemove} title="Borrar" />
+        </div>
+      </header>
+
+      {isEditing ? (
+        <div className="flex flex-col gap-2">
+          <textarea
+            value={editingText}
+            onChange={(e) => onChangeEdit(e.target.value)}
+            rows={3}
+            autoFocus
+            className="resize-none rounded-lg bg-surface border border-pri/40
+                       px-3 py-2 text-sm focus:outline-none focus:border-pri"
+          />
+          <div className="flex gap-2 justify-end">
+            <Button variant="ghost"   size="sm" onClick={onCancelEdit}>Cancelar</Button>
+            <Button variant="primary" size="sm" icon="check" onClick={onSaveEdit}>Guardar</Button>
+          </div>
+        </div>
+      ) : (
+        <p className="whitespace-pre-wrap text-sm leading-relaxed text-text">{note.text}</p>
+      )}
+
+      <footer className="mt-2 text-[10px] uppercase tracking-[0.18em] text-muted">
+        {note.updated}
+      </footer>
+    </Surface>
+  );
+}
+
+function IconBtn({
+  icon, onClick, title, active, danger,
+}: {
+  icon: "pin" | "edit" | "trash";
+  onClick: () => void;
+  title?: string;
+  active?: boolean;
+  danger?: boolean;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      title={title}
+      className={[
+        "h-7 w-7 grid place-items-center rounded-md transition-colors duration-150",
+        active ? "text-pri" : "text-text-dim hover:text-text",
+        danger ? "hover:text-danger hover:bg-danger/10" : "hover:bg-white/[0.05]",
+      ].join(" ")}
+    >
+      <Icon name={icon} size={14} />
+    </button>
+  );
+}
+
+function Inline({ error }: { error: string }) {
+  return (
+    <div className="mx-6 mt-3 flex items-start gap-2 p-3 rounded-md border border-danger/30 bg-danger/10 text-xs text-danger animate-fade-in">
+      <Icon name="alert" size={14} className="mt-0.5 shrink-0" /><span>{error}</span>
     </div>
   );
 }

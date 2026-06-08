@@ -14,6 +14,7 @@
 
 import { create } from "zustand";
 
+import { useInteractionStore } from "@/stores/interaction";
 import type {
   ChatMessage, LogRole, OrionState, ServerEvent,
 } from "@/types";
@@ -31,13 +32,20 @@ interface State {
   // Contadores por tipo de evento — los paneles los observan para
   // refrescar sus datos cuando algo cambia en el backend.
   rev: {
-    notes:    number;
-    memory:   number;
-    convs:    number;
-    theme:    number;
-    agent:    number;
-    iot:      number;
+    notes:     number;
+    memory:    number;
+    convs:     number;
+    theme:     number;
+    agent:     number;
+    iot:       number;
+    orchestra: number;
+    notifications: number;
   };
+
+  /** Conteo de notificaciones no leídas (Gmail + Classroom + …). Se
+   *  actualiza por evento `notification.new`/`notification.read` y al
+   *  hacer GET inicial al panel. */
+  unreadNotifs: number;
 
   // Telemetría: últimos puntos para sparklines (CPU/RAM/disk en 0..1).
   telemetry: {
@@ -89,8 +97,16 @@ function parseLogRole(text: string): { role: LogRole; body: string } {
   return { role: "sys", body: t };
 }
 
-let _id = 0;
-const nextId = () => `m${++_id}`;
+// IDs únicos para mensajes — crypto.randomUUID es nativo en todos los
+// browsers modernos. Fallback determinístico (timestamp + counter) por si
+// el contexto no es secure (Tauri webview con esquema custom, por ej.).
+let _counter = 0;
+const nextId = (): string => {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return `m${Date.now().toString(36)}-${++_counter}`;
+};
 
 export const useOrionStore = create<State>((set, get) => ({
   state:        "ESCUCHANDO",
@@ -98,7 +114,8 @@ export const useOrionStore = create<State>((set, get) => ({
   connected:    false,
   messages:     [],
   currentFile:  null,
-  rev: { notes: 0, memory: 0, convs: 0, theme: 0, agent: 0, iot: 0 },
+  rev: { notes: 0, memory: 0, convs: 0, theme: 0, agent: 0, iot: 0, orchestra: 0, notifications: 0 },
+  unreadNotifs: 0,
   telemetry:    { cpu: [], ram: [], disk: [], last: null },
   iotSensors:   {},
   apiKeyConfigured: true,  // se inicializa con GET /api/settings/api_key
@@ -121,9 +138,65 @@ export const useOrionStore = create<State>((set, get) => ({
         const { role, body } = parseLogRole(text);
         if (!body) break;
         const ts = Number(payload?.ts ?? Date.now() / 1000);
+
+        // Deduplicación con streaming: si el último mensaje del mismo role
+        // tiene turnId (es decir, vino vía chat.stream), reemplazamos su
+        // texto con el del log (texto completo confirmado del backend) en
+        // lugar de crear un mensaje duplicado. Esto pasa porque el backend
+        // emite write_log al final como safety-net.
+        const existing = [...get().messages];
+        const lastIdx  = existing.length - 1;
+        if (
+          lastIdx >= 0 &&
+          existing[lastIdx].turnId &&
+          existing[lastIdx].role === role
+        ) {
+          existing[lastIdx] = {
+            ...existing[lastIdx],
+            text: body,
+            streaming: false,
+          };
+          set({ messages: existing });
+          break;
+        }
+
         const msg: ChatMessage = { id: nextId(), role, text: body, ts };
-        const msgs = [...get().messages, msg];
+        const msgs = [...existing, msg];
         if (msgs.length > MAX_MESSAGES) msgs.splice(0, msgs.length - MAX_MESSAGES);
+        set({ messages: msgs });
+        break;
+      }
+      case "chat.stream": {
+        // Streaming palabra-por-palabra desde Gemini Live. El backend manda
+        // chunks parciales con un turn_id estable; acá los anexamos al
+        // mensaje correspondiente para que el texto aparezca en sync con
+        // la voz que está sonando.
+        const rawRole = String(payload?.role ?? "");
+        const role: LogRole = rawRole === "user" ? "user" : "ai";
+        const turnId = String(payload?.turn_id ?? "");
+        const delta  = String(payload?.delta ?? "");
+        const final  = Boolean(payload?.final);
+        if (!turnId) break;
+
+        const ts = Number(payload?.ts ?? Date.now() / 1000);
+        const msgs = [...get().messages];
+        const idx  = msgs.findIndex((m) => m.turnId === turnId);
+
+        if (idx >= 0) {
+          const prev = msgs[idx];
+          const nextText = delta ? (prev.text + (prev.text ? " " : "") + delta) : prev.text;
+          msgs[idx] = { ...prev, text: nextText, streaming: !final };
+        } else if (delta) {
+          msgs.push({
+            id: nextId(),
+            role,
+            text: delta,
+            ts,
+            turnId,
+            streaming: !final,
+          });
+          if (msgs.length > MAX_MESSAGES) msgs.splice(0, msgs.length - MAX_MESSAGES);
+        }
         set({ messages: msgs });
         break;
       }
@@ -159,10 +232,56 @@ export const useOrionStore = create<State>((set, get) => ({
       }
       case "agent.task": {
         set((s) => ({ rev: { ...s.rev, agent: s.rev.agent + 1 } }));
+        const id      = String(payload?.id ?? "");
+        const status  = String(payload?.status ?? "") as
+          "pending" | "running" | "completed" | "cancelled";
+        const goal    = String(payload?.goal ?? "");
+        if (id && status) {
+          useInteractionStore.getState().upsertAgentTask(id, status, goal);
+        }
+        break;
+      }
+      case "agent.speech": {
+        const taskId = payload?.task_id == null ? null : String(payload.task_id);
+        const text   = String(payload?.text ?? "");
+        if (text) useInteractionStore.getState().setAgentSpeech(taskId, text);
+        break;
+      }
+      case "tool.call.start": {
+        const name = String(payload?.name ?? "");
+        const args = (payload?.args ?? {}) as Record<string, string>;
+        if (name) useInteractionStore.getState().setActiveTool(name, args);
+        break;
+      }
+      case "tool.call.end": {
+        useInteractionStore.getState().clearActiveTool();
+        break;
+      }
+      case "orchestra.update": {
+        set((s) => ({ rev: { ...s.rev, orchestra: s.rev.orchestra + 1 } }));
         break;
       }
       case "iot.action": {
         set((s) => ({ rev: { ...s.rev, iot: s.rev.iot + 1 } }));
+        break;
+      }
+      case "notification.new": {
+        const count = Number(payload?.count ?? 0);
+        set((s) => ({
+          unreadNotifs:  s.unreadNotifs + (count > 0 ? count : 0),
+          rev:           { ...s.rev, notifications: s.rev.notifications + 1 },
+        }));
+        break;
+      }
+      case "notification.read": {
+        // El backend ya marcó como leídas en el store; el panel hará
+        // refetch via rev. Acá sólo bajamos el contador para que la
+        // campana se actualice instantánea.
+        const c = Number(payload?.count ?? 0);
+        set((s) => ({
+          unreadNotifs:  Math.max(0, s.unreadNotifs - c),
+          rev:           { ...s.rev, notifications: s.rev.notifications + 1 },
+        }));
         break;
       }
       case "iot.sensor": {

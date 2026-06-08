@@ -1,17 +1,5 @@
 [
   {
-    "id": "125daf03",
-    "started": "2026-05-27T12:14:15",
-    "title": "Conversación",
-    "messages": [
-      {
-        "role": "sys",
-        "text": "ORION en línea.",
-        "ts": "2026-05-27T12:14:20"
-      }
-    ]
-  },
-  {
     "id": "6b4012cd",
     "started": "2026-05-27T12:14:35",
     "title": "Hurry on Microsoft.",
@@ -1121,6 +1109,509 @@
         "role": "sys",
         "text": "Micrófono silenciado.",
         "ts": "2026-05-30T18:37:26"
+      }
+    ]
+  },
+  {
+    "id": "c53a7b7b",
+    "started": "2026-05-30T19:54:22",
+    "title": "Conversación",
+    "messages": [
+      {
+        "role": "sys",
+        "text": "ORION en línea.",
+        "ts": "2026-05-30T19:54:28"
+      }
+    ]
+  },
+  {
+    "id": "28f2d6ad",
+    "started": "2026-05-30T19:55:06",
+    "title": "Conversación",
+    "messages": [
+      {
+        "role": "sys",
+        "text": "ORION en línea.",
+        "ts": "2026-05-30T19:55:10"
+      },
+      {
+        "role": "sys",
+        "text": "Micrófono silenciado.",
+        "ts": "2026-05-30T19:55:31"
+      }
+    ]
+  },
+  {
+    "id": "d813e033",
+    "started": "2026-05-30T20:10:44",
+    "title": "minu Python.",
+    "messages": [
+      {
+        "role": "sys",
+        "text": "ORION en línea.",
+        "ts": "2026-05-30T20:10:48"
+      },
+      {
+        "role": "user",
+        "text": "minu Python.",
+        "ts": "2026-05-30T20:11:15"
+      },
+      {
+        "role": "ai",
+        "text": "¿Qué necesitas escribir en Python? Proporciona una breve descripción de lo que quieres lograr.",
+        "ts": "2026-05-30T20:11:15"
+      }
+    ]
+  },
+  {
+    "id": "27f4dd7d",
+    "started": "2026-05-31T08:27:10",
+    "title": "prueba de integración",
+    "messages": [
+      {
+        "role": "user",
+        "text": "prueba de integración",
+        "ts": "2026-05-31T08:27:10"
+      },
+      {
+        "role": "ai",
+        "text": "respuesta",
+        "ts": "2026-05-31T08:27:10"
+      }
+    ]
+  },
+  {
+    "id": "9ef4cf67",
+    "started": "2026-05-31T08:27:51",
+    "title": "Conversación",
+    "messages": [
+      {
+        "role": "sys",
+        "text": "ORION en línea.",
+        "ts": "2026-05-31T08:27:55"
+      },
+      {
+        "role": "sys",
+        "text": "Micrófono silenciado.",
+        "ts": "2026-05-31T08:28:07"
+      }
+    ]
+  },
+  {
+    "id": "a0de3601",
+    "started": "2026-05-31T08:33:02",
+    "title": "Conversación",
+    "messages": [
+      {
+        "role": "sys",
+        "text": "ORION en línea.",
+        "ts": "2026-05-31T08:33:06"
+      },
+      {
+        "role": "sys",
+        "text": "Micrófono silenciado.",
+        "ts": "2026-05-31T08:33:13"
+      }
+    ]
+  },
+  {
+    "id": "888ec89f",
+    "started": "2026-05-31T08:41:10",
+    "title": "Conversación",
+    "messages": [
+      {
+        "role": "sys",
+        "text": "ORION en línea.",
+        "ts": "2026-05-31T08:41:13"
+      },
+      {
+        "role": "sys",
+        "text": "Micrófono silenciado.",
+        "ts": "2026-05-31T08:41:33"
+      }
+    ]
+  },
+  {
+    "id": "c4ef7422",
+    "started": "2026-05-31T08:49:04",
+    "title": "Conversación",
+    "messages": [
+      {
+        "role": "sys",
+        "text": "ORION en línea.",
+        "ts": "2026-05-31T08:49:07"
+      }
+    ]
+  },
+  {
+    "id": "a1461a2b",
+    "started": "2026-05-31T08:52:49",
+    "title": "Conversación",
+    "messages": [
+      {
+        "role": "sys",
+        "text": "Nuevo hilo iniciado.",
+        "ts": "2026-05-31T08:52:49"
+      }
+    ]
+  },
+  {
+    "id": "097e0e66",
+    "started": "2026-05-31T08:53:40",
+    "title": "Conversación",
+    "messages": [
+      {
+        "role": "sys",
+        "text": "ORION en línea.",
+        "ts": "2026-05-31T08:53:43"
+      }
+    ]
+  },
+  {
+    "id": "9e2d2a2e",
+    "started": "2026-05-31T08:54:02",
+    "title": "Conversación",
+    "messages": [
+      {
+        "role": "sys",
+        "text": "ORION en línea.",
+        "ts": "2026-05-31T08:54:05"
+      }
+    ]
+  },
+  {
+    "id": "defcd0c9",
+    "started": "2026-05-31T08:54:22",
+    "title": "Conversación",
+    "messages": [
+      {
+        "role": "sys",
+        "text": "ORION en línea.",
+        "ts": "2026-05-31T08:54:25"
+      }
+    ]
+  },
+  {
+    "id": "706b6c1b",
+    "started": "2026-05-31T08:54:30",
+    "title": "Conversación",
+    "messages": [
+      {
+        "role": "sys",
+        "text": "Conversación cargada (1 mensajes).",
+        "ts": "2026-05-31T08:54:30"
+      }
+    ]
+  },
+  {
+    "id": "65316b6e",
+    "started": "2026-05-31T08:54:31",
+    "title": "Conversación",
+    "messages": [
+      {
+        "role": "sys",
+        "text": "Conversación cargada (1 mensajes).",
+        "ts": "2026-05-31T08:54:31"
+      }
+    ]
+  },
+  {
+    "id": "1a7bc635",
+    "started": "2026-05-31T08:54:32",
+    "title": "Conversación",
+    "messages": [
+      {
+        "role": "sys",
+        "text": "Conversación cargada (1 mensajes).",
+        "ts": "2026-05-31T08:54:32"
+      }
+    ]
+  },
+  {
+    "id": "b72f6810",
+    "started": "2026-05-31T08:54:33",
+    "title": "Conversación",
+    "messages": [
+      {
+        "role": "sys",
+        "text": "Conversación cargada (3 mensajes).",
+        "ts": "2026-05-31T08:54:33"
+      }
+    ]
+  },
+  {
+    "id": "4123941f",
+    "started": "2026-05-31T08:54:34",
+    "title": "Conversación",
+    "messages": [
+      {
+        "role": "sys",
+        "text": "Conversación cargada (2 mensajes).",
+        "ts": "2026-05-31T08:54:34"
+      },
+      {
+        "role": "sys",
+        "text": "Micrófono silenciado.",
+        "ts": "2026-05-31T08:54:58"
+      }
+    ]
+  },
+  {
+    "id": "0c6a06e1",
+    "started": "2026-05-31T09:04:25",
+    "title": "Conversación",
+    "messages": [
+      {
+        "role": "sys",
+        "text": "ORION en línea.",
+        "ts": "2026-05-31T09:04:28"
+      }
+    ]
+  },
+  {
+    "id": "424a1ddc",
+    "started": "2026-05-31T09:04:36",
+    "title": "Conversación",
+    "messages": [
+      {
+        "role": "sys",
+        "text": "Conversación cargada (2 mensajes).",
+        "ts": "2026-05-31T09:04:36"
+      }
+    ]
+  },
+  {
+    "id": "39038487",
+    "started": "2026-05-31T09:15:39",
+    "title": "Conversación",
+    "messages": [
+      {
+        "role": "sys",
+        "text": "ORION en línea.",
+        "ts": "2026-05-31T09:15:43"
+      }
+    ]
+  },
+  {
+    "id": "c500d480",
+    "started": "2026-05-31T10:29:36",
+    "title": "Conversación",
+    "messages": [
+      {
+        "role": "sys",
+        "text": "Micrófono silenciado.",
+        "ts": "2026-05-31T10:29:39"
+      }
+    ]
+  },
+  {
+    "id": "447ee43c",
+    "started": "2026-05-31T13:06:04",
+    "title": "hola orio",
+    "messages": [
+      {
+        "role": "sys",
+        "text": "ORION en línea.",
+        "ts": "2026-05-31T13:06:08"
+      },
+      {
+        "role": "user",
+        "text": "hola orio",
+        "ts": "2026-05-31T13:06:13"
+      },
+      {
+        "role": "ai",
+        "text": "Hola! ¿En qué puedo ayudarte hoy?",
+        "ts": "2026-05-31T13:06:16"
+      },
+      {
+        "role": "sys",
+        "text": "Micrófono silenciado.",
+        "ts": "2026-05-31T13:06:19"
+      }
+    ]
+  },
+  {
+    "id": "5c3a19da",
+    "started": "2026-05-31T13:08:39",
+    "title": "Conversación",
+    "messages": [
+      {
+        "role": "sys",
+        "text": "ORION en línea.",
+        "ts": "2026-05-31T13:08:42"
+      }
+    ]
+  },
+  {
+    "id": "83cf2147",
+    "started": "2026-05-31T13:50:59",
+    "title": "Conversación",
+    "messages": [
+      {
+        "role": "sys",
+        "text": "ORION en línea.",
+        "ts": "2026-05-31T13:51:03"
+      },
+      {
+        "role": "sys",
+        "text": "Micrófono silenciado.",
+        "ts": "2026-05-31T13:51:17"
+      }
+    ]
+  },
+  {
+    "id": "df008d55",
+    "started": "2026-05-31T13:51:43",
+    "title": "Conversación",
+    "messages": [
+      {
+        "role": "sys",
+        "text": "ORION en línea.",
+        "ts": "2026-05-31T13:51:47"
+      },
+      {
+        "role": "ai",
+        "text": "Hola! Estoy bien, gracias. ¿En qué puedo ayudarte hoy?",
+        "ts": "2026-05-31T13:52:03"
+      },
+      {
+        "role": "sys",
+        "text": "[IoT] action=all_on params={'action': 'all_on'}",
+        "ts": "2026-05-31T13:52:17"
+      },
+      {
+        "role": "ai",
+        "text": "Claro, he encendido todos los focos.",
+        "ts": "2026-05-31T13:52:20"
+      },
+      {
+        "role": "ai",
+        "text": "La integral definida de $\\sin(x)$ de 1 a $\\pi$ es: $$\\int_1^\\pi \\sin(x) \\,dx = [-\\cos(x)]_1^\\pi$$\n$$= (-\\cos(\\pi)) - (-\\cos(1))$$\n$$= (-(-1)) + \\cos(1)$$\n$$= 1 + \\cos(1)$$\nEl valor exacto es $1 + \\cos(1)$.",
+        "ts": "2026-05-31T13:53:10"
+      }
+    ]
+  },
+  {
+    "id": "bd57160f",
+    "started": "2026-05-31T14:59:20",
+    "title": "Conversación",
+    "messages": [
+      {
+        "role": "sys",
+        "text": "ORION en línea.",
+        "ts": "2026-05-31T14:59:24"
+      },
+      {
+        "role": "sys",
+        "text": "Micrófono silenciado.",
+        "ts": "2026-05-31T14:59:27"
+      },
+      {
+        "role": "sys",
+        "text": "Micrófono activo.",
+        "ts": "2026-05-31T14:59:29"
+      },
+      {
+        "role": "sys",
+        "text": "Micrófono silenciado.",
+        "ts": "2026-05-31T14:59:30"
+      }
+    ]
+  },
+  {
+    "id": "af8db913",
+    "started": "2026-05-31T14:59:48",
+    "title": "Conversación",
+    "messages": [
+      {
+        "role": "sys",
+        "text": "ORION en línea.",
+        "ts": "2026-05-31T14:59:53"
+      }
+    ]
+  },
+  {
+    "id": "16d21149",
+    "started": "2026-05-31T15:00:00",
+    "title": "Conversación",
+    "messages": [
+      {
+        "role": "sys",
+        "text": "Conversación cargada (4 mensajes).",
+        "ts": "2026-05-31T15:00:00"
+      }
+    ]
+  },
+  {
+    "id": "2756be92",
+    "started": "2026-05-31T15:00:01",
+    "title": "Conversación",
+    "messages": [
+      {
+        "role": "sys",
+        "text": "Conversación cargada (5 mensajes).",
+        "ts": "2026-05-31T15:00:01"
+      }
+    ]
+  },
+  {
+    "id": "f02ae6b4",
+    "started": "2026-05-31T15:00:01",
+    "title": "Conversación",
+    "messages": [
+      {
+        "role": "sys",
+        "text": "Conversación cargada (2 mensajes).",
+        "ts": "2026-05-31T15:00:01"
+      }
+    ]
+  },
+  {
+    "id": "806d5fb7",
+    "started": "2026-05-31T15:00:02",
+    "title": "Conversación",
+    "messages": [
+      {
+        "role": "sys",
+        "text": "Conversación cargada (1 mensajes).",
+        "ts": "2026-05-31T15:00:02"
+      }
+    ]
+  },
+  {
+    "id": "44822506",
+    "started": "2026-05-31T15:00:04",
+    "title": "Conversación",
+    "messages": [
+      {
+        "role": "sys",
+        "text": "Conversación cargada (1 mensajes).",
+        "ts": "2026-05-31T15:00:04"
+      }
+    ]
+  },
+  {
+    "id": "606a4da1",
+    "started": "2026-05-31T15:00:05",
+    "title": "Conversación",
+    "messages": [
+      {
+        "role": "sys",
+        "text": "Conversación cargada (1 mensajes).",
+        "ts": "2026-05-31T15:00:05"
+      }
+    ]
+  },
+  {
+    "id": "b3a65114",
+    "started": "2026-05-31T15:01:13",
+    "title": "Conversación",
+    "messages": [
+      {
+        "role": "sys",
+        "text": "ORION en línea.",
+        "ts": "2026-05-31T15:01:17"
       }
     ]
   }

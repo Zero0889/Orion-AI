@@ -19,10 +19,12 @@ from typing import Optional
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 
+from core.logger import get_logger
 from memory.quick_notes import (
     add_note, count_notes, delete_note, list_notes, update_note,
 )
 
+log = get_logger("server.routes.notes")
 router = APIRouter()
 
 
@@ -39,17 +41,17 @@ class NoteUpdate(BaseModel):
 
 
 @router.get("")
-async def get_notes() -> list[dict]:
+def get_notes() -> list[dict]:
     return list_notes()
 
 
 @router.get("/count")
-async def get_notes_count() -> dict:
+def get_notes_count() -> dict:
     return {"count": count_notes()}
 
 
 @router.post("", status_code=201)
-async def create_note(body: NoteCreate, request: Request) -> dict:
+def create_note(body: NoteCreate, request: Request) -> dict:
     n = add_note(body.text, color=body.color)
     if not n:
         raise HTTPException(status_code=400, detail="Texto vacío")
@@ -61,7 +63,7 @@ async def create_note(body: NoteCreate, request: Request) -> dict:
 
 
 @router.patch("/{note_id}")
-async def patch_note(note_id: str, body: NoteUpdate, request: Request) -> dict:
+def patch_note(note_id: str, body: NoteUpdate, request: Request) -> dict:
     ok = update_note(
         note_id,
         text=body.text,
@@ -75,7 +77,7 @@ async def patch_note(note_id: str, body: NoteUpdate, request: Request) -> dict:
 
 
 @router.delete("/{note_id}", status_code=204)
-async def remove_note(note_id: str, request: Request) -> None:
+def remove_note(note_id: str, request: Request) -> None:
     ok = delete_note(note_id)
     if not ok:
         raise HTTPException(status_code=404, detail=f"Nota '{note_id}' no encontrada")
@@ -89,5 +91,5 @@ def _publish_change(request: Request, op: str, *, note_id: Optional[str]) -> Non
         return
     try:
         bus.publish("note.changed", {"op": op, "id": note_id})
-    except Exception:
-        pass
+    except Exception as e:
+        log.debug("publish note.changed falló: %s", e)

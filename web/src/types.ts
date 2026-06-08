@@ -15,6 +15,13 @@ export interface ChatMessage {
   role: LogRole;
   text: string;
   ts: number;
+  /** Backend turn_id — presente cuando el mensaje llegó vía streaming.
+   *  Permite identificar el mismo mensaje a través de múltiples chunks. */
+  turnId?: string;
+  /** True mientras el mensaje sigue recibiendo chunks. False (o undefined)
+   *  cuando llegó el chunk final. Útil para mostrar un cursor parpadeante
+   *  en la UI durante la transcripción. */
+  streaming?: boolean;
 }
 
 export interface ConnectionStatus {

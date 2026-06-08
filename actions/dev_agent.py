@@ -6,9 +6,8 @@ import time
 from pathlib import Path
 
 
-from config import get_api_key
+from config import get_api_key, PROJECTS_DIR
 
-PROJECTS_DIR     = Path.home() / "Desktop" / "OrionProjects"
 MAX_FIX_ATTEMPTS = 5
 MODEL_PLANNER    = "gemini-2.5-flash"
 MODEL_WRITER     = "gemini-2.5-flash"

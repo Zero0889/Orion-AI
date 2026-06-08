@@ -12,6 +12,7 @@ import { api, type SharingState, type ThemeInfo } from "@/api/rest";
 import { useOrionStore } from "@/stores/orion";
 import { Icon, type IconName } from "@/ui/Icon";
 import { Badge, Button, Empty, SectionHeader, Surface, Switch } from "@/ui/primitives";
+import { toggleLightDark, isLightTheme } from "@/App";
 
 interface Palette { PRI?: string; PANEL?: string; BG?: string; ACC?: string }
 
@@ -160,6 +161,13 @@ function Appearance({
   palettes: Record<string, Palette>;
   onPick: (name: string) => void;
 }) {
+  const [light, setLight] = useState(() => isLightTheme());
+
+  function handleLightDarkToggle() {
+    const next = toggleLightDark();
+    setLight(next === "orion-light");
+  }
+
   if (!info) {
     return (
       <div className="space-y-3">
@@ -173,47 +181,76 @@ function Appearance({
   }
 
   return (
-    <Section title="Tema">
-      <p className="text-xs text-text-dim/80 mb-4 leading-relaxed">
-        Cambia la paleta global. El frontend reacciona al evento{" "}
-        <code className="text-acc font-mono text-[11px]">settings.theme</code>{" "}
-        y aplica el nuevo tema en caliente.
-      </p>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
-        {info.available.map((t, i) => {
-          const active  = t.id === info.name;
-          const palette = palettes[t.id];
-          return (
-            <button
-              key={t.id}
-              onClick={() => onPick(t.id)}
-              style={{ animationDelay: `${i * 40}ms` }}
-              className={[
-                "group relative rounded-xl border px-4 py-3.5 text-left animate-fade-in-up",
-                "transition-all duration-200 ease-out-expo",
-                active
-                  ? "bg-pri/8 border-pri/40 shadow-glow-soft"
-                  : "bg-elevated/40 border-white/[0.06] hover:border-white/[0.14]",
-              ].join(" ")}
-            >
-              <div className="flex items-center gap-3">
-                <div className="flex gap-0.5">
-                  <Swatch color={palette?.BG    ?? "#0A0B0F"} />
-                  <Swatch color={palette?.PANEL ?? "#11131A"} />
-                  <Swatch color={palette?.PRI   ?? "#6D7CFF"} />
-                  <Swatch color={palette?.ACC   ?? "#7EE7FF"} />
+    <>
+      {/* Light / Dark global toggle */}
+      <Section title="Modo">
+        <p className="text-xs text-text-dim/80 mb-4 leading-relaxed">
+          Alterna entre modo claro y oscuro al instante. El cambio es inmediato y se
+          guarda en este navegador.
+        </p>
+        <Surface level={2} className="p-4 mb-6">
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <span className="grid place-items-center h-10 w-10 rounded-xl bg-pri/15 text-pri">
+                <Icon name={light ? "sun" : "moon"} size={18} />
+              </span>
+              <div>
+                <div className="text-sm font-medium text-text">
+                  {light ? "Modo claro" : "Modo oscuro"}
                 </div>
-                <div className="flex-1 min-w-0">
-                  <div className="text-sm font-medium text-text truncate">{t.name}</div>
-                  <code className="text-[10px] font-mono text-muted">{t.id}</code>
+                <div className="text-[11px] text-text-dim">
+                  {light ? "Fondo claro, texto oscuro" : "Fondo oscuro, texto claro"}
                 </div>
-                {active && <Icon name="check" size={16} className="text-pri shrink-0" />}
               </div>
-            </button>
-          );
-        })}
-      </div>
-    </Section>
+            </div>
+            <Switch on={light} onClick={handleLightDarkToggle} />
+          </div>
+        </Surface>
+      </Section>
+
+      {/* Color palette picker */}
+      <Section title="Paleta de color">
+        <p className="text-xs text-text-dim/80 mb-4 leading-relaxed">
+          Cambia la paleta global. El frontend reacciona al evento{" "}
+          <code className="text-acc font-mono text-[11px]">settings.theme</code>{" "}
+          y aplica el nuevo tema en caliente.
+        </p>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+          {info.available.map((t, i) => {
+            const active  = t.id === info.name;
+            const palette = palettes[t.id];
+            return (
+              <button
+                key={t.id}
+                onClick={() => onPick(t.id)}
+                style={{ animationDelay: `${i * 40}ms` }}
+                className={[
+                  "group relative rounded-xl border px-4 py-3.5 text-left animate-fade-in-up",
+                  "transition-all duration-200 ease-out-expo",
+                  active
+                    ? "bg-pri/8 border-pri/40 shadow-glow-soft"
+                    : "bg-elevated/40 border-white/[0.06] hover:border-white/[0.14] hover:bg-elevated/70",
+                ].join(" ")}
+              >
+                <div className="flex items-center gap-3">
+                  <div className="flex gap-0.5">
+                    <Swatch color={palette?.BG    ?? "#0A0B0F"} />
+                    <Swatch color={palette?.PANEL ?? "#11131A"} />
+                    <Swatch color={palette?.PRI   ?? "#6D7CFF"} />
+                    <Swatch color={palette?.ACC   ?? "#7EE7FF"} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-medium text-text truncate">{t.name}</div>
+                    <code className="text-[10px] font-mono text-muted">{t.id}</code>
+                  </div>
+                  {active && <Icon name="check" size={16} className="text-pri shrink-0" />}
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </Section>
+    </>
   );
 }
 

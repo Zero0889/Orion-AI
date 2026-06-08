@@ -19,8 +19,10 @@ from __future__ import annotations
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 
+from core.logger import get_logger
 from memory.memory_manager import forget, load_memory, remember
 
+log = get_logger("server.routes.memory")
 router = APIRouter()
 
 VALID_CATEGORIES = {
@@ -34,12 +36,12 @@ class MemoryEntry(BaseModel):
 
 
 @router.get("")
-async def get_all_memory() -> dict:
+def get_all_memory() -> dict:
     return load_memory()
 
 
 @router.get("/{category}")
-async def get_memory_category(category: str) -> dict:
+def get_memory_category(category: str) -> dict:
     mem = load_memory()
     if category not in mem:
         raise HTTPException(status_code=404, detail=f"Categoría '{category}' no existe")
@@ -47,7 +49,7 @@ async def get_memory_category(category: str) -> dict:
 
 
 @router.put("/{category}/{key}")
-async def put_memory_entry(
+def put_memory_entry(
     category: str, key: str, body: MemoryEntry, request: Request,
 ) -> dict:
     if category not in VALID_CATEGORIES:
@@ -61,7 +63,7 @@ async def put_memory_entry(
 
 
 @router.delete("/{category}/{key}", status_code=204)
-async def delete_memory_entry(category: str, key: str, request: Request) -> None:
+def delete_memory_entry(category: str, key: str, request: Request) -> None:
     if category not in VALID_CATEGORIES:
         raise HTTPException(status_code=400, detail="Categoría inválida")
     mem = load_memory()
@@ -82,5 +84,5 @@ def _publish_change(
         bus.publish("memory.updated", {
             "op": op, "category": category, "key": key, "value": value,
         })
-    except Exception:
-        pass
+    except Exception as e:
+        log.debug("publish memory.updated falló: %s", e)

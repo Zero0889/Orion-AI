@@ -1,3 +1,4 @@
+import hashlib
 import os
 import shutil
 import platform
@@ -708,8 +709,19 @@ def find_files(name: str = "", extension: str = "",
         return f"Error de búsqueda: {e}"
 
 
-def get_largest_files(path: str = "downloads", count: int = 10) -> str:
-    count = min(count, 50)  # máximo 50
+def get_largest_files(
+    path:      str = "downloads",
+    count:     int = 10,
+    extension: str = "",
+    min_size_mb: float = 0.0,
+) -> str:
+    """Top N archivos más grandes con filtros opcionales por extensión y
+    tamaño mínimo. Una sola pasada con ``os.scandir`` recursivo —
+    significativamente más rápido que ``rglob`` para árboles grandes.
+    """
+    count = min(max(count, 1), 50)
+    min_size_bytes = int(min_size_mb * 1024 * 1024) if min_size_mb > 0 else 0
+    ext_filter = extension.lower().lstrip(".")
     try:
         search_path = _resolve_path(path)
         if not _is_safe_path(search_path):
@@ -717,21 +729,28 @@ def get_largest_files(path: str = "downloads", count: int = 10) -> str:
         if not search_path.exists():
             return f"Ruta no encontrada: {path}"
 
-        files = []
-        for item in search_path.rglob("*"):
-            if item.is_file():
-                try:
-                    files.append((item.stat().st_size, item))
-                except Exception:
-                    continue
+        files: list[tuple[int, Path]] = []
+        for fp, size in _walk_files_with_size(search_path):
+            if ext_filter and fp.suffix.lower().lstrip(".") != ext_filter:
+                continue
+            if size < min_size_bytes:
+                continue
+            files.append((size, fp))
 
         files.sort(reverse=True)
         top = files[:count]
 
         if not top:
-            return "No se encontraron archivos."
+            crit = []
+            if ext_filter: crit.append(f"extensión .{ext_filter}")
+            if min_size_bytes: crit.append(f"≥ {_format_size(min_size_bytes)}")
+            suffix = f" ({', '.join(crit)})" if crit else ""
+            return f"No se encontraron archivos{suffix} en {search_path.name}/."
 
-        lines = [f"Los {len(top)} archivos más grandes en {search_path.name}/:"]
+        head = f"Los {len(top)} archivos más grandes en {search_path.name}/"
+        if ext_filter:    head += f" (.{ext_filter})"
+        if min_size_bytes: head += f" ≥ {_format_size(min_size_bytes)}"
+        lines = [head + ":"]
         for size, f in top:
             lines.append(f"  {_format_size(size):>10}  {f.name}  ({f.parent})")
 
@@ -739,6 +758,254 @@ def get_largest_files(path: str = "downloads", count: int = 10) -> str:
 
     except Exception as e:
         return f"Error: {e}"
+
+
+# ── Helpers para los modos pesados ──────────────────────────────────────
+
+def _walk_files_with_size(root: Path):
+    """Generador (path, size) recursivo basado en os.scandir. Más rápido
+    que Path.rglob para árboles grandes porque evita allocaciones de
+    Path por cada item y no hace stat por separado."""
+    try:
+        with os.scandir(root) as it:
+            for entry in it:
+                try:
+                    if entry.is_dir(follow_symlinks=False):
+                        # Skip carpetas que típicamente NO interesan al usuario
+                        # y son enormes (cache de paquetes, repos, etc.).
+                        if entry.name in {
+                            "node_modules", ".git", "__pycache__",
+                            ".venv", "venv", "dist", "build", ".next",
+                            ".cache",
+                        }:
+                            continue
+                        yield from _walk_files_with_size(Path(entry.path))
+                    elif entry.is_file(follow_symlinks=False):
+                        try:
+                            size = entry.stat(follow_symlinks=False).st_size
+                        except OSError:
+                            continue
+                        yield Path(entry.path), size
+                except (PermissionError, OSError):
+                    continue
+    except (PermissionError, OSError):
+        return
+
+
+_HASH_CHUNK_SIZE = 1024 * 1024  # 1 MiB
+
+
+def _fast_hash(path: Path, head_only: bool = False, chunk_size: int = _HASH_CHUNK_SIZE) -> str | None:
+    """SHA-256 incremental. Si ``head_only`` solo lee el primer chunk —
+    útil para descartar candidatos antes del hash completo."""
+    h = hashlib.sha256()
+    try:
+        with open(path, "rb") as f:
+            if head_only:
+                buf = f.read(chunk_size)
+                if not buf:
+                    return None
+                h.update(buf)
+            else:
+                while True:
+                    buf = f.read(chunk_size)
+                    if not buf:
+                        break
+                    h.update(buf)
+        return h.hexdigest()
+    except (OSError, PermissionError):
+        return None
+
+
+def _find_duplicate_groups(
+    search_path: Path,
+    min_size_bytes: int,
+    ext_filter: str,
+) -> tuple[int, list[tuple[int, list[Path]]]]:
+    """Motor compartido: devuelve (scanned, groups). Cada grupo es
+    ``(size, paths)`` con ≥ 2 archivos del mismo contenido. Sin formato
+    — los formatters viven en las funciones públicas."""
+
+    # ── Etapa 1: indexar por tamaño ──────────────────────────────
+    by_size: dict[int, list[Path]] = {}
+    total_scanned = 0
+    for fp, size in _walk_files_with_size(search_path):
+        if size < min_size_bytes:
+            continue
+        if ext_filter and fp.suffix.lower().lstrip(".") != ext_filter:
+            continue
+        by_size.setdefault(size, []).append(fp)
+        total_scanned += 1
+    candidates = {sz: paths for sz, paths in by_size.items() if len(paths) > 1}
+    if not candidates:
+        return total_scanned, []
+
+    # ── Etapa 2: hash de cabecera (1 MiB) ────────────────────────
+    by_head: dict[tuple[int, str], list[Path]] = {}
+    for sz, paths in candidates.items():
+        for p in paths:
+            h = _fast_hash(p, head_only=True)
+            if h is None:
+                continue
+            by_head.setdefault((sz, h), []).append(p)
+    head_candidates = {k: ps for k, ps in by_head.items() if len(ps) > 1}
+    if not head_candidates:
+        return total_scanned, []
+
+    # ── Etapa 3: hash completo (solo para archivos > 1 MiB) ──────
+    by_full: dict[tuple[int, str], list[Path]] = {}
+    for (sz, _head), paths in head_candidates.items():
+        if sz <= _HASH_CHUNK_SIZE:
+            by_full.setdefault((sz, _head), []).extend(paths)
+            continue
+        for p in paths:
+            full = _fast_hash(p, head_only=False)
+            if full is None:
+                continue
+            by_full.setdefault((sz, full), []).append(p)
+
+    groups = [(sz, paths) for (sz, _h), paths in by_full.items() if len(paths) > 1]
+    # Más grandes primero (por espacio recuperable)
+    groups.sort(key=lambda g: g[0] * (len(g[1]) - 1), reverse=True)
+    return total_scanned, groups
+
+
+def find_duplicates(
+    path:        str = "downloads",
+    min_size_kb: float = 1.0,
+    max_groups:  int = 20,
+    extension:   str = "",
+) -> str:
+    """Busca grupos de archivos con CONTENIDO IDÉNTICO bajo ``path``.
+
+    Algoritmo en 3 etapas (tamaño → hash cabecera → hash completo) para
+    escalar a decenas de miles de archivos. Devuelve los ``max_groups``
+    grupos más grandes ordenados por espacio recuperable.
+    """
+    try:
+        search_path = _resolve_path(path)
+        if not _is_safe_path(search_path):
+            return f"Acceso denegado: {search_path}"
+        if not search_path.exists():
+            return f"Ruta no encontrada: {path}"
+
+        min_size_bytes = max(1, int(min_size_kb * 1024))
+        ext_filter = extension.lower().lstrip(".")
+        max_groups = min(max(max_groups, 1), 100)
+
+        total_scanned, groups = _find_duplicate_groups(
+            search_path, min_size_bytes, ext_filter,
+        )
+
+        if not groups:
+            return (
+                f"Sin duplicados en {search_path.name}/ "
+                f"(escaneados {total_scanned} archivos)."
+            )
+
+        top = groups[:max_groups]
+        total_recoverable = sum(sz * (len(paths) - 1) for sz, paths in groups)
+        lines = [
+            f"Duplicados en {search_path.name}/ "
+            f"(escaneados {total_scanned}, {len(groups)} grupos · "
+            f"{_format_size(total_recoverable)} recuperables si borrás copias):",
+            "",
+        ]
+        for sz, paths in top:
+            recover = sz * (len(paths) - 1)
+            lines.append(
+                f"• {_format_size(sz)} × {len(paths)} copias "
+                f"→ {_format_size(recover)} recuperables"
+            )
+            for p in paths:
+                lines.append(f"    {p}")
+            lines.append("")
+
+        if len(groups) > max_groups:
+            lines.append(f"(+ {len(groups) - max_groups} grupos más)")
+
+        return "\n".join(lines).rstrip()
+
+    except Exception as e:
+        return f"Error en find_duplicates: {e}"
+
+
+def tree_size(path: str = "home", depth: int = 1, top: int = 20) -> str:
+    """Suma recursiva de tamaños bajo ``path`` agrupada por subcarpeta de
+    primer nivel. Ideal para encontrar qué carpeta te ocupa todo el disco.
+
+    ``depth=1`` → solo hijas directas; ``depth=2`` → nietas, etc.
+    """
+    try:
+        root = _resolve_path(path)
+        if not _is_safe_path(root):
+            return f"Acceso denegado: {root}"
+        if not root.exists():
+            return f"Ruta no encontrada: {path}"
+        if not root.is_dir():
+            return f"Ruta no es carpeta: {root}"
+
+        depth = max(1, min(depth, 4))
+        top = max(1, min(top, 50))
+
+        # Para depth=1 listamos hijas y por cada una sumamos
+        targets: list[Path] = []
+        if depth == 1:
+            try:
+                with os.scandir(root) as it:
+                    for entry in it:
+                        if entry.is_dir(follow_symlinks=False):
+                            targets.append(Path(entry.path))
+            except (OSError, PermissionError):
+                pass
+        else:
+            # Recursión limitada
+            def _collect(cur: Path, d: int):
+                if d <= 0:
+                    return
+                try:
+                    with os.scandir(cur) as it:
+                        for entry in it:
+                            if entry.is_dir(follow_symlinks=False):
+                                p = Path(entry.path)
+                                targets.append(p)
+                                _collect(p, d - 1)
+                except (OSError, PermissionError):
+                    return
+            _collect(root, depth)
+
+        # Tamaños
+        sizes: list[tuple[int, Path]] = []
+        for t in targets:
+            total = 0
+            for _fp, sz in _walk_files_with_size(t):
+                total += sz
+            sizes.append((total, t))
+
+        sizes.sort(reverse=True)
+        top_n = sizes[:top]
+
+        if not top_n:
+            return f"No hay subcarpetas dentro de {root}."
+
+        grand_total = sum(sz for sz, _ in sizes)
+        lines = [
+            f"Tamaño bajo {root} (profundidad {depth}, total ≈ {_format_size(grand_total)}):",
+        ]
+        for sz, p in top_n:
+            try:
+                rel = p.relative_to(root)
+            except ValueError:
+                rel = p
+            pct = (sz / grand_total * 100) if grand_total else 0
+            lines.append(f"  {_format_size(sz):>10}  {pct:5.1f}%  {rel}")
+
+        if len(sizes) > top:
+            lines.append(f"(+ {len(sizes) - top} subcarpetas más)")
+        return "\n".join(lines)
+
+    except Exception as e:
+        return f"Error en tree_size: {e}"
 
 
 def get_disk_usage(path: str = "home") -> str:
@@ -754,6 +1021,320 @@ def get_disk_usage(path: str = "home") -> str:
         )
     except Exception as e:
         return f"No se pudo obtener el uso del disco: {e}"
+
+
+# ──────────────────────────────────────────────────────────────────────
+#  Borrado masivo con safety en dos fases
+# ──────────────────────────────────────────────────────────────────────
+#
+#   PATRÓN DE SEGURIDAD (CRÍTICO):
+#       1. Por DEFAULT cada función es ``dry_run=True``: solo PREVIEW.
+#       2. Ejecutar requiere ``dry_run=False`` Y ``confirm=True``.
+#       3. Todo va a la papelera (send2trash), no destrucción permanente.
+#       4. La preview muestra count + total + lista para que el usuario
+#          (vía ORION) pueda revisar antes de confirmar.
+#
+#   El planner y el LLM saben (por el prompt en el schema) que deben:
+#       a) Primera llamada: dry_run=true → mostrar al usuario qué borraría.
+#       b) Esperar confirmación verbal explícita.
+#       c) Segunda llamada: dry_run=false, confirm=true.
+
+
+def _delete_paths_with_summary(
+    paths_to_delete: list[Path],
+    total_size: int,
+    dry_run: bool,
+    confirm: bool,
+    context: str,
+) -> str:
+    """Helper común: maneja el dispatch dry-run vs ejecutar real con
+    todos los safety guards. Devuelve mensaje listo para Gemini."""
+    n = len(paths_to_delete)
+    if n == 0:
+        return f"Nada que borrar en {context}."
+
+    preview_lines = [
+        f"PREVIEW — {n} archivo(s), {_format_size(total_size)} en total."
+        if dry_run else
+        f"BORRADO — {n} archivo(s), {_format_size(total_size)}."
+    ]
+    sample = paths_to_delete[:15]
+    for p in sample:
+        preview_lines.append(f"  • {p}")
+    if n > 15:
+        preview_lines.append(f"  (+ {n - 15} más)")
+
+    if dry_run:
+        preview_lines.append("")
+        preview_lines.append(
+            "Para ejecutar de verdad, volvé a llamar con "
+            "dry_run=false Y confirm=true."
+        )
+        return "\n".join(preview_lines)
+
+    if not confirm:
+        return (
+            "Bloqueado por seguridad: borrar en bulk requiere "
+            "confirm=true cuando dry_run=false. "
+            f"Iba a borrar {n} archivos ({_format_size(total_size)})."
+        )
+
+    # Ejecutar real
+    deleted = 0
+    failed: list[tuple[Path, str]] = []
+    for p in paths_to_delete:
+        try:
+            _safe_trash(p)
+            deleted += 1
+        except Exception as e:
+            failed.append((p, str(e)))
+
+    result = [f"Listo: {deleted}/{n} archivos enviados a la papelera."]
+    if failed:
+        result.append(f"Fallaron {len(failed)}:")
+        for p, err in failed[:5]:
+            result.append(f"  • {p}: {err}")
+    return "\n".join(result)
+
+
+def delete_bulk(
+    path: str = "downloads",
+    pattern: str = "",
+    extension: str = "",
+    older_than_days: int = 0,
+    larger_than_mb: float = 0.0,
+    smaller_than_mb: float = 0.0,
+    dry_run: bool = True,
+    confirm: bool = False,
+) -> str:
+    """Borra archivos en bulk por criterios. SAFETY: dry-run por default.
+
+    Filtros (combinables — un archivo debe cumplir TODOS los activos):
+        - ``pattern``: glob estilo ``*.tmp`` o ``Thumbs.db`` (vacío = sin filtro)
+        - ``extension``: ``.log`` o ``log`` (más simple que pattern)
+        - ``older_than_days``: solo archivos con mtime anterior a N días
+        - ``larger_than_mb``: solo archivos > N MB
+        - ``smaller_than_mb``: solo archivos < N MB
+    Si NO se pasa NINGÚN filtro la función se niega — esto evita un
+    "borrá todo lo de Downloads" accidental.
+    """
+    import fnmatch
+    import time
+
+    try:
+        root = _resolve_path(path)
+        if not _is_safe_path(root):
+            return f"Acceso denegado: {root}"
+        if not root.exists():
+            return f"Ruta no encontrada: {path}"
+
+        # Sin filtros = refuse. No queremos "borrá todo" implícito.
+        has_filter = bool(
+            pattern.strip() or extension.strip()
+            or older_than_days > 0 or larger_than_mb > 0 or smaller_than_mb > 0
+        )
+        if not has_filter:
+            return (
+                "delete_bulk requiere AL MENOS un filtro "
+                "(pattern, extension, older_than_days, larger_than_mb, "
+                "smaller_than_mb). Cancelado por seguridad."
+            )
+
+        ext_filter = extension.lower().lstrip(".")
+        pattern = pattern.strip()
+        larger_bytes  = int(larger_than_mb  * 1024 * 1024) if larger_than_mb  > 0 else 0
+        smaller_bytes = int(smaller_than_mb * 1024 * 1024) if smaller_than_mb > 0 else 0
+        cutoff_ts = time.time() - (older_than_days * 86400) if older_than_days > 0 else None
+
+        matched: list[Path] = []
+        total_size = 0
+        for fp, size in _walk_files_with_size(root):
+            if ext_filter and fp.suffix.lower().lstrip(".") != ext_filter:
+                continue
+            if pattern and not fnmatch.fnmatch(fp.name, pattern):
+                continue
+            if larger_bytes  and size <= larger_bytes:
+                continue
+            if smaller_bytes and size >= smaller_bytes:
+                continue
+            if cutoff_ts is not None:
+                try:
+                    if fp.stat().st_mtime >= cutoff_ts:
+                        continue
+                except OSError:
+                    continue
+            matched.append(fp)
+            total_size += size
+
+        # Hard cap por seguridad: no borrar > 10k archivos de una
+        if len(matched) > 10000:
+            return (
+                f"Bloqueado: {len(matched)} archivos coinciden — demasiados "
+                f"para una sola operación. Refiná los filtros."
+            )
+
+        crit = []
+        if ext_filter:    crit.append(f"ext=.{ext_filter}")
+        if pattern:       crit.append(f"pattern={pattern}")
+        if larger_bytes:  crit.append(f">{_format_size(larger_bytes)}")
+        if smaller_bytes: crit.append(f"<{_format_size(smaller_bytes)}")
+        if cutoff_ts is not None: crit.append(f"older_than={older_than_days}d")
+        context = f"{root.name}/ ({', '.join(crit)})"
+
+        return _delete_paths_with_summary(matched, total_size, dry_run, confirm, context)
+
+    except Exception as e:
+        return f"Error en delete_bulk: {e}"
+
+
+def delete_duplicates(
+    path: str = "downloads",
+    keep: str = "shortest_path",
+    min_size_kb: float = 1.0,
+    extension: str = "",
+    dry_run: bool = True,
+    confirm: bool = False,
+) -> str:
+    """Borra duplicados dejando UNA copia por grupo. SAFETY: dry-run default.
+
+    Política ``keep``:
+        - ``shortest_path``  (default) — conserva la ruta más corta (suele
+          ser el "original", las copias agregan sufijos tipo " - Copy")
+        - ``oldest``         — conserva el archivo con mtime más antiguo
+        - ``newest``         — conserva el archivo con mtime más reciente
+        - ``first``          — conserva el primer path encontrado (orden de
+                              escaneo, no determinístico para el usuario)
+    """
+    valid_keep = {"shortest_path", "oldest", "newest", "first"}
+    if keep not in valid_keep:
+        return f"Política 'keep' inválida: {keep}. Usá una de: {sorted(valid_keep)}"
+
+    try:
+        root = _resolve_path(path)
+        if not _is_safe_path(root):
+            return f"Acceso denegado: {root}"
+        if not root.exists():
+            return f"Ruta no encontrada: {path}"
+
+        min_size_bytes = max(1, int(min_size_kb * 1024))
+        ext_filter = extension.lower().lstrip(".")
+
+        total_scanned, groups = _find_duplicate_groups(
+            root, min_size_bytes, ext_filter,
+        )
+        if not groups:
+            return f"Nada que borrar: 0 duplicados en {root.name}/ (escaneados {total_scanned})."
+
+        # Por cada grupo elegimos cuál conservar y agregamos el resto al kill-list
+        def _keeper(paths: list[Path]) -> Path:
+            if keep == "shortest_path":
+                return min(paths, key=lambda p: len(str(p)))
+            if keep == "oldest":
+                return min(paths, key=lambda p: _safe_mtime(p))
+            if keep == "newest":
+                return max(paths, key=lambda p: _safe_mtime(p))
+            return paths[0]  # "first"
+
+        kill_list: list[Path] = []
+        total_size = 0
+        for sz, paths in groups:
+            survivor = _keeper(paths)
+            for p in paths:
+                if p == survivor:
+                    continue
+                kill_list.append(p)
+                total_size += sz
+
+        context = f"{len(groups)} grupos de duplicados (keep={keep})"
+        return _delete_paths_with_summary(kill_list, total_size, dry_run, confirm, context)
+
+    except Exception as e:
+        return f"Error en delete_duplicates: {e}"
+
+
+def _safe_mtime(p: Path) -> float:
+    try:
+        return p.stat().st_mtime
+    except OSError:
+        return 0.0
+
+
+def delete_empty_folders(
+    path: str = "desktop",
+    dry_run: bool = True,
+    confirm: bool = False,
+) -> str:
+    """Borra carpetas vacías recursivamente. SAFETY: dry-run default.
+
+    Usa walk bottom-up para que carpetas que QUEDAN vacías tras borrar
+    sus subcarpetas también se eliminen (una sola pasada).
+    Una carpeta es "vacía" si NO contiene archivos (regulares o ocultos)
+    EN NINGÚN nivel debajo.
+    """
+    try:
+        root = _resolve_path(path)
+        if not _is_safe_path(root):
+            return f"Acceso denegado: {root}"
+        if not root.exists():
+            return f"Ruta no encontrada: {path}"
+        if not root.is_dir():
+            return f"Ruta no es carpeta: {root}"
+
+        # Walk bottom-up
+        empty: list[Path] = []
+        for dirpath, dirnames, filenames in os.walk(root, topdown=False):
+            current = Path(dirpath)
+            if current == root:
+                continue  # nunca borrar la raíz
+            try:
+                # ¿Vacía después de potenciales borrados de hijas?
+                if not any(current.iterdir()):
+                    empty.append(current)
+            except (OSError, PermissionError):
+                continue
+
+        if not empty:
+            return f"No hay carpetas vacías bajo {root}."
+
+        if dry_run:
+            lines = [f"PREVIEW — {len(empty)} carpeta(s) vacía(s) bajo {root}:"]
+            for p in empty[:25]:
+                lines.append(f"  • {p}")
+            if len(empty) > 25:
+                lines.append(f"  (+ {len(empty) - 25} más)")
+            lines.append("")
+            lines.append(
+                "Para ejecutar de verdad, volvé a llamar con "
+                "dry_run=false Y confirm=true."
+            )
+            return "\n".join(lines)
+
+        if not confirm:
+            return (
+                f"Bloqueado por seguridad: borrar {len(empty)} carpetas "
+                f"requiere confirm=true cuando dry_run=false."
+            )
+
+        deleted, failed = 0, []
+        for p in empty:
+            try:
+                # Re-check de seguridad: solo si sigue vacía
+                if any(p.iterdir()):
+                    continue
+                _safe_trash(p)
+                deleted += 1
+            except Exception as e:
+                failed.append((p, str(e)))
+
+        result = [f"Listo: {deleted}/{len(empty)} carpetas vacías enviadas a la papelera."]
+        if failed:
+            result.append(f"Fallaron {len(failed)}:")
+            for p, err in failed[:5]:
+                result.append(f"  • {p}: {err}")
+        return "\n".join(result)
+
+    except Exception as e:
+        return f"Error en delete_empty_folders: {e}"
 
 
 def organize_desktop() -> str:
@@ -901,6 +1482,52 @@ def file_controller(
             return get_largest_files(
                 path=path,
                 count=int(params.get("count", 10)),
+                extension=str(params.get("extension", "") or ""),
+                min_size_mb=float(params.get("min_size_mb", 0) or 0),
+            )
+
+        elif action == "duplicates":
+            return find_duplicates(
+                path=path,
+                min_size_kb=float(params.get("min_size_kb", 1) or 1),
+                max_groups=int(params.get("max_groups", 20)),
+                extension=str(params.get("extension", "") or ""),
+            )
+
+        elif action == "tree_size":
+            return tree_size(
+                path=path,
+                depth=int(params.get("depth", 1)),
+                top=int(params.get("top", 20)),
+            )
+
+        elif action == "delete_bulk":
+            return delete_bulk(
+                path=path,
+                pattern=str(params.get("pattern", "") or ""),
+                extension=str(params.get("extension", "") or ""),
+                older_than_days=int(params.get("older_than_days", 0) or 0),
+                larger_than_mb=float(params.get("larger_than_mb", 0) or 0),
+                smaller_than_mb=float(params.get("smaller_than_mb", 0) or 0),
+                dry_run=bool(params.get("dry_run", True)),
+                confirm=bool(params.get("confirm", False)),
+            )
+
+        elif action == "delete_duplicates":
+            return delete_duplicates(
+                path=path,
+                keep=str(params.get("keep", "shortest_path") or "shortest_path"),
+                min_size_kb=float(params.get("min_size_kb", 1) or 1),
+                extension=str(params.get("extension", "") or ""),
+                dry_run=bool(params.get("dry_run", True)),
+                confirm=bool(params.get("confirm", False)),
+            )
+
+        elif action == "delete_empty_folders":
+            return delete_empty_folders(
+                path=path,
+                dry_run=bool(params.get("dry_run", True)),
+                confirm=bool(params.get("confirm", False)),
             )
 
         elif action == "disk_usage":

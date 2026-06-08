@@ -41,6 +41,10 @@ from actions.iot.config import (
 from actions.iot.devices import Device
 from actions.iot.sensors import get_cache
 from actions.iot.scenes import list_scenes
+from core.logger import get_logger
+from server import safe_error_detail
+
+log = get_logger("server.routes.iot")
 
 router = APIRouter()
 
@@ -89,7 +93,7 @@ class TransportBody(BaseModel):
 
 # ── Read endpoints ──────────────────────────────────────────────────────
 @router.get("/devices")
-async def get_devices() -> list[dict]:
+def get_devices() -> list[dict]:
     sys = get_system()
     devices = []
     for dev in sys.cfg.devices.values():
@@ -107,12 +111,12 @@ async def get_devices() -> list[dict]:
 
 
 @router.get("/scenes")
-async def get_scenes() -> list[dict]:
+def get_scenes() -> list[dict]:
     return list_scenes(get_system().cfg)
 
 
 @router.get("/sensors")
-async def get_sensors() -> dict:
+def get_sensors() -> dict:
     cache = get_cache()
     out = {}
     for dev_id, reading in cache.all().items():
@@ -125,14 +129,14 @@ async def get_sensors() -> dict:
 
 
 @router.get("/status")
-async def get_transport_status() -> dict:
+def get_transport_status() -> dict:
     """Estado de conexión de los transports configurados."""
     result = iot_control({"action": "status"})
     return {"status": result}
 
 
 @router.get("/config")
-async def get_full_config() -> dict:
+def get_full_config() -> dict:
     """Devuelve el config completo (transports + devices + scenes).
 
     Útil para que el frontend muestre los detalles de cada transport
@@ -144,7 +148,7 @@ async def get_full_config() -> dict:
 
 # ── Write endpoints (acciones, no config) ───────────────────────────────
 @router.post("/devices/{device_id}/action")
-async def device_action(
+def device_action(
     device_id: str, body: DeviceAction, request: Request,
 ) -> dict:
     if device_id not in get_system().cfg.devices:
@@ -161,7 +165,7 @@ async def device_action(
 
 
 @router.post("/scenes/{scene_id}/run")
-async def scene_run(scene_id: str, request: Request) -> dict:
+def scene_run(scene_id: str, request: Request) -> dict:
     if scene_id not in get_system().cfg.scenes:
         raise HTTPException(status_code=404, detail=f"Escena '{scene_id}' no existe")
     result = iot_control({"action": "scene", "scene": scene_id})
@@ -210,7 +214,8 @@ def _persist_and_reload(request: Request, cfg: IoTConfig, event: dict) -> None:
                 indent=2, ensure_ascii=False, sort_keys=True,
             )
             old_hash = hashlib.sha256(old_serialized.encode("utf-8")).hexdigest()
-    except Exception:
+    except (OSError, ValueError) as e:
+        log.warning("no pude leer hash de iot_config: %s", e)
         old_hash = None
 
     if old_hash == new_hash:
@@ -223,12 +228,12 @@ def _persist_and_reload(request: Request, cfg: IoTConfig, event: dict) -> None:
     try:
         get_system().reload()
     except Exception as e:
-        print(f"[IoT-Admin] ⚠️ Hot-reload falló: {e}")
+        log.warning("Hot-reload IoT falló: %s", e)
     _publish(request, "iot.config", event)
 
 
 @router.post("/admin/devices", status_code=201)
-async def create_device(body: DeviceBody, request: Request) -> dict:
+def create_device(body: DeviceBody, request: Request) -> dict:
     if not body.id:
         raise HTTPException(status_code=400, detail="Falta 'id' del dispositivo")
 
@@ -253,7 +258,7 @@ async def create_device(body: DeviceBody, request: Request) -> dict:
 
 
 @router.put("/admin/devices/{device_id}")
-async def update_device(device_id: str, body: DeviceBody, request: Request) -> dict:
+def update_device(device_id: str, body: DeviceBody, request: Request) -> dict:
     sys = get_system()
     if device_id not in sys.cfg.devices:
         raise HTTPException(status_code=404, detail=f"'{device_id}' no existe")
@@ -275,7 +280,7 @@ async def update_device(device_id: str, body: DeviceBody, request: Request) -> d
 
 
 @router.delete("/admin/devices/{device_id}")
-async def delete_device(device_id: str, request: Request) -> dict:
+def delete_device(device_id: str, request: Request) -> dict:
     sys = get_system()
     if device_id not in sys.cfg.devices:
         raise HTTPException(status_code=404, detail=f"'{device_id}' no existe")
@@ -286,7 +291,7 @@ async def delete_device(device_id: str, request: Request) -> dict:
 
 
 @router.put("/admin/transports/{transport_id}")
-async def upsert_transport(transport_id: str, body: TransportBody, request: Request) -> dict:
+def upsert_transport(transport_id: str, body: TransportBody, request: Request) -> dict:
     tcfg = _transport_dict_from_body(body)
     sys = get_system()
     errs = validate_transport(tcfg, existing=sys.cfg.transports, self_id=transport_id)
@@ -299,7 +304,7 @@ async def upsert_transport(transport_id: str, body: TransportBody, request: Requ
 
 
 @router.delete("/admin/transports/{transport_id}")
-async def delete_transport(transport_id: str, request: Request) -> dict:
+def delete_transport(transport_id: str, request: Request) -> dict:
     sys = get_system()
     if transport_id not in sys.cfg.transports:
         raise HTTPException(status_code=404, detail=f"'{transport_id}' no existe")
@@ -318,15 +323,75 @@ async def delete_transport(transport_id: str, request: Request) -> dict:
 
 
 @router.post("/admin/reload")
-async def reload_system(request: Request) -> dict:
+def reload_system(request: Request) -> dict:
     """Recarga el config desde disco sin escribir nada. Útil si editaste
     iot_config.json a mano y quieres aplicar sin reiniciar ORION."""
     try:
         get_system().reload()
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Reload falló: {e}")
+        log.exception("Reload IoT falló")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Reload falló: {safe_error_detail(e)}",
+        )
     _publish(request, "iot.config", {"action": "reload"})
     return {"ok": True}
+
+
+# ── Pausar / reanudar TODOS los sensores (corta transports) ─────────────
+@router.post("/admin/disconnect")
+def disconnect_all(request: Request) -> dict:
+    """Cierra TODOS los transports IoT (serial + MQTT) sin tocar el config.
+    Útil cuando no querés que ORION conecte al COM o al broker al arrancar.
+    Persiste el estado en :file:`config/iot_paused.flag` para que sobreviva
+    al reinicio."""
+    from actions.iot.transports import close_all
+    from config import IOT_CONFIG_PATH
+
+    close_all()
+    # Reset del singleton para que un futuro get_system() respete el flag.
+    import actions.iot.control as _ctrl
+    with _ctrl._system_lock:
+        _ctrl._system = None
+
+    flag = IOT_CONFIG_PATH.parent / "iot_paused.flag"
+    try:
+        flag.write_text("1", encoding="utf-8")
+    except OSError as e:
+        log.warning("No pude persistir flag de pausa: %s", e)
+
+    _publish(request, "iot.config", {"action": "disconnect", "paused": True})
+    return {"ok": True, "paused": True}
+
+
+@router.post("/admin/connect")
+def connect_all(request: Request) -> dict:
+    """Reanuda los transports. Borra el flag de pausa y reabre."""
+    from config import IOT_CONFIG_PATH
+    flag = IOT_CONFIG_PATH.parent / "iot_paused.flag"
+    try:
+        if flag.exists():
+            flag.unlink()
+    except Exception:
+        pass
+    try:
+        get_system().reload()
+    except Exception as e:
+        log.exception("Reconectar IoT falló")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Reconectar falló: {safe_error_detail(e)}",
+        )
+    _publish(request, "iot.config", {"action": "connect", "paused": False})
+    return {"ok": True, "paused": False}
+
+
+@router.get("/admin/paused")
+def get_paused() -> dict:
+    """Estado actual del flag (true = transports cerrados)."""
+    from config import IOT_CONFIG_PATH
+    flag = IOT_CONFIG_PATH.parent / "iot_paused.flag"
+    return {"paused": flag.exists()}
 
 
 # ── helpers ─────────────────────────────────────────────────────────────
@@ -336,5 +401,5 @@ def _publish(request: Request, topic: str, payload: dict) -> None:
         return
     try:
         bus.publish(topic, payload)
-    except Exception:
-        pass
+    except Exception as e:
+        log.debug("publish %s falló: %s", topic, e)

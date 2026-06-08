@@ -10,15 +10,17 @@ from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException, Request
 
+from core.logger import get_logger
 from memory.conversations import (
     delete_conversation, get_conversation, list_conversations,
 )
 
+log = get_logger("server.routes.conversations")
 router = APIRouter()
 
 
 @router.get("")
-async def get_all_conversations() -> list[dict]:
+def get_all_conversations() -> list[dict]:
     """Lista las conversaciones (resumidas, sin el cuerpo de mensajes).
 
     ``list_conversations()`` ya devuelve metadata ligera con ``msg_count``;
@@ -38,7 +40,7 @@ async def get_all_conversations() -> list[dict]:
 
 
 @router.get("/{conv_id}")
-async def get_one_conversation(conv_id: str) -> dict:
+def get_one_conversation(conv_id: str) -> dict:
     conv = get_conversation(conv_id)
     if conv is None:
         raise HTTPException(status_code=404, detail=f"Conversación '{conv_id}' no encontrada")
@@ -46,7 +48,7 @@ async def get_one_conversation(conv_id: str) -> dict:
 
 
 @router.delete("/{conv_id}", status_code=204)
-async def remove_conversation(conv_id: str, request: Request) -> None:
+def remove_conversation(conv_id: str, request: Request) -> None:
     ok = delete_conversation(conv_id)
     if not ok:
         raise HTTPException(status_code=404, detail=f"Conversación '{conv_id}' no encontrada")
@@ -54,5 +56,5 @@ async def remove_conversation(conv_id: str, request: Request) -> None:
     if bus is not None:
         try:
             bus.publish("conversation.deleted", {"id": conv_id})
-        except Exception:
-            pass
+        except Exception as e:
+            log.debug("publish conversation.deleted falló: %s", e)

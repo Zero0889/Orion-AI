@@ -12,7 +12,7 @@
  * matter of registering the same id on the backend.
  */
 
-import { useEffect, useMemo, useState } from "react";
+import { memo, useEffect, useMemo, useState } from "react";
 
 import { api, type IoTDevice, type IoTScene, type IoTSensor } from "@/api/rest";
 import { DeviceFormModal } from "@/components/DeviceFormModal";
@@ -42,6 +42,8 @@ export function IoTPanel() {
   const [scenes,  setScenes]  = useState<IoTScene[]>([]);
   const [sensors, setSensors] = useState<Record<string, IoTSensor>>({});
   const [error,   setError]   = useState<string | null>(null);
+  const [paused,  setPaused]  = useState<boolean>(false);
+  const [pausing, setPausing] = useState<boolean>(false);
 
   // modal
   const [editing, setEditing] = useState<IoTDevice | LocalDevice | undefined>(undefined);
@@ -51,11 +53,28 @@ export function IoTPanel() {
 
   useEffect(() => {
     let alive = true;
-    Promise.all([api.iotDevices(), api.iotScenes(), api.iotSensors()])
-      .then(([d, s, se]) => { if (alive) { setBackendDevices(d); setScenes(s); setSensors(se); setError(null); } })
+    Promise.all([api.iotDevices(), api.iotScenes(), api.iotSensors(), api.iotPausedStatus()])
+      .then(([d, s, se, p]) => {
+        if (!alive) return;
+        setBackendDevices(d); setScenes(s); setSensors(se);
+        setPaused(p.paused); setError(null);
+      })
       .catch((e) => { if (alive) setError(String(e)); });
     return () => { alive = false; };
   }, [rev, refreshTick]);
+
+  async function togglePause() {
+    setPausing(true);
+    try {
+      const r = paused ? await api.iotConnect() : await api.iotDisconnect();
+      setPaused(r.paused);
+      setRefreshTick((n) => n + 1);
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setPausing(false);
+    }
+  }
 
   // merge backend + local, dedup by id (backend wins capabilities).
   const devices = useMemo<(IoTDevice | LocalDevice)[]>(() => {
@@ -96,9 +115,23 @@ export function IoTPanel() {
         action={
           <div className="flex items-center gap-2">
             <div className="hidden md:flex items-center gap-1.5">
-              <Badge tone="info" dot>{devices.length} disp.</Badge>
-              <Badge tone="accent">{scenes.length} escenas</Badge>
+              <Badge tone={paused ? "warn" : "info"} dot>
+                {paused ? "Sensores pausados" : `${devices.length} disp.`}
+              </Badge>
+              {!paused && <Badge tone="accent">{scenes.length} escenas</Badge>}
             </div>
+            <Button
+              variant={paused ? "primary" : "ghost"}
+              size="sm"
+              icon={paused ? "play" : "close"}
+              onClick={togglePause}
+              disabled={pausing}
+              title={paused
+                ? "Reconectar transports (COM + MQTT)"
+                : "Cortar conexión: cierra COM y broker hasta que reactives"}
+            >
+              {paused ? "Reactivar sensores" : "Apagar sensores"}
+            </Button>
             <Button variant="primary" size="sm" icon="plus" onClick={openCreate}>
               Nuevo
             </Button>
@@ -222,7 +255,12 @@ function Subhead({ title, count }: { title: string; count: number }) {
 }
 
 /* ── DEVICE CARD ─────────────────────────────────────────────────── */
-function DeviceCard({
+// React.memo: DeviceCard solo re-renderiza si cambian sus props. Como el
+// sensor en vivo se lee dentro de <SensorReadout> con un selector granular
+// del store (solo escucha iotSensors[deviceId]), los cards de OTROS
+// dispositivos no se rerenderean cuando llega una lectura. Sin esto, con 8
+// sensores ticking a 1Hz teníamos ~480 re-renders/min del panel entero.
+const DeviceCard = memo(function DeviceCard({
   dev, config, onAct, onEdit, delay,
 }: {
   dev:    IoTDevice | LocalDevice;
@@ -329,10 +367,10 @@ function DeviceCard({
       )}
     </Surface>
   );
-}
+});
 
 /* ── SENSOR READOUT (value + optional sparkline) ─────────────────── */
-function SensorReadout({ deviceId, graph }: { deviceId: string; graph: boolean }) {
+const SensorReadout = memo(function SensorReadout({ deviceId, graph }: { deviceId: string; graph: boolean }) {
   const sample  = useOrionStore((s) => s.iotSensors[deviceId]);
   const history = useSensorHistory(deviceId, 48);
 
@@ -369,23 +407,31 @@ function SensorReadout({ deviceId, graph }: { deviceId: string; graph: boolean }
       )}
     </div>
   );
-}
+});
 
 /* ── SPARKLINE (mirrors the area chart from TelemetryPanel) ──────── */
-function Sparkline({ data }: { data: number[] }) {
+// memo + useMemo de los path SVG: el cálculo de min/max/range/pts/line es
+// O(n) sobre la ventana de muestras. Se recalcula solo cuando el array
+// `data` cambia de referencia (history es un nuevo array cada tick, así
+// que sirve como tripwire natural).
+const Sparkline = memo(function Sparkline({ data }: { data: number[] }) {
   const W = 260, H = 64, P = 3;
-  const min = Math.min(...data);
-  const max = Math.max(...data);
-  const range = Math.max(max - min, 0.001);
-  const step  = (W - 2 * P) / Math.max(data.length - 1, 1);
-  const pts   = data.map((v, i) => {
-    const x = P + i * step;
-    const y = H - P - ((v - min) / range) * (H - 2 * P);
-    return [x, y] as const;
-  });
-  const line = pts.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(" ");
-  const area = `${pts[0][0]},${H} ${line} ${pts[pts.length - 1][0]},${H}`;
   const id = useStableId();
+
+  const { line, area, tip } = useMemo(() => {
+    const min = Math.min(...data);
+    const max = Math.max(...data);
+    const range = Math.max(max - min, 0.001);
+    const step  = (W - 2 * P) / Math.max(data.length - 1, 1);
+    const pts   = data.map((v, i) => {
+      const x = P + i * step;
+      const y = H - P - ((v - min) / range) * (H - 2 * P);
+      return [x, y] as const;
+    });
+    const lineStr = pts.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(" ");
+    const areaStr = `${pts[0][0]},${H} ${lineStr} ${pts[pts.length - 1][0]},${H}`;
+    return { line: lineStr, area: areaStr, tip: pts[pts.length - 1] };
+  }, [data]);
 
   return (
     <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-16">
@@ -409,13 +455,13 @@ function Sparkline({ data }: { data: number[] }) {
         strokeLinecap="round"
       />
       <circle
-        cx={pts[pts.length - 1][0]} cy={pts[pts.length - 1][1]} r="2.2"
+        cx={tip[0]} cy={tip[1]} r="2.2"
         fill="rgb(var(--orion-acc))"
         style={{ filter: "drop-shadow(0 0 4px rgb(var(--orion-acc)))" }}
       />
     </svg>
   );
-}
+});
 
 /* tiny per-component id helper for the SVG gradient URLs */
 let _sparkSeq = 0;

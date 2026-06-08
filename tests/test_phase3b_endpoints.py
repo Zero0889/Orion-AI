@@ -113,6 +113,11 @@ class _FakeDevice:
         self.transport = transport
         from actions.iot.devices import Capabilities
         self.capabilities = Capabilities.from_dict(caps)
+        # Campos opcionales que GET /api/iot/devices serializa para el
+        # modal de edición. Tras IoT v3 se devuelven dev.serial y dev.mqtt;
+        # los fakes los exponen como None.
+        self.serial = None
+        self.mqtt   = None
 
 
 class _FakeIoTConfig:
