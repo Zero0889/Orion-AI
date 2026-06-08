@@ -10,7 +10,7 @@
 [![Python](https://img.shields.io/badge/python-3.11%20%7C%203.12-blue.svg)](https://www.python.org/)
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey.svg)]()
 [![Stack](https://img.shields.io/badge/stack-FastAPI%20%7C%20React%20%7C%20Tauri-success.svg)]()
-[![Last commit](https://img.shields.io/github/last-commit/Zero0889/O.R.I.O.N---IA.svg)](https://github.com/Zero0889/O.R.I.O.N---IA/commits/master)
+[![Last commit](https://img.shields.io/github/last-commit/Zero0889/Orion-AI.svg)](https://github.com/Zero0889/Orion-AI/commits/master)
 
 <!-- Reemplaza esta línea con un GIF o screenshot de Orion en acción (assets/hero.gif) -->
 <!-- ![Orion demo](assets/hero.gif) -->
