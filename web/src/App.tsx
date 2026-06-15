@@ -15,6 +15,9 @@
 import { useEffect, useState } from "react";
 
 import { AgentsPanel } from "@/components/AgentsPanel";
+import { BackgroundEye } from "@/components/BackgroundEye";
+import { CircuitPanel } from "@/components/CircuitPanel";
+import { EyeCore, type EyePalette } from "@/components/EyeCore";
 import { ChatPanel } from "@/components/ChatPanel";
 import { CommandPalette } from "@/components/CommandPalette";
 import { DropZone } from "@/components/DropZone";
@@ -30,7 +33,10 @@ import { SettingsPanel } from "@/components/SettingsPanel";
 import { Sidebar } from "@/components/Sidebar";
 import { SkillsPanel } from "@/components/SkillsPanel";
 import { TelemetryPanel } from "@/components/TelemetryPanel";
+import { Toaster } from "@/components/Toaster";
 import { TopBar } from "@/components/TopBar";
+import { useEventPulses } from "@/hooks/useEventPulses";
+import { useEyeState } from "@/hooks/useEyeState";
 import { useOrionSocket } from "@/hooks/useOrionSocket";
 import { useOrionStore } from "@/stores/orion";
 import { useViewStore } from "@/stores/view";
@@ -120,6 +126,19 @@ export default function App() {
     window.localStorage.setItem(RAIL_KEY, collapsed ? "1" : "0");
   }, [collapsed]);
 
+  // ── Chrome reactivo: escribe el estado del ojo en <html data-eye-state>
+  // para que el CSS pueda teñir los bordes del sidebar/topbar con el color
+  // del estado actual. El CSS hace la transición suave (~600ms).
+  const eyeState = useEyeState();
+  useEffect(() => {
+    document.documentElement.dataset.eyeState = eyeState;
+  }, [eyeState]);
+
+  // Bisagra mundo→ojo: dispara pulsos radiales por sensores nuevos,
+  // notifs, tools, etc. Sin filtros se vuelve ruido — la lógica de
+  // qué amerita pulso vive en useEventPulses.
+  useEventPulses();
+
   const railW = collapsed ? "72px" : "264px";
 
   return (
@@ -128,14 +147,14 @@ export default function App() {
       style={{ gridTemplateColumns: `${railW} 1fr` }}
     >
       {/* ── Sidebar ───────────────────────────────────────────────── */}
-      <aside className="relative flex flex-col p-3 border-r border-white/[0.06] bg-sunken/50 backdrop-blur-sm">
+      <aside className="relative flex flex-col p-3 border-r border-white/[0.06] bg-sunken/50 backdrop-blur-sm chrome-edge-right">
         {/* brand */}
         <div className={collapsed ? "flex justify-center py-2 mb-3" : "flex items-center gap-2.5 px-2 py-2 mb-4"}>
           <BrandMark />
           {!collapsed && (
             <div className="leading-tight">
               <div className="text-[13px] font-semibold tracking-[0.18em] text-text">ORION</div>
-              <div className="text-[9px] uppercase tracking-[0.22em] text-muted">OS · v{version || "…"}</div>
+              <div className="text-[9px] uppercase tracking-[0.22em] text-muted numeric">OS · v{version || "…"}</div>
             </div>
           )}
         </div>
@@ -161,19 +180,27 @@ export default function App() {
           onInterrupt={() => send("interrupt")}
         />
 
-        <main key={view} className="flex-1 overflow-hidden bg-bg animate-fade-in">
-          {view === "home"      && <HomePanel />}
-          {view === "chat"      && <ChatPanel onSend={(t) => send("text", { text: t })} />}
-          {view === "notes"     && <NotesPanel />}
-          {view === "memory"    && <MemoryPanel />}
-          {view === "history"   && <HistoryPanel />}
-          {view === "telemetry" && <TelemetryPanel />}
-          {view === "agents"    && <AgentsPanel />}
-          {view === "iot"       && <IoTPanel />}
-          {view === "mcp"       && <MCPPanel />}
-          {view === "skills"    && <SkillsPanel />}
-          {view === "notifications" && <NotificationsPanel />}
-          {view === "settings"  && <SettingsPanel />}
+        <main key={view} className="relative flex-1 overflow-hidden bg-bg animate-fade-in">
+          {/* ojo ambiental detrás de todas las vistas != home — reacciona
+              al estado real del backend (escuchando/pensando/hablando/error) */}
+          {view !== "home" && <BackgroundEye />}
+
+          {/* las vistas viven sobre el ojo, en su propio plano */}
+          <div className="relative z-10 h-full">
+            {view === "home"      && <HomePanel />}
+            {view === "chat"      && <ChatPanel send={send} />}
+            {view === "notes"     && <NotesPanel />}
+            {view === "memory"    && <MemoryPanel />}
+            {view === "history"   && <HistoryPanel />}
+            {view === "telemetry" && <TelemetryPanel />}
+            {view === "agents"    && <AgentsPanel />}
+            {view === "iot"       && <IoTPanel />}
+            {view === "mcp"       && <MCPPanel />}
+            {view === "skills"    && <SkillsPanel />}
+            {view === "notifications" && <NotificationsPanel />}
+            {view === "circuit"   && <CircuitPanel />}
+            {view === "settings"  && <SettingsPanel />}
+          </div>
         </main>
       </div>
 
@@ -181,29 +208,42 @@ export default function App() {
       <Onboarding />
       <DropZone />
       <CommandPalette send={send} />
+      <Toaster />
+
+      {/* HUD scanlines — capa CRT global. Va detrás del noise overlay
+          (z-9999) pero por encima de toda la UI. pointer-events:none. */}
+      <div className="scanlines" aria-hidden />
     </div>
   );
 }
 
-/* ─── brand mark — minimal orbit glyph ─────────────────────────────── */
+/* ─── brand mark — el MISMO ojo del Inicio, sólo que en miniatura ─────
+   En reposo se queda QUIETO. Sólo arranca todas las animaciones del
+   diseño (anillos girando, mirada robótica, iris dilatándose) cuando
+   el mouse está encima. La paleta queda FIJA en blanco-azul: nunca
+   cambia de color con el estado de Orion. */
+const SIDEBAR_EYE_PALETTE: EyePalette = {
+  main:   "rgba(200, 225, 255, 0.95)",
+  second: "rgba(120, 165, 230, 0.85)",
+  glow:   "rgba(200, 225, 255, 0.45)",
+};
+
 function BrandMark() {
+  const [hover, setHover] = useState(false);
   return (
-    <div className="relative h-9 w-9 grid place-items-center">
-      <div className="absolute inset-0 rounded-full bg-pri/15 blur-md" />
-      <svg viewBox="0 0 40 40" className="relative h-9 w-9 animate-breath">
-        <defs>
-          <radialGradient id="brandCore" cx="50%" cy="40%" r="55%">
-            <stop offset="0%"   stopColor="#FFFFFF" stopOpacity="0.95" />
-            <stop offset="45%"  stopColor="rgb(var(--orion-pri))" stopOpacity="0.95" />
-            <stop offset="100%" stopColor="#000" stopOpacity="0.85" />
-          </radialGradient>
-        </defs>
-        <circle cx="20" cy="20" r="11" fill="url(#brandCore)" />
-        <ellipse cx="20" cy="20" rx="17" ry="6" fill="none"
-                 stroke="rgb(var(--orion-pri))" strokeOpacity="0.55" strokeWidth="0.9"
-                 transform="rotate(-22 20 20)" />
-        <circle cx="36" cy="14" r="1.3" fill="rgb(var(--orion-acc))" />
-      </svg>
+    <div
+      className="relative h-9 w-9 grid place-items-center cursor-default"
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+    >
+      <div className="absolute inset-0 rounded-full bg-pri/10 blur-md pointer-events-none" />
+      <EyeCore
+        size={38}
+        state="idle"
+        palette={SIDEBAR_EYE_PALETTE}
+        paused={!hover}
+        className="relative"
+      />
     </div>
   );
 }

@@ -147,8 +147,9 @@ def build_app(bus: Any) -> FastAPI:
 
     # ── Routers ───────────────────────────────────────────────────────────
     from server.routes import (
-        agent, conversations, files, iot, mcp, memory, notes, notifications,
-        skills, settings as settings_route,
+        agent, circuit, conversations, files, integrations, iot, mcp, memory,
+        notebooklm as notebooklm_route,
+        notes, notifications, skills, settings as settings_route,
     )
     app.include_router(memory.router,            prefix="/api/memory",        tags=["memory"])
     app.include_router(notes.router,             prefix="/api/notes",         tags=["notes"])
@@ -160,6 +161,9 @@ def build_app(bus: Any) -> FastAPI:
     app.include_router(skills.router,            prefix="/api/skills",        tags=["skills"])
     app.include_router(notifications.router,     prefix="/api/notifications", tags=["notifications"])
     app.include_router(files.router,             prefix="/api/files",         tags=["files"])
+    app.include_router(notebooklm_route.router,  prefix="/api/notebooklm",    tags=["notebooklm"])
+    app.include_router(integrations.router,      prefix="/api/integrations",  tags=["integrations"])
+    app.include_router(circuit.router,           prefix="/api/circuit",       tags=["circuit"])
 
     # ── WebSocket hub ────────────────────────────────────────────────────
     from server.ws import register_ws

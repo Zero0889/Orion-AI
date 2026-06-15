@@ -51,11 +51,25 @@ def _stub_live_only(name: str):
 # ── Schemas y handlers ──────────────────────────────────────────────────
 
 def register_builtin_tools() -> None:
-    """Registra las 22 tools builtin + los 4 stubs Live-only.
+    """Registra las 23 tools builtin + los 4 stubs Live-only.
 
-    Idempotente: re-llamarlo sobreescribe las entradas anteriores.
+    **Idempotente de verdad**: si ya están registradas, no hace nada.
+    Antes la función reescribía siempre y eso pisaba los handlers
+    Live-only que ``OrionLive._inject_live_only_handlers`` inyectaba
+    en startup. El executor llama a esta función al ejecutar el primer
+    step de un plan, y eso destruía silenciosamente el handler real de
+    ``agent_task`` — a partir de ese momento Gemini Live recibía el
+    stub 'solo disponible en modo voz' por el resto de la sesión.
+
+    El guard chequea por ``agent_task`` que es siempre la última builtin
+    registrada antes que el resto. Si ya está, asumimos que main.py
+    pasó por acá Y que la inyección Live ya corrió.
     """
     reg = ToolRegistry()
+    if reg.has("agent_task") and reg.has("ask_user"):
+        # Ya inicializado. Salimos sin tocar nada — preserva los handlers
+        # Live-only y cualquier tool MCP que se haya agregado después.
+        return
 
     # ── open_app ────────────────────────────────────────────────────
     def h_open_app(parameters: dict, *, player=None, **_):
@@ -667,6 +681,83 @@ def register_builtin_tools() -> None:
         h_file_proc,
     )
 
+    # ── circuit_from_image ──────────────────────────────────────────
+    def h_circuit_from_image(parameters: dict, *, player=None, **_):
+        from actions.circuit_from_image import circuit_from_image
+        return circuit_from_image(parameters, player=player) or "Listo."
+
+    reg.register(
+        ToolDeclaration(
+            name="circuit_from_image",
+            description=(
+                "Analyzes an electronic circuit image (photo, screenshot, hand-drawn "
+                "schematic) and generates a SPICE netlist (.cir importable to Proteus "
+                "via File > Import Section) and a KiCad schematic (.kicad_sch). "
+                "Use this WHENEVER the user uploads a circuit image and asks for a "
+                "netlist, SPICE, Proteus, KiCad, .cir or schematic file. "
+                "Do NOT use file_processor for this — file_processor only describes "
+                "images, it does not generate circuit files."
+            ),
+            parameters={
+                "type": "OBJECT",
+                "properties": {
+                    "image_path": {
+                        "type": "STRING",
+                        "description": "Absolute path to the circuit image. If empty, uses the currently uploaded file."
+                    },
+                    "outputs": {
+                        "type": "ARRAY",
+                        "items": {"type": "STRING"},
+                        "description": "Targets to generate: 'spice', 'kicad'. Default: both."
+                    },
+                    "output_dir": {
+                        "type": "STRING",
+                        "description": "Folder where the .cir and .kicad_sch are written. Default: the image's folder."
+                    },
+                },
+                "required": ["image_path"]
+            },
+            timeout=120,
+            needs_current_file=True,
+        ),
+        h_circuit_from_image,
+    )
+
+    # ── proteus_autodraw ────────────────────────────────────────────
+    def h_proteus_autodraw(parameters: dict, *, player=None, **_):
+        from actions.proteus_autodraw import proteus_autodraw
+        return proteus_autodraw(parameters, player=player) or "Listo."
+
+    reg.register(
+        ToolDeclaration(
+            name="proteus_autodraw",
+            description=(
+                "Automates Proteus 8 Schematic Capture to add the components "
+                "of a previously generated SPICE netlist (.cir) into Proteus' "
+                "DEVICES panel. The user must have Proteus open in Schematic "
+                "Capture mode and bring it to foreground when prompted. "
+                "Components are added to the panel only — the user still needs "
+                "to drag them onto the canvas and wire them manually."
+            ),
+            parameters={
+                "type": "OBJECT",
+                "properties": {
+                    "cir_path": {
+                        "type": "STRING",
+                        "description": "Absolute path to the .cir file."
+                    },
+                    "countdown": {
+                        "type": "INTEGER",
+                        "description": "Seconds before automation starts (default 3) — gives the user time to focus Proteus."
+                    },
+                },
+                "required": ["cir_path"]
+            },
+            timeout=180,
+        ),
+        h_proteus_autodraw,
+    )
+
     # ── quick_note (Live-only stub; main.py inyecta el real) ────────
     reg.register(
         ToolDeclaration(
@@ -915,6 +1006,83 @@ def register_builtin_tools() -> None:
         h_classroom,
     )
 
+    # ── notebooklm_research ─────────────────────────────────────────
+    def h_nblm(parameters: dict, *, player=None, **_):
+        from actions.notebooklm_research import notebooklm_research
+        return notebooklm_research(parameters=parameters, player=player) or "Listo."
+
+    reg.register(
+        ToolDeclaration(
+            name="notebooklm_research",
+            description=(
+                "Investigación dinámica con Google NotebookLM. SUSTITUYE a web_search "
+                "cuando el usuario pide investigar un tema con MÚLTIPLES fuentes, generar "
+                "un notebook de referencias, o quiere abrir el resultado en notebooklm.google.com. "
+                "Acciones: "
+                "research (default) — crea un notebook nuevo y dispara el research agent "
+                "de Google para buscar fuentes web o Drive y auto-importarlas; "
+                "list — lista los notebooks existentes del usuario; "
+                "ask — hace una pregunta a un notebook ya creado (respuesta grounded con citas); "
+                "delete — elimina un notebook por id. "
+                "Para 'research' devuelve la URL del notebook listo para abrir en el navegador. "
+                "Modo 'fast' (~minutos) vs 'deep' (~10-30 min, fuentes más exhaustivas). "
+                "Source 'web' (default) busca en internet, 'drive' busca en tu Google Drive."
+            ),
+            parameters={
+                "type": "OBJECT",
+                "properties": {
+                    "action": {
+                        "type": "STRING",
+                        "description": "research (default) | list | ask | delete"
+                    },
+                    "topic": {
+                        "type": "STRING",
+                        "description": "Tema a investigar (para action=research). Sé específico: incluye fechas, ámbito, idioma si aplica."
+                    },
+                    "n_sources": {
+                        "type": "INTEGER",
+                        "description": "Número objetivo de fuentes a importar (default 20)."
+                    },
+                    "mode": {
+                        "type": "STRING",
+                        "description": "fast (default, ~minutos) | deep (búsqueda exhaustiva, ~10-30 min)."
+                    },
+                    "source": {
+                        "type": "STRING",
+                        "description": "web (default, busca en internet) | drive (busca en Google Drive del usuario)."
+                    },
+                    "auto_import": {
+                        "type": "BOOLEAN",
+                        "description": "Importa automáticamente las fuentes encontradas al notebook (default true)."
+                    },
+                    "notebook_name": {
+                        "type": "STRING",
+                        "description": "Título personalizado del notebook. Si se omite, se usa el topic."
+                    },
+                    "notebook_id": {
+                        "type": "STRING",
+                        "description": "ID del notebook (para action=ask o action=delete)."
+                    },
+                    "question": {
+                        "type": "STRING",
+                        "description": "Pregunta para action=ask."
+                    },
+                    "limit": {
+                        "type": "INTEGER",
+                        "description": "Máximo de notebooks a devolver en action=list (default 30)."
+                    },
+                    "timeout": {
+                        "type": "NUMBER",
+                        "description": "Timeout en segundos para esperar el research (default 1800 = 30 min)."
+                    },
+                },
+                "required": []
+            },
+            timeout=1900,
+        ),
+        h_nblm,
+    )
+
     # ── use_skill ───────────────────────────────────────────────────
     # Devuelve el cuerpo markdown de una skill como contexto extra. El
     # Director / planner la invoca cuando la tarea encaja con la skill;
@@ -939,6 +1107,81 @@ def register_builtin_tools() -> None:
             f"Ejecuta los bloques bash con generated_code cuando aplique.\n\n"
             f"---\n{body}"
         )
+
+    # ── ask_user ────────────────────────────────────────────────────
+    # Permite que un agente PAUSE y le pregunte algo al usuario con
+    # opciones tipo menú. La respuesta vuelve como tool-response y la
+    # conversación continúa. Mismo patrón que AskUserQuestion de Claude.
+    def h_ask_user(parameters: dict, **_kwargs) -> str:
+        from core.ask_user import get_ask_user
+        question    = (parameters.get("question") or "").strip()
+        options     = parameters.get("options") or []
+        allow_other = bool(parameters.get("allow_other", True))
+        if not question:
+            return "ask_user: falta el campo 'question'."
+        if not options or not isinstance(options, list):
+            return "ask_user: 'options' debe ser una lista con al menos 2 opciones."
+        # Normaliza: cada opción debe tener al menos un 'label'
+        clean: list[dict] = []
+        for o in options:
+            if isinstance(o, dict) and o.get("label"):
+                clean.append({
+                    "label":       str(o["label"]),
+                    "description": str(o.get("description", "")),
+                })
+            elif isinstance(o, str):
+                clean.append({"label": o, "description": ""})
+        if len(clean) < 2:
+            return "ask_user: se requieren al menos 2 opciones válidas."
+        return get_ask_user().ask(question, clean, allow_other=allow_other)
+
+    reg.register(
+        ToolDeclaration(
+            name="ask_user",
+            description=(
+                "Asks the user a clarification question with multiple-choice options. "
+                "Use BEFORE executing a task when the request is ambiguous and you "
+                "need a specific detail: time period, language, depth (fast/deep), "
+                "source type, output format, scope, target audience, etc. "
+                "The user picks an option (or types their own if allow_other is true) "
+                "and the choice comes back as the tool result so you can continue. "
+                "Best practice: keep it to 2-4 mutually exclusive options. "
+                "Examples: '¿Qué período histórico te interesa?' with ['Colonial 1532-1821', "
+                "'Independencia 1821-1824', 'Toda la conquista']. "
+                "'¿Búsqueda rápida o profunda?' with ['Rápida (5 fuentes)', "
+                "'Profunda (20+ fuentes vía NotebookLM)']."
+            ),
+            parameters={
+                "type": "OBJECT",
+                "properties": {
+                    "question": {
+                        "type": "STRING",
+                        "description": "Clarification question in Spanish, e.g. '¿Qué período te interesa?'",
+                    },
+                    "options": {
+                        "type": "ARRAY",
+                        "items": {
+                            "type": "OBJECT",
+                            "properties": {
+                                "label":       {"type": "STRING", "description": "Short button text (max 40 chars)"},
+                                "description": {"type": "STRING", "description": "Optional one-line subtitle for clarity"},
+                            },
+                            "required": ["label"],
+                        },
+                        "description": "2-4 mutually exclusive options",
+                    },
+                    "allow_other": {
+                        "type": "BOOLEAN",
+                        "description": "If true (default), user gets a free-text 'Otro' option to type a custom answer.",
+                    },
+                },
+                "required": ["question", "options"],
+            },
+            # La tool bloquea hasta 300s esperando respuesta + 20s margen.
+            timeout=320,
+        ),
+        h_ask_user,
+    )
 
     reg.register(
         ToolDeclaration(

@@ -49,6 +49,18 @@ export const api = {
     request<ConversationDetail>("GET", `/api/conversations/${id}`),
   deleteConversation: (id: string) =>
     request<void>("DELETE", `/api/conversations/${id}`),
+  bulkDeleteConversations: (ids: string[]) =>
+    request<{ deleted: number }>("POST", "/api/conversations/bulk_delete", { ids }),
+  deleteAllConversations: () =>
+    request<{ deleted: number }>("DELETE", "/api/conversations"),
+
+  // NotebookLM auth
+  notebookLMStatus: () =>
+    request<NotebookLMStatus>("GET", "/api/notebooklm/status"),
+  notebookLMLogin:  () =>
+    request<{ ok: boolean; pid?: number; message: string }>("POST", "/api/notebooklm/login"),
+  notebookLMCancel: () =>
+    request<{ ok: boolean; message: string }>("POST", "/api/notebooklm/cancel"),
 
   // Settings
   getTheme:   () => request<ThemeInfo>("GET", "/api/settings/theme"),
@@ -127,6 +139,25 @@ export const api = {
   iotDisconnect:   () => request<{ ok: true; paused: true }>("POST", "/api/iot/admin/disconnect"),
   iotConnect:      () => request<{ ok: true; paused: false }>("POST", "/api/iot/admin/connect"),
 
+  // ── Google Sheets sync ────────────────────────────────────────────
+  iotSheetsStatus:     () => request<IoTSheetsState>("GET", "/api/iot/sheets/status"),
+  iotSheetsConnect:    (body: { account: string; title?: string }) =>
+    request<IoTSheetsState>("POST", "/api/iot/sheets/connect", body),
+  iotSheetsDisconnect: () =>
+    request<IoTSheetsState>("POST", "/api/iot/sheets/disconnect"),
+  iotSheetsSyncNow:    () => request<{ ok: true }>("POST", "/api/iot/sheets/sync_now"),
+
+  // ── Integraciones (gog / Google) ──────────────────────────────────
+  gogAccounts:    () => request<GogAccount[]>("GET", "/api/integrations/gog/accounts"),
+  gogServices:    () => request<GogService[]>("GET", "/api/integrations/gog/services"),
+  gogFlowStatus:  () => request<GogFlowStatus>("GET", "/api/integrations/gog/flow_status"),
+  gogStartAuth:   (body: { account: string; services?: string[]; force_consent?: boolean }) =>
+    request<GogFlowStatus>("POST", "/api/integrations/gog/start_auth", body),
+  gogCancelAuth:  () => request<GogFlowStatus>("POST", "/api/integrations/gog/cancel"),
+  gogResetAuth:   () => request<GogFlowStatus>("POST", "/api/integrations/gog/reset"),
+  gogCheckScopes: (body: { account: string; services: string[] }) =>
+    request<GogCheckResult>("POST", "/api/integrations/gog/check", body),
+
   // ── MCP (servidores externos) ─────────────────────────────────────
   mcpListServers:   () => request<Array<MCPServerStatus>>("GET", "/api/mcp/servers"),
   mcpListTools:     () => request<Array<MCPToolInfo>>("GET", "/api/mcp/tools"),
@@ -204,6 +235,29 @@ export const api = {
   authorizeClassroom: () =>
     request<{ ok: true; token_path: string }>(
       "POST", "/api/notifications/classroom/authorize",
+    ),
+
+  // ── Circuit-from-image ─────────────────────────────────────────────
+  circuitFromImage: (imagePath: string, outputs?: Array<"spice" | "kicad">) =>
+    request<CircuitGenerateResult>(
+      "POST", "/api/circuit/from-image",
+      { image_path: imagePath, outputs },
+    ),
+  circuitList:   () => request<{ items: CircuitItem[] }>("GET", "/api/circuit/list"),
+  circuitDelete: (path: string) =>
+    request<{ ok: true }>("DELETE", `/api/circuit/item?path=${encodeURIComponent(path)}`),
+  circuitProteusAutodraw: (
+    cirPath: string,
+    opts: { countdown?: number; placeInCanvas?: boolean; cols?: number } = {},
+  ) =>
+    request<{ ok: boolean; summary: string }>(
+      "POST", "/api/circuit/proteus-autodraw",
+      {
+        cir_path:        cirPath,
+        countdown:       opts.countdown ?? 3,
+        place_in_canvas: opts.placeInCanvas ?? true,
+        cols:            opts.cols ?? 3,
+      },
     ),
 };
 
@@ -425,6 +479,50 @@ export interface IoTSensor {
   age_s:   number;
 }
 
+export interface GogAccount {
+  email:      string;
+  services:   string[];
+  scopes:     string[];
+  client:     string;
+  created_at: string;
+}
+
+export interface GogService {
+  service: string;
+  scopes:  string[];
+  apis:    string[];
+  user:    boolean;
+}
+
+export interface GogFlowStatus {
+  status:       "idle" | "running" | "success" | "error" | "cancelled";
+  account?:     string;
+  services?:    string[];
+  started_at?:  number;
+  finished_at?: number;
+  auth_url?:    string | null;
+  message?:     string | null;
+}
+
+export interface GogCheckResult {
+  satisfied:      boolean;
+  missing:        string[];
+  account_exists: boolean;
+  error?:         string;
+}
+
+export interface IoTSheetsState {
+  enabled:          boolean;
+  account:          string | null;
+  spreadsheet_id:   string | null;
+  spreadsheet_url:  string | null;
+  sheet_name:       string;
+  last_pushed_row:  number;
+  last_sync_at:     string | null;
+  last_error:       string | null;
+  sync_interval_s:  number;
+}
+
 export interface FileUploadResult {
   ok:       true;
   path:     string;
@@ -440,7 +538,38 @@ export interface CurrentFile {
   exists: boolean;
 }
 
+// ── Circuit-from-image ──────────────────────────────────────────────────
+export interface CircuitGenerateResult {
+  ok:           true;
+  summary:      string;
+  spice_path?:  string;
+  kicad_path?:  string;
+}
+
+export interface CircuitItem {
+  name:     string;
+  path:     string;
+  kind:     "spice" | "kicad";
+  size:     number;
+  modified: number;
+}
+
 // ── MCP ─────────────────────────────────────────────────────────────────
+// ── NotebookLM ──────────────────────────────────────────────────────────
+export interface NotebookLMLoginState {
+  status:       "idle" | "running" | "success" | "failed";
+  message:      string;
+  started_at:   number;
+  finished_at:  number;
+  elapsed:      number;
+}
+export interface NotebookLMStatus {
+  installed:   boolean;
+  cli_path:    string | null;
+  has_session: boolean;
+  login:       NotebookLMLoginState;
+}
+
 export interface MCPServerBody {
   command:          string;
   args?:            string[];

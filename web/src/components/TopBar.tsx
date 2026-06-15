@@ -9,7 +9,8 @@
  */
 
 import { useCommandPalette } from "@/components/CommandPalette";
-import { OrbHUD } from "@/components/OrbHUD";
+import { EyeCore, type EyeState } from "@/components/EyeCore";
+import { useInteractionStore } from "@/stores/interaction";
 import { useOrionStore } from "@/stores/orion";
 import { useViewStore, type View } from "@/stores/view";
 import { Icon } from "@/ui/Icon";
@@ -27,6 +28,7 @@ const VIEW_TITLE: Record<View, { eyebrow: string; title: string }> = {
   mcp:       { eyebrow: "Sistema",      title: "Servidores MCP" },
   skills:    { eyebrow: "Sistema",      title: "Skills" },
   notifications: { eyebrow: "Sistema",  title: "Notificaciones" },
+  circuit:   { eyebrow: "Herramientas", title: "Circuitos" },
   settings:  { eyebrow: "Sistema",      title: "Ajustes" },
 };
 
@@ -38,18 +40,49 @@ interface Props {
   onInterrupt:    () => void;
 }
 
+/**
+ * Mapea el estado real de Orion al EyeState que entiende EyeCore.
+ * tool/agent reusan "thinking" — mismo magenta.
+ */
+function deriveEyeState({
+  state, tool, agentRunning,
+}: {
+  state: string;
+  tool: boolean;
+  agentRunning: boolean;
+}): EyeState {
+  if (tool || agentRunning)   return "thinking";
+  if (state === "ESCUCHANDO") return "listening";
+  if (state === "PENSANDO")   return "thinking";
+  if (state === "HABLANDO")   return "speaking";
+  return "idle";
+}
+
 export function TopBar({
   version, collapsed, onToggleRail, onToggleMute, onInterrupt,
 }: Props) {
   const view      = useViewStore((s) => s.view);
   const muted     = useOrionStore((s) => s.muted);
   const connected = useOrionStore((s) => s.connected);
+  const state     = useOrionStore((s) => s.state);
+  const tool      = useInteractionStore((s) => s.tool);
+  const agent     = useInteractionStore((s) => s.agent);
   const openPalette = useCommandPalette((s) => s.toggle);
   const { eyebrow, title } = VIEW_TITLE[view];
 
+  const eyeState = deriveEyeState({
+    state,
+    tool: Boolean(tool),
+    agentRunning: agent?.status === "running",
+  });
+  // Sin conexión o silenciado → modo `frozen` (mismo ojo del Inicio:
+  // azul sobrio + quieto). Con conexión → `paused` (mismo ojo, cambia
+  // de color por estado, sin moverse).
+  const eyeFrozen = !connected || muted;
+
   return (
     <header className="relative h-14 flex items-center gap-3 px-4 border-b border-white/[0.06]
-                          bg-gradient-to-r from-bg/80 via-bg/60 to-bg/80 backdrop-blur-md">
+                          bg-gradient-to-r from-bg/80 via-bg/60 to-bg/80 backdrop-blur-md chrome-edge-bottom">
       {/* rail toggle */}
       <button
         onClick={onToggleRail}
@@ -102,14 +135,36 @@ export function TopBar({
       {/* divider */}
       <span className="h-6 w-px bg-white/[0.08] mx-1" />
 
-      {/* mini orb status */}
-      <OrbHUD size="mini" />
+      {/* mini eye status — el MISMO ojo del Inicio, en miniatura y
+          QUIETO (paused). No se mueve nunca; sólo cambia de color con
+          el estado real de Orion (idle / escuchando / pensando /
+          hablando / error). Sin conexión vira a azul sobrio. */}
+      <div title={`Orion: ${state}`} className="grid place-items-center">
+        <EyeCore
+          size={34}
+          state={eyeState}
+          paused={!eyeFrozen}
+          frozen={eyeFrozen}
+        />
+      </div>
 
-      {/* version + connection chip */}
-      <div className="hidden lg:flex items-center gap-1.5 h-8 px-2.5 rounded-md
+      {/* version + connection chip + repo link */}
+      <div className="hidden lg:flex items-center gap-1 h-8 pl-2.5 pr-1 rounded-md
                       border border-white/[0.06] bg-elevated/60 text-[10px] uppercase tracking-[0.16em]">
         <span className={`h-1.5 w-1.5 rounded-full ${connected ? "bg-ok shadow-[0_0_8px_rgb(var(--orion-ok))]" : "bg-muted"}`} />
-        <span className="text-text-dim">v{version || "…"}</span>
+        <span className="text-text-dim numeric">v{version || "…"}</span>
+        <span className="mx-1 h-3 w-px bg-white/[0.08]" aria-hidden="true" />
+        <a
+          href="https://github.com/Zero0889/Orion-AI"
+          target="_blank"
+          rel="noopener noreferrer"
+          title="Orion AI · creado por Zahir Padilla · ver en GitHub"
+          aria-label="Abrir repositorio en GitHub"
+          className="h-6 w-6 grid place-items-center rounded text-text-dim
+                     hover:text-text hover:bg-white/[0.06] transition-colors"
+        >
+          <Icon name="github" size={13} />
+        </a>
       </div>
     </header>
   );

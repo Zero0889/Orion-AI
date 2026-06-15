@@ -40,6 +40,12 @@ const SECTIONS: Section[] = [
     ],
   },
   {
+    label: "Herramientas",
+    items: [
+      { id: "circuit",   label: "Circuitos",  icon: "cpu" },
+    ],
+  },
+  {
     label: "Sistema",
     items: [
       { id: "telemetry", label: "Telemetría", icon: "telemetry" },
