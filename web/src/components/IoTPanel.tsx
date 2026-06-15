@@ -16,8 +16,13 @@ import { memo, useEffect, useMemo, useState } from "react";
 
 import { api, type IoTDevice, type IoTScene, type IoTSensor } from "@/api/rest";
 import { DeviceFormModal } from "@/components/DeviceFormModal";
+import { GogScopeGuard } from "@/components/GogScopeGuard";
 import { useDeviceConfig, type DeviceConfig, type LocalDevice } from "@/hooks/useDeviceConfig";
 import { useSensorHistory } from "@/hooks/useSensorHistory";
+import {
+  formatSensorValue, getSensorPersonality, rangePercent,
+  type SensorPersonality,
+} from "@/lib/sensorPersonality";
 import { useOrionStore } from "@/stores/orion";
 import { Icon } from "@/ui/Icon";
 import { Badge, Button, Empty, SectionHeader, Surface, Switch } from "@/ui/primitives";
@@ -120,6 +125,7 @@ export function IoTPanel() {
               </Badge>
               {!paused && <Badge tone="accent">{scenes.length} escenas</Badge>}
             </div>
+            <ExportMenu />
             <Button
               variant={paused ? "primary" : "ghost"}
               size="sm"
@@ -226,6 +232,17 @@ export function IoTPanel() {
             </div>
           )}
         </section>
+
+        {/* google sheets sync */}
+        <section className="px-6 pb-10">
+          <Subhead title="Google Sheets" count={0} />
+          <GogScopeGuard
+            requires={["sheets", "drive"]}
+            title="Sheets requiere permisos de Google"
+          >
+            <SheetsPanel />
+          </GogScopeGuard>
+        </section>
       </div>
 
       <DeviceFormModal
@@ -275,6 +292,7 @@ const DeviceCard = memo(function DeviceCard({
   const isLocal = !!(dev as LocalDevice).__local;
   const isSensor = !!caps.sensor;
   const displayName = config.displayName || dev.name;
+  const personality = isSensor ? getSensorPersonality(caps.sensor) : null;
 
   function toggle() {
     const next = !on;
@@ -292,17 +310,46 @@ const DeviceCard = memo(function DeviceCard({
   return (
     <Surface
       level={2}
-      className="group relative p-4 animate-fade-in-up"
-      style={{ animationDelay: `${delay ?? 0}ms` }}
+      className="group relative p-4 pl-5 animate-fade-in-up overflow-hidden"
+      style={{
+        animationDelay: `${delay ?? 0}ms`,
+        ...(personality ? { ["--sensor-accent" as string]: personality.color } : {}),
+      }}
     >
+      {/* Barra lateral identitaria del sensor (solo cards de sensor) */}
+      {personality && (
+        <span
+          aria-hidden="true"
+          className="absolute left-0 top-3 bottom-3 w-[3px] rounded-r-full"
+          style={{
+            background: personality.color,
+            boxShadow: `0 0 12px ${personality.color}55`,
+          }}
+        />
+      )}
+
       <header className="flex items-start justify-between gap-3 mb-2">
-        <div className="min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            <h4 className="text-[15px] font-medium text-text leading-tight truncate">{displayName}</h4>
-            {isLocal   && <Badge tone="accent">Local</Badge>}
-            {isSensor  && config.showGraph && <Badge tone="info" dot>Gráfico</Badge>}
+        <div className="min-w-0 flex items-start gap-2.5">
+          {personality && (
+            <span
+              className="grid place-items-center h-8 w-8 shrink-0 rounded-lg border"
+              style={{
+                background: `${personality.color}1A`,
+                borderColor: `${personality.color}55`,
+                color: personality.color,
+              }}
+            >
+              <Icon name={personality.icon} size={16} />
+            </span>
+          )}
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h4 className="text-[15px] font-medium text-text leading-tight truncate">{displayName}</h4>
+              {isLocal   && <Badge tone="accent">Local</Badge>}
+              {isSensor  && config.showGraph && <Badge tone="info" dot>Gráfico</Badge>}
+            </div>
+            <code className="text-[10px] font-mono text-muted">{dev.transport}</code>
           </div>
-          <code className="text-[10px] font-mono text-muted">{dev.transport}</code>
         </div>
 
         <div className="flex items-center gap-1.5 shrink-0">
@@ -362,15 +409,21 @@ const DeviceCard = memo(function DeviceCard({
       )}
 
       {/* SENSOR readout + optional sparkline */}
-      {isSensor && (
-        <SensorReadout deviceId={dev.id} graph={!!config.showGraph} />
+      {isSensor && personality && (
+        <SensorReadout
+          deviceId={dev.id}
+          graph={!!config.showGraph}
+          personality={personality}
+        />
       )}
     </Surface>
   );
 });
 
 /* ── SENSOR READOUT (value + optional sparkline) ─────────────────── */
-const SensorReadout = memo(function SensorReadout({ deviceId, graph }: { deviceId: string; graph: boolean }) {
+const SensorReadout = memo(function SensorReadout({ deviceId, graph, personality }: {
+  deviceId: string; graph: boolean; personality: SensorPersonality;
+}) {
   const sample  = useOrionStore((s) => s.iotSensors[deviceId]);
   const history = useSensorHistory(deviceId, 48);
 
@@ -382,29 +435,72 @@ const SensorReadout = memo(function SensorReadout({ deviceId, graph }: { deviceI
     );
   }
 
+  const pct = rangePercent(sample?.value, personality);
+  const displayValue = formatSensorValue(sample?.value, personality);
+
   return (
-    <div className="mt-3 rounded-lg border border-white/[0.05] bg-bg/40 p-3">
-      <div className="flex items-baseline justify-between">
-        <div className="text-[10px] uppercase tracking-[0.22em] text-text-dim">Última lectura</div>
-        <div className="text-xl font-mono tabular-nums text-acc">{sample?.value || "—"}</div>
+    <div
+      className="mt-3 rounded-lg border bg-bg/40 p-3"
+      style={{ borderColor: `${personality.color}22` }}
+    >
+      <div className="flex items-end justify-between gap-3">
+        <div>
+          <div className="text-[10px] uppercase tracking-[0.22em] text-text-dim">
+            Última lectura · {personality.hint ?? personality.label.toLowerCase()}
+          </div>
+          <div
+            className="mt-0.5 text-2xl font-mono tabular-nums leading-none"
+            style={{ color: personality.color }}
+          >
+            {displayValue}
+          </div>
+        </div>
+        {pct !== null && (
+          <RangeBar pct={pct} color={personality.color} />
+        )}
       </div>
+
       {graph && history.length >= 2 && (
-        <div className="mt-2">
-          <Sparkline data={history.map((p) => p.value)} />
+        <div className="mt-3">
+          <Sparkline data={history.map((p) => p.value)} accent={personality.color} />
           <div className="mt-1.5 flex items-center justify-between text-[10px] uppercase tracking-[0.18em] text-muted">
             <span>{history.length} muestras</span>
             <span className="flex items-center gap-1">
-              <span className="h-1 w-1 rounded-full bg-acc shadow-[0_0_6px_rgb(var(--orion-acc))]" />
+              <span
+                className="h-1 w-1 rounded-full"
+                style={{ background: personality.color, boxShadow: `0 0 6px ${personality.color}` }}
+              />
               live
             </span>
           </div>
         </div>
       )}
       {graph && history.length < 2 && (
-        <div className="mt-2 h-12 rounded-md border border-dashed border-white/[0.06] grid place-items-center text-[10px] uppercase tracking-[0.18em] text-muted">
+        <div className="mt-3 h-12 rounded-md border border-dashed border-white/[0.06] grid place-items-center text-[10px] uppercase tracking-[0.18em] text-muted">
           Acumulando datos…
         </div>
       )}
+    </div>
+  );
+});
+
+/* ── RANGE BAR (mini termostato vertical) ────────────────────────── */
+const RangeBar = memo(function RangeBar({ pct, color }: { pct: number; color: string }) {
+  const h = Math.max(0, Math.min(1, pct)) * 100;
+  return (
+    <div
+      className="relative w-2 h-12 rounded-full overflow-hidden border"
+      style={{ background: `${color}10`, borderColor: `${color}33` }}
+      aria-label={`${Math.round(h)}% del rango`}
+    >
+      <div
+        className="absolute bottom-0 left-0 right-0 rounded-full transition-[height] duration-500 ease-out"
+        style={{
+          height: `${h}%`,
+          background: color,
+          boxShadow: `0 0 10px ${color}AA`,
+        }}
+      />
     </div>
   );
 });
@@ -414,9 +510,12 @@ const SensorReadout = memo(function SensorReadout({ deviceId, graph }: { deviceI
 // O(n) sobre la ventana de muestras. Se recalcula solo cuando el array
 // `data` cambia de referencia (history es un nuevo array cada tick, así
 // que sirve como tripwire natural).
-const Sparkline = memo(function Sparkline({ data }: { data: number[] }) {
+const Sparkline = memo(function Sparkline({ data, accent }: { data: number[]; accent?: string }) {
   const W = 260, H = 64, P = 3;
   const id = useStableId();
+  // Si llega un acento por personalidad lo usamos; si no, caemos al
+  // token global --orion-acc (compatibilidad con consumidores futuros).
+  const stroke = accent ?? "rgb(var(--orion-acc))";
 
   const { line, area, tip } = useMemo(() => {
     const min = Math.min(...data);
@@ -437,12 +536,12 @@ const Sparkline = memo(function Sparkline({ data }: { data: number[] }) {
     <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-16">
       <defs>
         <linearGradient id={`spark-fill-${id}`} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%"   stopColor="rgb(var(--orion-acc))" stopOpacity="0.36" />
-          <stop offset="100%" stopColor="rgb(var(--orion-acc))" stopOpacity="0" />
+          <stop offset="0%"   stopColor={stroke} stopOpacity="0.36" />
+          <stop offset="100%" stopColor={stroke} stopOpacity="0" />
         </linearGradient>
         <linearGradient id={`spark-line-${id}`} x1="0" y1="0" x2="1" y2="0">
-          <stop offset="0%"   stopColor="rgb(var(--orion-acc))" stopOpacity="0.25" />
-          <stop offset="100%" stopColor="rgb(var(--orion-acc))" stopOpacity="1" />
+          <stop offset="0%"   stopColor={stroke} stopOpacity="0.25" />
+          <stop offset="100%" stopColor={stroke} stopOpacity="1" />
         </linearGradient>
       </defs>
       <polygon points={area} fill={`url(#spark-fill-${id})`} />
@@ -456,12 +555,207 @@ const Sparkline = memo(function Sparkline({ data }: { data: number[] }) {
       />
       <circle
         cx={tip[0]} cy={tip[1]} r="2.2"
-        fill="rgb(var(--orion-acc))"
-        style={{ filter: "drop-shadow(0 0 4px rgb(var(--orion-acc)))" }}
+        fill={stroke}
+        style={{ filter: `drop-shadow(0 0 4px ${stroke})` }}
       />
     </svg>
   );
 });
+
+/* ── SHEETS PANEL ─────────────────────────────────────────────────── */
+// Pequeño dashboard que muestra el estado del sync continuo a Google
+// Sheets. Si está desconectado, muestra el formulario de conexión.
+// Si está conectado, muestra el link al Sheet, último sync, errores
+// y un botón para forzar sync inmediato o desconectar.
+function SheetsPanel() {
+  const [state, setState] = useState<import("@/api/rest").IoTSheetsState | null>(null);
+  const [email, setEmail] = useState("");
+  const [title, setTitle] = useState("");
+  const [busy,  setBusy]  = useState(false);
+  const [err,   setErr]   = useState<string | null>(null);
+  // tick para refrescar el "hace Xs" sin pegarle al backend
+  const [, setTick] = useState(0);
+
+  async function refresh() {
+    try { setState(await api.iotSheetsStatus()); }
+    catch (e) { setErr(String(e)); }
+  }
+
+  useEffect(() => { refresh(); }, []);
+  useEffect(() => {
+    const id = setInterval(() => setTick((n) => n + 1), 5000);
+    return () => clearInterval(id);
+  }, []);
+
+  async function doConnect() {
+    if (!email.trim()) { setErr("Falta el email."); return; }
+    setBusy(true); setErr(null);
+    try {
+      const s = await api.iotSheetsConnect({
+        account: email.trim(),
+        title: title.trim() || undefined,
+      });
+      setState(s);
+      setEmail(""); setTitle("");
+    } catch (e) { setErr(String(e)); }
+    finally { setBusy(false); }
+  }
+
+  async function doDisconnect() {
+    setBusy(true); setErr(null);
+    try { setState(await api.iotSheetsDisconnect()); }
+    catch (e) { setErr(String(e)); }
+    finally { setBusy(false); }
+  }
+
+  async function doSyncNow() {
+    setBusy(true); setErr(null);
+    try {
+      await api.iotSheetsSyncNow();
+      // El sync corre en background, esperamos un tiquito y re-fetch.
+      setTimeout(() => { refresh(); setBusy(false); }, 1500);
+    } catch (e) { setErr(String(e)); setBusy(false); }
+  }
+
+  if (!state) {
+    return <p className="text-sm text-text-dim italic">Cargando…</p>;
+  }
+
+  // ── Disconnected: formulario de conexión ────────────────────────
+  if (!state.enabled) {
+    return (
+      <Surface level={2} className="p-4">
+        <div className="flex items-start gap-3 mb-3">
+          <span className="grid place-items-center h-9 w-9 rounded-lg
+                           bg-acc/10 border border-acc/30 text-acc shrink-0">
+            <Icon name="upload" size={16} />
+          </span>
+          <div className="min-w-0">
+            <h4 className="text-[15px] font-medium leading-tight">Sincronizar con Google Sheets</h4>
+            <p className="mt-0.5 text-[12px] text-text-dim leading-snug">
+              ORION va a crear un Sheet nuevo y le pushea las lecturas cada 5 minutos.
+              Necesita que tu cuenta tenga el scope <code className="text-acc font-mono">sheets</code> autorizado en gog.
+            </p>
+          </div>
+        </div>
+
+        <div className="grid gap-2 mt-3">
+          <input
+            type="email"
+            placeholder="tu-email@gmail.com"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            disabled={busy}
+            className="w-full px-3 py-2 rounded-md border border-white/[0.08]
+                       bg-bg/40 text-sm focus:outline-none focus:border-acc/60"
+          />
+          <input
+            type="text"
+            placeholder="Nombre del Sheet (opcional)"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            disabled={busy}
+            className="w-full px-3 py-2 rounded-md border border-white/[0.08]
+                       bg-bg/40 text-sm focus:outline-none focus:border-acc/60"
+          />
+          <div className="flex justify-end mt-1">
+            <Button
+              variant="primary"
+              size="sm"
+              icon="upload"
+              disabled={busy || !email.trim()}
+              onClick={doConnect}
+            >
+              {busy ? "Conectando…" : "Conectar"}
+            </Button>
+          </div>
+          {err && (
+            <div className="mt-1 flex items-start gap-2 p-2 rounded-md
+                            border border-danger/30 bg-danger/10 text-xs text-danger">
+              <Icon name="alert" size={13} className="mt-0.5 shrink-0" />
+              <span className="break-all">{err}</span>
+            </div>
+          )}
+        </div>
+      </Surface>
+    );
+  }
+
+  // ── Connected: dashboard ────────────────────────────────────────
+  const ageStr = state.last_sync_at ? formatAge(state.last_sync_at) : "nunca";
+
+  return (
+    <Surface level={2} className="p-4">
+      <div className="flex items-start gap-3">
+        <span className="grid place-items-center h-9 w-9 rounded-lg
+                         bg-ok/15 border border-ok/40 text-ok shrink-0">
+          <Icon name="check" size={16} />
+        </span>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <h4 className="text-[15px] font-medium leading-tight">Sheet conectado</h4>
+            <Badge tone="info" dot>live</Badge>
+          </div>
+          <div className="mt-0.5 text-[12px] text-text-dim font-mono break-all">
+            {state.account}
+          </div>
+        </div>
+        <Button variant="ghost" size="sm" icon="close" onClick={doDisconnect} disabled={busy}>
+          Desconectar
+        </Button>
+      </div>
+
+      <div className="mt-3 grid sm:grid-cols-2 gap-2">
+        <Surface level={2} className="p-3 bg-bg/40">
+          <div className="text-[10px] uppercase tracking-[0.18em] text-text-dim">Última sync</div>
+          <div className="mt-0.5 text-sm tabular-nums">{ageStr}</div>
+        </Surface>
+        <Surface level={2} className="p-3 bg-bg/40">
+          <div className="text-[10px] uppercase tracking-[0.18em] text-text-dim">Filas pusheadas</div>
+          <div className="mt-0.5 text-sm font-mono tabular-nums">{state.last_pushed_row.toLocaleString()}</div>
+        </Surface>
+      </div>
+
+      {state.spreadsheet_url && (
+        <a
+          href={state.spreadsheet_url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="mt-3 flex items-center gap-2 px-3 py-2 rounded-md
+                     border border-acc/30 bg-acc/10 text-sm text-acc
+                     hover:bg-acc/15 transition-colors"
+        >
+          <Icon name="chart" size={14} />
+          <span className="flex-1 truncate font-mono">{state.spreadsheet_url}</span>
+          <Icon name="arrow-right" size={13} />
+        </a>
+      )}
+
+      <div className="mt-3 flex justify-end">
+        <Button variant="ghost" size="sm" icon="bolt" onClick={doSyncNow} disabled={busy}>
+          {busy ? "Sincronizando…" : "Sync ahora"}
+        </Button>
+      </div>
+
+      {state.last_error && (
+        <div className="mt-3 flex items-start gap-2 p-2 rounded-md
+                        border border-danger/30 bg-danger/10 text-xs text-danger">
+          <Icon name="alert" size={13} className="mt-0.5 shrink-0" />
+          <span className="break-all">{state.last_error}</span>
+        </div>
+      )}
+    </Surface>
+  );
+}
+
+function formatAge(iso: string): string {
+  const past = new Date(iso).getTime();
+  if (isNaN(past)) return iso;
+  const secs = Math.max(0, Math.floor((Date.now() - past) / 1000));
+  if (secs < 60)   return `hace ${secs}s`;
+  if (secs < 3600) return `hace ${Math.floor(secs / 60)} min`;
+  return `hace ${Math.floor(secs / 3600)} h`;
+}
 
 /* tiny per-component id helper for the SVG gradient URLs */
 let _sparkSeq = 0;
@@ -471,4 +765,70 @@ function useStableId(): number {
   // eslint-disable-next-line react-hooks/rules-of-hooks
   const [id] = useState(() => ++_sparkSeq);
   return id;
+}
+
+/* ── EXPORT MENU ──────────────────────────────────────────────────── */
+// Mini dropdown que ofrece CSV / XLSX. Usa <a download> directo así no
+// inflamos el cliente con blobs en memoria — el browser dispara la
+// descarga en streaming desde el endpoint.
+function ExportMenu() {
+  const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    function close(e: MouseEvent) {
+      const t = e.target as HTMLElement;
+      if (!t.closest("[data-export-menu]")) setOpen(false);
+    }
+    document.addEventListener("click", close);
+    return () => document.removeEventListener("click", close);
+  }, [open]);
+
+  return (
+    <div className="relative" data-export-menu>
+      <Button
+        variant="ghost"
+        size="sm"
+        icon="download"
+        onClick={() => setOpen((o) => !o)}
+        title="Descargar histórico de sensores"
+      >
+        Exportar
+      </Button>
+      {open && (
+        <div
+          className="absolute right-0 top-full mt-1.5 z-30 min-w-[200px]
+                     rounded-lg border border-white/[0.08] bg-elevated/95
+                     backdrop-blur-md shadow-xl p-1.5 animate-fade-in"
+        >
+          <a
+            href="/api/iot/sensor_log/xlsx"
+            download
+            onClick={() => setOpen(false)}
+            className="flex items-center gap-2.5 px-3 py-2 rounded-md text-sm text-text
+                       hover:bg-white/[0.06] transition-colors"
+          >
+            <Icon name="chart" size={14} className="text-acc" />
+            <div className="flex-1">
+              <div className="leading-tight">Excel (.xlsx)</div>
+              <div className="text-[10px] uppercase tracking-[0.18em] text-muted">una hoja por sensor</div>
+            </div>
+          </a>
+          <a
+            href="/api/iot/sensor_log/csv"
+            download
+            onClick={() => setOpen(false)}
+            className="flex items-center gap-2.5 px-3 py-2 rounded-md text-sm text-text
+                       hover:bg-white/[0.06] transition-colors"
+          >
+            <Icon name="download" size={14} className="text-text-dim" />
+            <div className="flex-1">
+              <div className="leading-tight">CSV (.csv)</div>
+              <div className="text-[10px] uppercase tracking-[0.18em] text-muted">tabla cruda</div>
+            </div>
+          </a>
+        </div>
+      )}
+    </div>
+  );
 }

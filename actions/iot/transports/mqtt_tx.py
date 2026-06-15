@@ -74,8 +74,9 @@ class MQTTTransport(Transport):
         self._connected = threading.Event()
         # device_id → topic_state que se ha suscrito (para sensores)
         self._subscriptions: dict[str, dict] = {}
-        # topic → device_id (para enrutar mensajes entrantes)
-        self._topic_to_device: dict[str, str] = {}
+        # topic → [device_id, ...] (varios devices pueden compartir un topic,
+        # ej. temperatura y humedad ambos leyendo del JSON de un DHT)
+        self._topic_to_device: dict[str, list[str]] = {}
         self._lock = threading.Lock()
 
         client_id = cfg.get("client_id", "orion")
@@ -133,24 +134,27 @@ class MQTTTransport(Transport):
 
     def _on_message(self, client, userdata, msg):
         topic = msg.topic
-        dev_id = self._topic_to_device.get(topic)
-        if not dev_id:
+        dev_ids = self._topic_to_device.get(topic) or []
+        if not dev_ids:
             return
         try:
-            payload = msg.payload.decode("utf-8", errors="replace")
+            raw_payload = msg.payload.decode("utf-8", errors="replace")
         except Exception:
-            payload = str(msg.payload)
+            raw_payload = str(msg.payload)
 
-        sub = self._subscriptions.get(dev_id, {})
-        field = sub.get("sensor_field")
-        if field:
-            try:
-                data = json.loads(payload)
-                payload = str(data.get(field, payload))
-            except json.JSONDecodeError:
-                pass  # se queda como string
-
-        self._dispatch_sensor(dev_id, payload)
+        # Cada device puede extraer un campo distinto del mismo payload
+        # (típico: un DHT que publica {"temperatura":..,"humedad":..}).
+        for dev_id in dev_ids:
+            sub = self._subscriptions.get(dev_id, {})
+            field = sub.get("sensor_field")
+            payload = raw_payload
+            if field:
+                try:
+                    data = json.loads(raw_payload)
+                    payload = str(data.get(field, raw_payload))
+                except json.JSONDecodeError:
+                    pass  # se queda como string
+            self._dispatch_sensor(dev_id, payload)
 
     # ── Conexión ─────────────────────────────────────────────────────────
     def is_connected(self) -> bool:
@@ -258,9 +262,11 @@ class MQTTTransport(Transport):
                 "topic": topic,
                 "sensor_field": (device.mqtt or {}).get("sensor_field"),
             }
-            self._topic_to_device[topic] = device.id
+            self._topic_to_device.setdefault(topic, []).append(device.id)
+            already_subscribed = len(self._topic_to_device[topic]) > 1
         try:
-            self._client.subscribe(topic)
+            if not already_subscribed:
+                self._client.subscribe(topic)
             print(f"[IoT-MQTT:{self.id}] SUB {topic} ← {device.id}")
         except Exception as e:
             print(f"[IoT-MQTT:{self.id}] Error suscribiéndose a {topic}: {e}")

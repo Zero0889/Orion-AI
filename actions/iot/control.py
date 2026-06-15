@@ -24,7 +24,10 @@ import threading
 import time
 from typing import Callable, Optional
 
+from core.logger import get_logger
 from .config import IoTConfig, load_config
+
+log = get_logger("iot.control")
 from .devices import Device
 from .rules import (
     detect_intent_local, detect_intent_with_gemini,
@@ -50,11 +53,20 @@ class IoTSystem:
 
     def __init__(self) -> None:
         self.cfg = load_config()
+        # Arranca el datalogger (idempotente, también flushea cuando paused)
+        from actions.iot import sensor_log, sheets_sync
+        sensor_log.start()
+        sheets_sync.auto_start()   # solo si hay un Sheet ya conectado
         if not self._is_paused():
             self._init_transports()
             self._wire_sensors()
         else:
-            print("[IoT] ⏸ Pausado por iot_paused.flag — no abro transports.")
+            # NO usar print() acá: la consola de Windows decodifica con
+            # cp1252 y los caracteres unicode (⏸, —) crashean con
+            # UnicodeEncodeError, lo que rompe el request HTTP entero
+            # (cualquier hit a /api/iot/* explota). El logger ya escribe
+            # en utf-8.
+            log.info("Pausado por iot_paused.flag - no abro transports.")
 
     @staticmethod
     def _is_paused() -> bool:
@@ -106,6 +118,9 @@ class IoTSystem:
                 def _sensor_callback(device_id: str, raw_value: str) -> None:
                     val = raw_value.strip()
                     cache.update(d_id, val)
+                    # Persistir al datalogger (buffer en memoria, flush 1/min)
+                    from actions.iot import sensor_log
+                    sensor_log.record(d_id, val)
                     from server.event_bus import OrionEventBus
                     bus = OrionEventBus.get_instance()
                     if bus:

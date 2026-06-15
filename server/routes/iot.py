@@ -32,9 +32,10 @@ from __future__ import annotations
 from typing import Any, Optional
 
 from fastapi import APIRouter, HTTPException, Request
+from fastapi.responses import Response
 from pydantic import BaseModel, Field
 
-from actions.iot import get_system, iot_control
+from actions.iot import get_system, iot_control, sensor_log, sheets_sync
 from actions.iot.config import (
     IoTConfig, save_config, validate_device, validate_transport,
 )
@@ -392,6 +393,73 @@ def get_paused() -> dict:
     from config import IOT_CONFIG_PATH
     flag = IOT_CONFIG_PATH.parent / "iot_paused.flag"
     return {"paused": flag.exists()}
+
+
+# ── Descarga del log de sensores ────────────────────────────────────────
+@router.get("/sensor_log/csv")
+def download_sensor_log_csv() -> Response:
+    """Descarga el log persistente como CSV. Una fila por dispositivo
+    por minuto (promedio de las lecturas de ese minuto)."""
+    data = sensor_log.read_csv_bytes()
+    return Response(
+        content=data,
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": 'attachment; filename="orion_iot_sensores.csv"'},
+    )
+
+
+class SheetsConnectBody(BaseModel):
+    account: str = Field(..., description="Email Google asociado a gog")
+    title:   Optional[str] = Field(default=None, description="Nombre del Sheet (opcional)")
+
+
+@router.get("/sheets/status")
+def sheets_status() -> dict:
+    """Estado actual del sync a Google Sheets."""
+    return sheets_sync.status()
+
+
+@router.post("/sheets/connect")
+def sheets_connect(body: SheetsConnectBody, request: Request) -> dict:
+    """Crea un Sheet nuevo y arranca el sync continuo."""
+    try:
+        state = sheets_sync.connect(body.account.strip(), body.title)
+    except Exception as e:
+        log.exception("Sheets connect falló")
+        raise HTTPException(status_code=400, detail=safe_error_detail(e))
+    _publish(request, "iot.sheets", {"action": "connect", "state": state})
+    return state
+
+
+@router.post("/sheets/disconnect")
+def sheets_disconnect(request: Request) -> dict:
+    """Para el sync. NO borra el Sheet en Drive."""
+    state = sheets_sync.disconnect()
+    _publish(request, "iot.sheets", {"action": "disconnect", "state": state})
+    return state
+
+
+@router.post("/sheets/sync_now")
+def sheets_sync_now(request: Request) -> dict:
+    """Fuerza un sync inmediato sin esperar al próximo tick."""
+    sheets_sync.request_sync_now()
+    return {"ok": True}
+
+
+@router.get("/sensor_log/xlsx")
+def download_sensor_log_xlsx() -> Response:
+    """Descarga el log como Excel formateado: hoja `all` con todo +
+    una hoja por dispositivo."""
+    try:
+        data = sensor_log.read_xlsx_bytes()
+    except Exception as e:
+        log.exception("Generar XLSX falló")
+        raise HTTPException(status_code=500, detail=f"XLSX: {safe_error_detail(e)}")
+    return Response(
+        content=data,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": 'attachment; filename="orion_iot_sensores.xlsx"'},
+    )
 
 
 # ── helpers ─────────────────────────────────────────────────────────────
