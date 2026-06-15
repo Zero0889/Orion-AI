@@ -18,7 +18,8 @@ export type IconName =
   | "lightbulb" | "thermometer" | "droplet" | "gauge" | "motion"
   | "wind" | "tag" | "save" | "chart-line" | "plug" | "bell"
   | "add" | "arrow-left" | "arrow-right" | "arrow-down"
-  | "compass" | "sigma" | "feather" | "chart" | "folder" | "sensors";
+  | "compass" | "sigma" | "feather" | "chart" | "folder" | "sensors"
+  | "github";
 
 type Props = SVGProps<SVGSVGElement> & {
   name: IconName;
@@ -39,6 +40,7 @@ export function Icon({ name, size = 18, strokeWidth = 1.6, className, ...rest }:
       strokeLinejoin="round"
       className={className}
       aria-hidden="true"
+      data-icon={name}
       {...rest}
     >
       {PATHS[name]}
@@ -50,45 +52,47 @@ const PATHS: Record<IconName, JSX.Element> = {
   chat: (
     <>
       <path d="M21 12a8.5 8.5 0 0 1-12.6 7.45L3 21l1.55-5.4A8.5 8.5 0 1 1 21 12Z" />
-      <path d="M8.5 11.5h.01M12 11.5h.01M15.5 11.5h.01" />
+      <path data-part="dot-1" d="M8.5 11.5h.01" />
+      <path data-part="dot-2" d="M12 11.5h.01" />
+      <path data-part="dot-3" d="M15.5 11.5h.01" />
     </>
   ),
   notes: (
     <>
       <path d="M5 4.5h11l3 3V18a1.5 1.5 0 0 1-1.5 1.5h-12A1.5 1.5 0 0 1 4 18V6A1.5 1.5 0 0 1 5.5 4.5Z" />
       <path d="M16 4.5V7a1.5 1.5 0 0 0 1.5 1.5H20" />
-      <path d="M8 12h6M8 15.5h4" />
+      <path data-part="lines" d="M8 12h6M8 15.5h4" />
     </>
   ),
   memory: (
     <>
-      <path d="M4 7c0-1.5 3.6-3 8-3s8 1.5 8 3-3.6 3-8 3-8-1.5-8-3Z" />
-      <path d="M4 7v5c0 1.5 3.6 3 8 3s8-1.5 8-3V7" />
-      <path d="M4 12v5c0 1.5 3.6 3 8 3s8-1.5 8-3v-5" />
+      <path data-part="layer-1" d="M4 7c0-1.5 3.6-3 8-3s8 1.5 8 3-3.6 3-8 3-8-1.5-8-3Z" />
+      <path data-part="layer-2" d="M4 7v5c0 1.5 3.6 3 8 3s8-1.5 8-3V7" />
+      <path data-part="layer-3" d="M4 12v5c0 1.5 3.6 3 8 3s8-1.5 8-3v-5" />
     </>
   ),
   history: (
     <>
       <path d="M3 12a9 9 0 1 0 3-6.7" />
       <path d="M3 4v4h4" />
-      <path d="M12 8v4l3 2" />
+      <path data-part="hands" d="M12 8v4l3 2" />
     </>
   ),
   telemetry: (
     <>
-      <path d="M3 12h3.5l2-7 4 14 2-7H21" />
+      <path data-part="wave" d="M3 12h3.5l2-7 4 14 2-7H21" />
     </>
   ),
   agents: (
     <>
       <rect x="5" y="5" width="14" height="14" rx="3" />
-      <rect x="9" y="9" width="6" height="6" rx="1.2" />
+      <rect data-part="core" x="9" y="9" width="6" height="6" rx="1.2" />
       <path d="M9 2v3M15 2v3M9 19v3M15 19v3M2 9h3M2 15h3M19 9h3M19 15h3" />
     </>
   ),
   iot: (
     <>
-      <path d="M3 11.5 12 4l9 7.5" />
+      <path data-part="roof" d="M3 11.5 12 4l9 7.5" />
       <path d="M5.5 10v9A1.5 1.5 0 0 0 7 20.5h10a1.5 1.5 0 0 0 1.5-1.5v-9" />
       <path d="M10 20.5v-5h4v5" />
     </>
@@ -99,7 +103,7 @@ const PATHS: Record<IconName, JSX.Element> = {
       <path d="M9 2v4" />
       <path d="M15 2v4" />
       <path d="M7 6h10v6a5 5 0 0 1-5 5 5 5 0 0 1-5-5V6Z" />
-      <path d="M12 17v5" />
+      <path data-part="cord" d="M12 17v5" />
     </>
   ),
   settings: (
@@ -139,14 +143,14 @@ const PATHS: Record<IconName, JSX.Element> = {
   plus: <path d="M12 5v14M5 12h14" />,
   sparkles: (
     <>
-      <path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M5.6 18.4l2.1-2.1M16.3 7.7l2.1-2.1" />
-      <path d="M12 8.5 13 11l2.5 1L13 13l-1 2.5L11 13 8.5 12 11 11Z" />
+      <path data-part="rays" d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M5.6 18.4l2.1-2.1M16.3 7.7l2.1-2.1" />
+      <path data-part="star" d="M12 8.5 13 11l2.5 1L13 13l-1 2.5L11 13 8.5 12 11 11Z" />
     </>
   ),
   bell: (
     <>
       <path d="M6 8a6 6 0 1 1 12 0c0 7 3 9 3 9H3s3-2 3-9z" />
-      <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
+      <path data-part="clapper" d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
     </>
   ),
   paperclip: (
@@ -358,6 +362,11 @@ const PATHS: Record<IconName, JSX.Element> = {
     <>
       <circle cx="12" cy="12" r="3" />
       <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1Z" />
+    </>
+  ),
+  github: (
+    <>
+      <path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22" />
     </>
   ),
 };

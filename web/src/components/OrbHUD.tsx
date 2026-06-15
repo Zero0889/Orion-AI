@@ -1,24 +1,22 @@
 /**
- * OrbHUD — cinematic, multi-state SVG orb. The visual identity of Orion.
+ * OrbHUD — el ojo cinemático de Orion (centerpiece de Inicio).
  *
  * State system:
- *   - idle      (muted / disconnected): slow breath + ambient halo
- *   - listening (ESCUCHANDO):           expanding pulse rings, reactive
- *   - thinking  (PENSANDO):              rotating orbital rings + particles
- *   - speaking  (HABLANDO):              rhythmic wave + voice burst
- *   - tool      (override):              progress ring + directional flow
- *   - agent     (override):              multi-orbit parallel processes
- *   - error     (override):              controlled red pulse
+ *   - idle      (muted / disconnected): ojo "observando" tranquilo
+ *   - listening (ESCUCHANDO):           cian más vivo, iris pulsando
+ *   - thinking  (PENSANDO):              magenta, giro vertiginoso
+ *   - speaking  (HABLANDO):              verde-cian, dilatado, destellos
+ *   - tool      (override):              se pinta como pensando
+ *   - agent     (override):              se pinta como pensando
+ *   - error     (override):              rojo crítico con alerta
  *
- * The component reads the public OrionState from the store and lets the
- * shell pass a higher-priority `mode` override (used when there's an
- * active tool/agent execution surfaced by the bus). Two render sizes:
- *   - default ("full"): centerpiece
- *   - "mini":           top-bar avatar
+ * El componente lee el `OrionState` público del store y deja al shell
+ * pasar un `mode` override de prioridad superior. Dos tamaños:
+ *   - default ("full"): centerpiece — usa <EyeCore>
+ *   - "mini":           top-bar avatar — mini bolita estilizada
  */
 
-import { useEffect, useMemo, useRef, useState } from "react";
-
+import { EyeCore, type EyeState } from "@/components/EyeCore";
 import { useInteractionStore } from "@/stores/interaction";
 import { useOrionStore } from "@/stores/orion";
 
@@ -52,16 +50,26 @@ interface Props {
   mode?: OrbMode;
 }
 
+/**
+ * Mapea el `OrbMode` (incluye tool/agent) al subconjunto que entiende
+ * el `EyeCore`. tool/agent reusan la animación de pensando.
+ */
+export function modeToEyeState(mode: OrbMode): EyeState {
+  if (mode === "listening") return "listening";
+  if (mode === "speaking")  return "speaking";
+  if (mode === "thinking" || mode === "tool" || mode === "agent") return "thinking";
+  if (mode === "error")     return "error";
+  return "idle";
+}
+
 export function OrbHUD({ size = "full", mode: override }: Props) {
   const state     = useOrionStore((s) => s.state);
   const muted     = useOrionStore((s) => s.muted);
   const connected = useOrionStore((s) => s.connected);
 
-  // Estos overrides automáticos hacen al orbe reaccionar de verdad a lo
-  // que pasa abajo, no solo al estado de audio. Una tool en ejecución
-  // pinta el orbe amarillo con anillo girando rápido; un agente activo
-  // lo pinta rosa con múltiples órbitas. El `override` explícito (prop)
-  // tiene aún más prioridad — útil para previews o demos.
+  // Overrides automáticos: una tool en ejecución o un agente activo
+  // hacen al ojo pintar "pensando" (mismo magenta que PENSANDO). El
+  // `override` explícito por prop tiene aún más prioridad.
   const activeTool  = useInteractionStore((s) => s.tool);
   const activeAgent = useInteractionStore((s) => s.agent);
 
@@ -81,160 +89,32 @@ export function OrbHUD({ size = "full", mode: override }: Props) {
 }
 
 /* ─────────────────────────────────────────────────────────────────────
-   FULL ORB — workspace centerpiece, 320×320 visual.
+   FULL ORB — el ojo cinemático de Inicio, 320 px.
+   La bolita anterior se sustituyó por <EyeCore>. Mantengo el halo
+   ambiental por detrás (sigue la paleta del modo) y el bloque de
+   etiquetas/conexión debajo.
    ───────────────────────────────────────────────────────────────────── */
 function FullOrb({ mode, muted, connected }: { mode: OrbMode; muted: boolean; connected: boolean }) {
   const p = PALETTE[mode];
+  const eyeState = modeToEyeState(mode);
 
   return (
     <div className="relative flex flex-col items-center gap-7 select-none animate-fade-in">
-      {/* outer ambient halo + drift */}
       <div className="relative h-[320px] w-[320px] grid place-items-center">
 
-        {/* ambient blur halo, far reach */}
+        {/* halo ambiental por detrás del ojo */}
         <div
-          className="absolute h-[300px] w-[300px] rounded-full blur-3xl animate-halo"
+          className="absolute h-[320px] w-[320px] rounded-full blur-3xl animate-halo pointer-events-none"
           style={{ background: p.glow, transition: "background 600ms ease" }}
         />
-        {/* secondary tint (acc) */}
-        <div
-          className="absolute h-[260px] w-[260px] rounded-full blur-2xl opacity-50 animate-drift-slow"
-          style={{ background: p.glow }}
-        />
 
-        {/* expanding pulse rings — listening / speaking */}
-        {(mode === "listening" || mode === "speaking") && (
-          <>
-            <PulseRing color={p.ring} delay="0s"   />
-            <PulseRing color={p.ring} delay="0.9s" />
-            <PulseRing color={p.ring} delay="1.7s" />
-          </>
-        )}
-
-        {/* main SVG — layered orb */}
-        <svg
-          viewBox="0 0 320 320"
-          className="relative h-[320px] w-[320px] animate-breath"
-          style={{ filter: `drop-shadow(0 0 24px ${p.glow})`, transition: "filter 600ms ease" }}
-        >
-          <defs>
-            <radialGradient id="orbCore" cx="50%" cy="42%" r="58%">
-              <stop offset="0%"   stopColor="#FFFFFF" stopOpacity="0.95" />
-              <stop offset="22%"  stopColor={p.core}  stopOpacity="0.92" />
-              <stop offset="68%"  stopColor={p.core}  stopOpacity="0.30" />
-              <stop offset="100%" stopColor="#000000" stopOpacity="0.85" />
-            </radialGradient>
-            <radialGradient id="orbInner" cx="50%" cy="38%" r="40%">
-              <stop offset="0%"   stopColor="#FFFFFF" stopOpacity="0.7" />
-              <stop offset="100%" stopColor="#FFFFFF" stopOpacity="0" />
-            </radialGradient>
-            <linearGradient id="orbRim" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%"   stopColor={p.accent} stopOpacity="0.6" />
-              <stop offset="100%" stopColor={p.ring}   stopOpacity="0" />
-            </linearGradient>
-            <filter id="softGlow">
-              <feGaussianBlur stdDeviation="2" />
-            </filter>
-          </defs>
-
-          {/* outermost wire ring — thinking/agent rotate */}
-          <g
-            style={{ transformOrigin: "160px 160px", transition: "opacity 400ms" }}
-            className={
-              mode === "thinking" ? "animate-spin-slow"
-              : mode === "agent"   ? "animate-spin-mid"
-              : mode === "tool"    ? "animate-spin-fast"
-              : ""
-            }
-          >
-            <circle
-              cx="160" cy="160" r="148"
-              fill="none" stroke={p.ring}
-              strokeOpacity="0.18" strokeWidth="0.8"
-              strokeDasharray={
-                mode === "thinking" ? "2 6"
-                : mode === "tool"    ? "10 4"
-                : mode === "agent"   ? "1 5"
-                : "1 0"
-              }
-            />
-            {/* orbital marker */}
-            <circle cx="160" cy="12" r="2.5" fill={p.accent} opacity="0.9" filter="url(#softGlow)" />
-          </g>
-
-          {/* mid ring counter-rotation (thinking/agent) */}
-          {(mode === "thinking" || mode === "agent") && (
-            <g style={{ transformOrigin: "160px 160px" }} className="animate-spin-rev">
-              <circle
-                cx="160" cy="160" r="128"
-                fill="none" stroke={p.accent}
-                strokeOpacity="0.20" strokeWidth="0.6"
-                strokeDasharray="1 8"
-              />
-              <circle cx="160" cy="32" r="1.6" fill={p.accent} opacity="0.7" />
-              {mode === "agent" && (
-                <circle cx="160" cy="288" r="1.6" fill={p.accent} opacity="0.7" />
-              )}
-            </g>
-          )}
-
-          {/* tool progress arc */}
-          {mode === "tool" && (
-            <g style={{ transformOrigin: "160px 160px" }} className="animate-spin-fast">
-              <circle
-                cx="160" cy="160" r="138"
-                fill="none" stroke={p.accent}
-                strokeWidth="1.6" strokeLinecap="round"
-                strokeDasharray="180 700"
-              />
-            </g>
-          )}
-
-          {/* core orb */}
-          <circle
-            cx="160" cy="160" r="92"
-            fill="url(#orbCore)"
-            stroke={p.ring} strokeOpacity="0.45" strokeWidth="1"
-            style={{ transition: "stroke 400ms" }}
-          />
-          {/* specular highlight */}
-          <ellipse cx="135" cy="125" rx="42" ry="22" fill="url(#orbInner)" />
-          {/* rim soft */}
-          <circle cx="160" cy="160" r="92" fill="none" stroke="url(#orbRim)" strokeWidth="1.2" />
-
-          {/* inner ring */}
-          <circle
-            cx="160" cy="160" r="72"
-            fill="none" stroke={p.ring} strokeOpacity="0.18" strokeWidth="0.6"
-          />
-
-          {/* speaking waveform overlay */}
-          {mode === "speaking" && <Waveform color={p.accent} />}
-
-          {/* error sigil */}
-          {mode === "error" && (
-            <g opacity="0.9">
-              <circle cx="160" cy="160" r="32" fill="none" stroke={p.ring} strokeWidth="1.2" />
-              <path d="M160 144v22M160 174v2" stroke={p.ring} strokeWidth="2" strokeLinecap="round" />
-            </g>
-          )}
-        </svg>
-
-        {/* muted overlay */}
-        {muted && (
-          <div className="absolute inset-0 grid place-items-center">
-            <div className="rounded-full bg-bg/55 backdrop-blur-sm p-3 border border-white/10 animate-scale-in">
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none"
-                   stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" className="text-text-dim">
-                <path d="m3 3 18 18" />
-                <path d="M9 9v3a3 3 0 0 0 5.12 2.12" />
-                <path d="M15 9.34V6a3 3 0 0 0-5.94-.6" />
-                <path d="M5 11a7 7 0 0 0 12 5M19 11a7 7 0 0 1-.34 2.16" />
-                <path d="M12 18v3" />
-              </svg>
-            </div>
-          </div>
-        )}
+        {/* OJO — sustituye a la bolita anterior. Si Orion está sin
+            conexión, frozen=true: el ojo se queda quieto y el cian se
+            apaga a un azul sobrio (no parpadea ni gira). El estado
+            "silenciado" se comunica vía la etiqueta de abajo + el ojo
+            apagado (paleta idle), no con un icono encima — el icono
+            ensuciaba la composición. */}
+        <EyeCore state={eyeState} size={300} frozen={!connected} />
       </div>
 
       {/* state label */}
@@ -256,7 +136,8 @@ function FullOrb({ mode, muted, connected }: { mode: OrbMode; muted: boolean; co
 }
 
 /* ─────────────────────────────────────────────────────────────────────
-   MINI ORB — used in the top bar, 36×36.
+   MINI ORB — used in the top bar, 36×36. Sigue siendo la bolita
+   estilizada original — el ojo completo no rinde bien a 36 px.
    ───────────────────────────────────────────────────────────────────── */
 function MiniOrb({ mode }: { mode: OrbMode }) {
   const p = PALETTE[mode];
@@ -286,64 +167,4 @@ function MiniOrb({ mode }: { mode: OrbMode }) {
       </svg>
     </div>
   );
-}
-
-/* ─────────────────────────────────────────────────────────────────────
-   PulseRing — single expanding ring with delayed start.
-   ───────────────────────────────────────────────────────────────────── */
-function PulseRing({ color, delay }: { color: string; delay: string }) {
-  return (
-    <span
-      className="absolute h-[200px] w-[200px] rounded-full border animate-pulse-ring"
-      style={{ borderColor: color, animationDelay: delay }}
-    />
-  );
-}
-
-/* ─────────────────────────────────────────────────────────────────────
-   Waveform — voice-reactive bars for HABLANDO. Uses random base heights
-   refreshed every 110ms to mimic an audio envelope without real audio.
-   Each <rect> still animates via CSS (`animate-wave`) for smooth pulse.
-   ───────────────────────────────────────────────────────────────────── */
-function Waveform({ color }: { color: string }) {
-  const BARS = 11;
-  const [seeds, setSeeds] = useState<number[]>(() =>
-    Array.from({ length: BARS }, () => 0.4 + Math.random() * 0.6));
-
-  const tick = useRef<number | null>(null);
-  useEffect(() => {
-    const loop = () => {
-      setSeeds(Array.from({ length: BARS }, () => 0.4 + Math.random() * 0.6));
-      tick.current = window.setTimeout(loop, 110);
-    };
-    loop();
-    return () => { if (tick.current) clearTimeout(tick.current); };
-  }, []);
-
-  const W = 90, H = 38, X0 = 160 - W / 2, Y0 = 160;
-  const gap = W / BARS;
-
-  return useMemo(() => (
-    <g style={{ transformOrigin: "160px 160px" }}>
-      {seeds.map((h, i) => {
-        const barH = h * H;
-        return (
-          <rect
-            key={i}
-            x={X0 + i * gap + gap * 0.18}
-            y={Y0 - barH / 2}
-            width={gap * 0.64}
-            height={barH}
-            rx={1.5}
-            fill={color}
-            opacity="0.85"
-            style={{
-              transformOrigin: `${X0 + i * gap + gap * 0.5}px ${Y0}px`,
-              transition: "height 120ms cubic-bezier(0.16,1,0.3,1), y 120ms",
-            }}
-          />
-        );
-      })}
-    </g>
-  ), [seeds, color]);
 }

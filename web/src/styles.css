@@ -186,12 +186,88 @@
 @layer utilities {
   /* surfaces */
   .surface-1 {
+    position: relative;
     background: rgb(var(--orion-surface));
     border: 1px solid rgb(var(--orion-border) / 0.06);
   }
   .surface-2 {
+    position: relative;
     background: rgb(var(--orion-elevated));
     border: 1px solid rgb(var(--orion-border) / 0.08);
+  }
+
+  /* ── HUD corner brackets ───────────────────────────────────────────
+     Cada surface dibuja 4 esquinas en L (estilo visor militar / HUD).
+     Las ramas se pintan con 8 linear-gradient en una sola ::before:
+     2 por esquina (una horizontal + una vertical). El color toma la
+     paleta primary del tema, con alpha bajo para que no compita con
+     el ojo. `inset:2px` evita que el border-radius corte las puntas. */
+  .surface-1::before,
+  .surface-2::before {
+    content: "";
+    position: absolute;
+    inset: 2px;
+    pointer-events: none;
+    border-radius: inherit;
+    --hud-c: rgb(var(--orion-pri) / 0.55);
+    --hud-w: 1.5px;
+    --hud-l: 12px;
+    background:
+      linear-gradient(var(--hud-c), var(--hud-c)) top    left  / var(--hud-l) var(--hud-w) no-repeat,
+      linear-gradient(var(--hud-c), var(--hud-c)) top    left  / var(--hud-w) var(--hud-l) no-repeat,
+      linear-gradient(var(--hud-c), var(--hud-c)) top    right / var(--hud-l) var(--hud-w) no-repeat,
+      linear-gradient(var(--hud-c), var(--hud-c)) top    right / var(--hud-w) var(--hud-l) no-repeat,
+      linear-gradient(var(--hud-c), var(--hud-c)) bottom left  / var(--hud-l) var(--hud-w) no-repeat,
+      linear-gradient(var(--hud-c), var(--hud-c)) bottom left  / var(--hud-w) var(--hud-l) no-repeat,
+      linear-gradient(var(--hud-c), var(--hud-c)) bottom right / var(--hud-l) var(--hud-w) no-repeat,
+      linear-gradient(var(--hud-c), var(--hud-c)) bottom right / var(--hud-w) var(--hud-l) no-repeat;
+    opacity: 0.55;
+    transition: opacity 0.3s ease;
+  }
+  /* en hover los brackets brillan más — refuerzo visual de que la card
+     es interactiva sin necesidad de cambiar el fondo. */
+  .surface-1:hover::before,
+  .surface-2:hover::before { opacity: 0.95; }
+
+  /* ── Chrome reactivo al estado del ojo ─────────────────────────────
+     `useEyeState` (en App.tsx) escribe en <html data-eye-state="..."> y
+     acá traducimos a una variable de color RGB triplet + alpha. El
+     sidebar y la topbar leen esta variable en sus pseudoelementos para
+     mostrar un borde + glow que respira con el estado real de Orion. */
+  :root {
+    --orion-state-rgb:   var(--orion-pri);
+    --orion-state-alpha: 0.14;
+  }
+  [data-eye-state="listening"] {
+    --orion-state-rgb:   126 231 255;
+    --orion-state-alpha: 0.38;
+  }
+  [data-eye-state="thinking"] {
+    --orion-state-rgb:   255 0 85;
+    --orion-state-alpha: 0.32;
+  }
+  [data-eye-state="speaking"] {
+    --orion-state-rgb:   0 255 170;
+    --orion-state-alpha: 0.32;
+  }
+  [data-eye-state="error"] {
+    --orion-state-rgb:   255 0 17;
+    --orion-state-alpha: 0.48;
+  }
+
+  /* Sidebar — borde derecho + halo hacia el contenido principal. */
+  .chrome-edge-right {
+    border-right-color: rgb(var(--orion-state-rgb) / var(--orion-state-alpha)) !important;
+    box-shadow: 6px 0 28px -10px rgb(var(--orion-state-rgb) / var(--orion-state-alpha));
+    transition: border-color 600ms cubic-bezier(0.4, 0, 0.2, 1),
+                box-shadow   600ms cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  /* TopBar — borde inferior + halo hacia el área de trabajo. */
+  .chrome-edge-bottom {
+    border-bottom-color: rgb(var(--orion-state-rgb) / var(--orion-state-alpha)) !important;
+    box-shadow: 0 6px 28px -10px rgb(var(--orion-state-rgb) / var(--orion-state-alpha));
+    transition: border-color 600ms cubic-bezier(0.4, 0, 0.2, 1),
+                box-shadow   600ms cubic-bezier(0.4, 0, 0.2, 1);
   }
   .surface-glass {
     background:
@@ -255,6 +331,36 @@
     z-index: 9999;
   }
 
+  /* ── Scanlines CRT-style ──────────────────────────────────────────
+     Capa fija con líneas horizontales finas (1px cada 3px) al 2.2% de
+     opacidad + flicker sutil cada 8s. Refuerza el lenguaje "visor /
+     consola operativa" y dialoga con la textura SVG del ojo. */
+  .scanlines {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 9998;          /* debajo del noise (9999), encima del resto */
+    background: repeating-linear-gradient(
+      to bottom,
+      rgb(255 255 255 / 0.022) 0px,
+      rgb(255 255 255 / 0.022) 1px,
+      transparent             1px,
+      transparent             3px
+    );
+    mix-blend-mode: overlay;
+    animation: scanlines-flicker 8s ease-in-out infinite;
+  }
+  @keyframes scanlines-flicker {
+    0%, 100% { opacity: 1;    }
+    48%      { opacity: 0.85; }
+    50%      { opacity: 0.60; }
+    52%      { opacity: 0.85; }
+  }
+  /* opt-out: respeta a usuarios con prefers-reduced-motion */
+  @media (prefers-reduced-motion: reduce) {
+    .scanlines { animation: none; }
+  }
+
   /* scrollbars */
   .scrollbar-thin::-webkit-scrollbar           { width: 8px; height: 8px; }
   .scrollbar-thin::-webkit-scrollbar-thumb     {
@@ -268,6 +374,23 @@
     background-clip: padding-box;
   }
   .scrollbar-thin::-webkit-scrollbar-track     { background: transparent; }
+
+  /* ── Tabular numerals ─────────────────────────────────────────────
+     Aplicado globalmente a .font-mono: dígitos del mismo ancho para
+     que columnas de números, timestamps, IDs y contadores no se
+     shifteen al cambiar de "1" a "0" (el "1" suele ser más angosto).
+     ss01 activa la stylistic-set 1 en fuentes que la traen (JetBrains
+     Mono, Fira Code) — más geométrico, más HUD. */
+  .font-mono {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum", "ss01", "cv11";
+  }
+  /* Utilidad opt-in para texto NO mono que igual quiere dígitos
+     alineados (chips de versión, badges con contadores, telemetría). */
+  .numeric {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum";
+  }
 
   /* shimmer skeleton */
   .skeleton {
@@ -340,6 +463,395 @@ input[type="number"] {
 .katex-display > .katex { white-space: nowrap; }
 .katex .msupsub { font-size: 0.95em; }
 .inline-katex { display: inline; }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Icon hover micro-animations — activado por `.group:hover` del botón.
+   Cada animación declara su propio `transform-box`:
+     · view-box → rota alrededor del centro del icono (12,12 del viewBox).
+     · fill-box → escala/translada alrededor del centro del propio path.
+   El SVG raíz usa el modo HTML estándar (transform-origin: center).
+   ═══════════════════════════════════════════════════════════════════════ */
+
+.group svg[data-icon] {
+  transform-origin: center;
+}
+
+@keyframes orion-spin-cw  { to { transform: rotate( 360deg); } }
+@keyframes orion-spin-ccw { to { transform: rotate(-360deg); } }
+
+/* ── telemetry — pulso recorre la onda ───────────────────────────────── */
+@keyframes orion-pulse-sweep {
+  from { stroke-dashoffset:  46; }
+  to   { stroke-dashoffset: -46; }
+}
+.group:hover svg[data-icon="telemetry"] [data-part="wave"] {
+  stroke-dasharray: 6 40;
+  animation: orion-pulse-sweep 1.4s linear infinite;
+}
+
+/* ── chat — 3 puntos en cascada ──────────────────────────────────────── */
+@keyframes orion-chat-dot {
+  0%, 70%, 100% { opacity: 0.3; transform: translateY(0); }
+  35%           { opacity: 1;   transform: translateY(-1px); }
+}
+.group:hover svg[data-icon="chat"] [data-part^="dot-"] {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: orion-chat-dot 1.2s ease-in-out infinite;
+}
+.group:hover svg[data-icon="chat"] [data-part="dot-2"] { animation-delay: 0.15s; }
+.group:hover svg[data-icon="chat"] [data-part="dot-3"] { animation-delay: 0.30s; }
+
+/* ── notes — guiones fluyen como texto escribiéndose ─────────────────── */
+@keyframes orion-notes-write {
+  from { stroke-dashoffset:   0; }
+  to   { stroke-dashoffset: -12; }
+}
+.group:hover svg[data-icon="notes"] [data-part="lines"] {
+  stroke-dasharray: 6 6;
+  animation: orion-notes-write 0.9s linear infinite;
+}
+
+/* ── memory — escritura en cascada (highlight + descanso) ────────────── */
+@keyframes orion-memory-write {
+  0%, 80%, 100% { opacity: 0.35; }
+  20%, 40%      { opacity: 1;    }
+}
+.group:hover svg[data-icon="memory"] [data-part="layer-1"] { animation: orion-memory-write 1.6s ease-in-out infinite;        }
+.group:hover svg[data-icon="memory"] [data-part="layer-2"] { animation: orion-memory-write 1.6s ease-in-out infinite 0.20s; }
+.group:hover svg[data-icon="memory"] [data-part="layer-3"] { animation: orion-memory-write 1.6s ease-in-out infinite 0.40s; }
+
+/* ── history — manecillas rebobinan alrededor del centro del reloj ───── */
+.group:hover svg[data-icon="history"] [data-part="hands"] {
+  transform-box: view-box;
+  transform-origin: center;     /* = (12,12), centro del viewBox 24×24 */
+  animation: orion-spin-ccw 2.4s linear infinite;
+}
+
+/* ── agents — núcleo late (heartbeat: rápido in, lento out) ──────────── */
+@keyframes orion-agents-beat {
+  0%   { transform: scale(1);    opacity: 1;    }
+  18%  { transform: scale(0.5);  opacity: 0.35; }
+  60%  { transform: scale(1.08); opacity: 1;    }
+  100% { transform: scale(1);    opacity: 1;    }
+}
+.group:hover svg[data-icon="agents"] [data-part="core"] {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: orion-agents-beat 1.3s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+/* ── iot — el tejado escanea como un radar ───────────────────────────── */
+@keyframes orion-iot-scan {
+  0%   { stroke-dashoffset:  24; opacity: 0.55; }
+  50%  { opacity: 1; }
+  100% { stroke-dashoffset: -24; opacity: 0.55; }
+}
+.group:hover svg[data-icon="iot"] [data-part="roof"] {
+  stroke-dasharray: 5 22;
+  animation: orion-iot-scan 1.5s linear infinite;
+}
+
+/* ── plug — corriente fluyendo por el cable (guiones suben) ──────────── */
+@keyframes orion-plug-flow {
+  from { stroke-dashoffset:  0; }
+  to   { stroke-dashoffset: -8; }
+}
+.group:hover svg[data-icon="plug"] [data-part="cord"] {
+  stroke-dasharray: 2 2;
+  animation: orion-plug-flow 0.55s linear infinite;
+}
+
+/* ── sparkles — estrella centellea, rayos rotan ──────────────────────── */
+@keyframes orion-twinkle {
+  0%, 100% { transform: scale(1)   rotate(0);     }
+  50%      { transform: scale(1.3) rotate(45deg); }
+}
+.group:hover svg[data-icon="sparkles"] [data-part="star"] {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: orion-twinkle 1.4s ease-in-out infinite;
+}
+.group:hover svg[data-icon="sparkles"] [data-part="rays"] {
+  transform-box: view-box;
+  transform-origin: center;
+  animation: orion-spin-cw 4.5s linear infinite;
+  opacity: 0.85;
+}
+
+/* ── bell — campana repica colgada desde la corona ───────────────────── */
+@keyframes orion-bell-ring {
+  0%, 100% { transform: rotate(0);       }
+  15%      { transform: rotate(-12deg);  }
+  30%      { transform: rotate(9deg);    }
+  45%      { transform: rotate(-6deg);   }
+  60%      { transform: rotate(3deg);    }
+}
+.group:hover svg[data-icon="bell"] {
+  transform-origin: 50% 16%;     /* pivota desde la corona, no el centro */
+  animation: orion-bell-ring 1.2s ease-in-out infinite;
+}
+
+/* ── settings — engranaje gira lento ─────────────────────────────────── */
+.group:hover svg[data-icon="settings"] {
+  animation: orion-spin-cw 3.5s linear infinite;
+}
+
+/* ── orbit — anillos orbitan ─────────────────────────────────────────── */
+.group:hover svg[data-icon="orbit"] {
+  animation: orion-spin-cw 4s linear infinite;
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   EyeCore — el "ojo" cinemático que vive en Inicio y de fondo en el
+   resto de vistas. Variables CSS scoped a `.ec-canvas` para no tocar
+   los tokens globales de Orion.
+   ══════════════════════════════════════════════════════════════════════ */
+.ec-canvas {
+  --ec-neon-main:     #00f0ff;
+  --ec-neon-second:   #0055ff;
+  --ec-neon-glow:     rgba(0, 240, 255, 0.6);
+  --ec-spin-outer:    30s;
+  --ec-spin-mid:      15s;
+  --ec-spin-inner:    8s;
+  --ec-core-pulse:    3s;
+  --ec-dilation:      1;
+
+  position: relative;
+  display: block;
+  filter: drop-shadow(0 0 30px rgba(0, 102, 255, 0.15));
+  transition: filter 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ── fondo gigante recortado a la derecha (para vistas != home) ────── */
+.ec-canvas.ec-bg {
+  position: absolute;
+  top: 50%;
+  right: -15vw;
+  transform: translateY(-50%);
+  width: 130vh;
+  height: 130vh;
+  max-width: 1400px;
+  max-height: 1400px;
+  opacity: 0.13;
+  z-index: 0;
+  pointer-events: none;
+}
+.ec-canvas.ec-bg.ec-state-error { opacity: 0.32; }
+
+/* ── ESTADOS ───────────────────────────────────────────────────────── */
+
+/* Escuchando — cian más vivo, pulso de iris un poco más rápido. */
+.ec-canvas.ec-state-listening {
+  --ec-neon-main:   #7EE7FF;
+  --ec-neon-second: #00f0ff;
+  --ec-neon-glow:   rgba(126, 231, 255, 0.7);
+  --ec-core-pulse:  1.8s;
+  --ec-dilation:    1.1;
+  filter: drop-shadow(0 0 36px rgba(126, 231, 255, 0.35));
+}
+
+/* Pensando — magenta intenso, giro vertiginoso, iris contraído. */
+.ec-canvas.ec-state-thinking {
+  --ec-neon-main:   #ff0055;
+  --ec-neon-second: #7700ff;
+  --ec-neon-glow:   rgba(255, 0, 85, 0.6);
+  --ec-spin-outer:  0.8s;
+  --ec-spin-mid:    0.5s;
+  --ec-spin-inner:  0.3s;
+  --ec-core-pulse:  1.2s;
+  --ec-dilation:    0.6;
+  filter: drop-shadow(0 0 50px rgba(255, 0, 85, 0.4));
+}
+/* bloqueo central — el ojo no se mueve mientras piensa */
+.ec-canvas.ec-state-thinking .ec-tracking-group {
+  animation: none !important;
+  transform: translate(0, 0) !important;
+}
+
+/* Hablando — verde-cian, dilatado, destellos blancos de voz. */
+.ec-canvas.ec-state-responding {
+  --ec-neon-main:   #00ffaa;
+  --ec-neon-second: #0088ff;
+  --ec-neon-glow:   rgba(0, 255, 170, 0.6);
+  --ec-spin-outer:  20s;
+  --ec-spin-mid:    10s;
+  --ec-spin-inner:  5s;
+  --ec-core-pulse:  1.5s;
+  --ec-dilation:    1.3;
+  filter: drop-shadow(0 0 40px rgba(0, 255, 170, 0.3));
+}
+.ec-canvas.ec-state-responding .ec-voice-target {
+  animation: ec-voice-flashes 1s infinite alternate cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Error — rojo crítico, símbolo de alerta gigante. */
+.ec-canvas.ec-state-error {
+  --ec-neon-main:   #ff0011;
+  --ec-neon-second: #ff5500;
+  --ec-neon-glow:   rgba(255, 0, 17, 0.8);
+  --ec-spin-outer:  50s;
+  --ec-spin-mid:    30s;
+  --ec-spin-inner:  20s;
+  --ec-core-pulse:  0.4s;
+  --ec-dilation:    1.1;
+  filter: drop-shadow(0 0 50px rgba(255, 0, 17, 0.5));
+}
+.ec-canvas.ec-state-error .ec-glass-reflection { opacity: 0; }
+.ec-canvas.ec-state-error .ec-dark-overlay     { opacity: 0.8; }
+.ec-canvas.ec-state-error .ec-error-symbol-group {
+  opacity: 1;
+  visibility: visible;
+  animation: ec-error-pulse 1.5s infinite ease-in-out;
+}
+
+/* ── Pulsos de eventos ─────────────────────────────────────────────── */
+/* Cada anillo nace en el iris (r=60) y se expande hasta el borde del
+   ojo (r=180) mientras se desvanece. Una sola pasada, ~1.2s. La capa
+   .ec-pulses está clipeada al socket, así nunca se sale del círculo. */
+@keyframes ec-pulse-wave {
+  0%   { r: 60;  opacity: 0;    stroke-width: 3; }
+  15%  {         opacity: 0.42;                    }
+  100% { r: 180; opacity: 0;    stroke-width: 0.5; }
+}
+.ec-canvas .ec-pulse-ring {
+  animation: ec-pulse-wave 1200ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  mix-blend-mode: screen;
+}
+.ec-canvas .ec-pulse-sensor { stroke: #7EE7FF; }
+.ec-canvas .ec-pulse-notif  { stroke: #A78BFA; }
+.ec-canvas .ec-pulse-tool   { stroke: #F472B6; }
+.ec-canvas .ec-pulse-error  { stroke: #FF3344; }
+/* Cuando el ojo está congelado o el componente paused, los pulsos no
+   tienen sentido: cortamos su animación. */
+.ec-canvas.ec-frozen .ec-pulse-ring,
+.ec-canvas.ec-paused .ec-pulse-ring { animation: none; opacity: 0; }
+
+/* ── Anillos ───────────────────────────────────────────────────────── */
+.ec-canvas .ec-spin-cw      { transform-origin: 200px 200px; animation: ec-spin        linear infinite var(--ec-spin-outer); }
+.ec-canvas .ec-spin-cw-fast { transform-origin: 200px 200px; animation: ec-spin        linear infinite var(--ec-spin-mid);   }
+.ec-canvas .ec-spin-ccw     { transform-origin: 200px 200px; animation: ec-spin-rev    linear infinite var(--ec-spin-inner); }
+
+/* ── Iris pulse ────────────────────────────────────────────────────── */
+.ec-canvas .ec-pulse-dilate {
+  transform-origin: 200px 200px;
+  animation: ec-pulse-dilate ease-in-out infinite var(--ec-core-pulse);
+  transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ── Mirada robótica (idle/listening) ──────────────────────────────── */
+.ec-canvas .ec-tracking-group {
+  animation: ec-robotic-look 13s infinite cubic-bezier(0.2, 0.8, 0.2, 1);
+  transition: transform 0.3s ease;
+}
+
+/* ── Reflejos de vidrio y transiciones suaves ──────────────────────── */
+.ec-canvas .ec-glass-reflection,
+.ec-canvas .ec-dark-overlay { transition: opacity 0.3s ease; }
+.ec-canvas .ec-voice-target { transition: filter 0.3s ease; }
+
+/* ── Símbolo de error (oculto por defecto) ─────────────────────────── */
+.ec-canvas .ec-error-symbol-group {
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.3s ease;
+  transform-origin: 200px 200px;
+  transform: scale(0.85);
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   Keyframes del ojo
+   ══════════════════════════════════════════════════════════════════════ */
+@keyframes ec-spin     { 100% { transform: rotate(360deg);  } }
+@keyframes ec-spin-rev { 100% { transform: rotate(-360deg); } }
+
+@keyframes ec-pulse-dilate {
+  0%, 100% {
+    transform: scale(var(--ec-dilation));
+    filter: drop-shadow(0 0 12px var(--ec-neon-main));
+  }
+  50% {
+    transform: scale(calc(var(--ec-dilation) * 1.12));
+    filter: drop-shadow(0 0 25px var(--ec-neon-main));
+  }
+}
+
+@keyframes ec-robotic-look {
+  0%, 15%   { transform: translate(0, 0); }
+  17%, 25%  { transform: translate(22px, -14px); }
+  27%, 30%  { transform: translate(26px, 0); }
+  32%, 45%  { transform: translate(-19px, -11px); }
+  47%, 65%  { transform: translate(0, 0); }
+  67%, 75%  { transform: translate(-16px, 21px); }
+  77%, 85%  { transform: translate(13px, 24px); }
+  87%, 100% { transform: translate(0, 0); }
+}
+
+@keyframes ec-voice-flashes {
+  0%, 100%               { filter: drop-shadow(0 0 10px var(--ec-neon-glow)); }
+  5%, 15%, 25%, 40%, 60%, 80% { filter: drop-shadow(0 0 25px #ffffff); opacity: 1; }
+  10%, 20%, 30%, 50%, 70%, 90% { filter: drop-shadow(0 0 5px var(--ec-neon-glow)); opacity: 0.8; }
+}
+
+@keyframes ec-error-pulse {
+  0%, 100% {
+    opacity: 0.8;
+    filter: drop-shadow(0 0 15px var(--ec-neon-main));
+  }
+  50% {
+    opacity: 1;
+    filter: drop-shadow(0 0 45px var(--ec-neon-main)) drop-shadow(0 0 20px var(--ec-neon-main));
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   FROZEN — "Sin conexión": el ojo se queda quieto y la paleta se
+   apaga a un azul sobrio. Aplica tanto al centerpiece de Inicio como
+   al BackgroundEye.
+   ══════════════════════════════════════════════════════════════════════ */
+.ec-canvas.ec-frozen {
+  --ec-neon-main:   #5C7A99;
+  --ec-neon-second: #2A3A52;
+  --ec-neon-glow:   rgba(92, 122, 153, 0.28);
+  filter: drop-shadow(0 0 14px rgba(92, 122, 153, 0.18));
+}
+.ec-canvas.ec-frozen.ec-bg { opacity: 0.10; }
+
+/* paralizamos TODO movimiento: anillos, iris, mirada, voz, error */
+.ec-canvas.ec-frozen .ec-tracking-group,
+.ec-canvas.ec-frozen .ec-pulse-dilate,
+.ec-canvas.ec-frozen .ec-spin-cw,
+.ec-canvas.ec-frozen .ec-spin-cw-fast,
+.ec-canvas.ec-frozen .ec-spin-ccw,
+.ec-canvas.ec-frozen .ec-voice-target,
+.ec-canvas.ec-frozen .ec-error-symbol-group {
+  animation: none !important;
+  transform: none !important;
+}
+/* iris fijo en la dilatación base (sin escala doble) */
+.ec-canvas.ec-frozen .ec-pulse-dilate {
+  filter: drop-shadow(0 0 8px var(--ec-neon-main)) !important;
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   PAUSED — congela TODAS las animaciones sin tocar la paleta. Se usa
+   en el mini-ojo del top-bar: no se mueve, pero el color sigue
+   reflejando el estado real de Orion.
+   ══════════════════════════════════════════════════════════════════════ */
+.ec-canvas.ec-paused .ec-tracking-group,
+.ec-canvas.ec-paused .ec-pulse-dilate,
+.ec-canvas.ec-paused .ec-spin-cw,
+.ec-canvas.ec-paused .ec-spin-cw-fast,
+.ec-canvas.ec-paused .ec-spin-ccw,
+.ec-canvas.ec-paused .ec-voice-target,
+.ec-canvas.ec-paused .ec-error-symbol-group {
+  animation: none !important;
+  transform: none !important;
+}
+/* fija el iris en su tamaño base para que no quede "deshinchado" */
+.ec-canvas.ec-paused .ec-pulse-dilate {
+  filter: drop-shadow(0 0 8px var(--ec-neon-main)) !important;
+}
 
 /* respect reduced-motion users — disable infinite ambient loops only */
 @media (prefers-reduced-motion: reduce) {

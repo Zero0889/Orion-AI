@@ -15,45 +15,8 @@
 
 import { useEffect, useState } from "react";
 
+import { prettyToolName } from "@/lib/toolLabels";
 import { useInteractionStore } from "@/stores/interaction";
-
-// Etiquetas amistosas para nombres internos de tools. Lo que no esté
-// mapeado se muestra capitalizado y con guiones a espacios.
-const TOOL_LABELS: Record<string, { label: string; icon: string }> = {
-  web_search:        { label: "Buscando en la web",          icon: "🔍" },
-  file_controller:   { label: "Trabajando con archivos",     icon: "📂" },
-  bulk_delete:       { label: "Limpiando archivos",          icon: "🗑️" },
-  generated_code:    { label: "Generando código",            icon: "💻" },
-  file_processor:    { label: "Procesando archivo",          icon: "📄" },
-  screen_processor:  { label: "Analizando la pantalla",      icon: "👁️" },
-  weather_report:    { label: "Consultando el clima",        icon: "☁️" },
-  reminder:          { label: "Programando recordatorio",    icon: "⏰" },
-  send_message:      { label: "Enviando mensaje",            icon: "💬" },
-  open_app:          { label: "Abriendo aplicación",         icon: "🪟" },
-  browser_control:   { label: "Controlando navegador",       icon: "🌐" },
-  computer_control:  { label: "Controlando el sistema",      icon: "🖥️" },
-  computer_settings: { label: "Ajustando el sistema",        icon: "⚙️" },
-  iot_control:       { label: "Controlando IoT",             icon: "💡" },
-  sensors:           { label: "Leyendo sensores",            icon: "📊" },
-  google_drive:      { label: "Trabajando con Drive",        icon: "📦" },
-  classroom:         { label: "Revisando Classroom",         icon: "📚" },
-  youtube_video:     { label: "Buscando en YouTube",         icon: "▶️" },
-  flight_finder:     { label: "Buscando vuelos",             icon: "✈️" },
-  desktop:           { label: "Operando el escritorio",      icon: "🖱️" },
-  game_updater:      { label: "Gestionando juego",           icon: "🎮" },
-  code_helper:       { label: "Asistiendo con código",       icon: "🧰" },
-  agent_task:        { label: "Delegando a un agente",       icon: "🤝" },
-  use_skill:         { label: "Cargando skill",              icon: "📜" },
-  quick_note:        { label: "Guardando nota",              icon: "📝" },
-  save_memory:       { label: "Memorizando",                 icon: "🧠" },
-};
-
-function prettyName(name: string): { label: string; icon: string } {
-  const known = TOOL_LABELS[name];
-  if (known) return known;
-  const human = name.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
-  return { label: human, icon: "🛠️" };
-}
 
 export function ToolBanner() {
   const tool  = useInteractionStore((s) => s.tool);
@@ -69,7 +32,7 @@ export function ToolBanner() {
   }, [tool, agent]);
 
   if (tool) {
-    const { label, icon } = prettyName(tool.name);
+    const { label, icon } = prettyToolName(tool.name);
     const seconds = Math.max(0, Math.floor((Date.now() - tool.startedAt) / 1000));
     return (
       <div className="mx-auto max-w-3xl px-4 md:px-8 pt-3 animate-fade-in-up">
