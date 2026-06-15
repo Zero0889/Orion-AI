@@ -14,6 +14,7 @@
 
 import { create } from "zustand";
 
+import { useAskUserStore } from "@/stores/askUser";
 import { useInteractionStore } from "@/stores/interaction";
 import type {
   ChatMessage, LogRole, OrionState, ServerEvent,
@@ -255,6 +256,31 @@ export const useOrionStore = create<State>((set, get) => ({
       }
       case "tool.call.end": {
         useInteractionStore.getState().clearActiveTool();
+        break;
+      }
+      case "ask_user.start": {
+        // Un agente está pidiendo una clarificación con menú. Lo
+        // empujamos al askUser store; el componente AskUserPrompt
+        // (montado en ChatPanel) lo renderiza arriba del composer.
+        const qid    = String(payload?.question_id ?? "");
+        const q      = String(payload?.question    ?? "");
+        const opts   = (payload?.options ?? []) as Array<{ label?: unknown; description?: unknown }>;
+        const allowO = Boolean(payload?.allow_other ?? true);
+        if (!qid || !q || !Array.isArray(opts)) break;
+        const cleanOpts = opts
+          .map((o) => ({
+            label:       String((o as { label?: unknown }).label ?? "").trim(),
+            description: String((o as { description?: unknown }).description ?? "").trim() || undefined,
+          }))
+          .filter((o) => o.label);
+        if (cleanOpts.length === 0) break;
+        useAskUserStore.getState().setPending({
+          questionId: qid,
+          question:   q,
+          options:    cleanOpts,
+          allowOther: allowO,
+          receivedAt: Date.now(),
+        });
         break;
       }
       case "orchestra.update": {

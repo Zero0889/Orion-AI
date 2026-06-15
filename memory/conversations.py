@@ -113,6 +113,32 @@ def delete_conversation(conv_id: str) -> bool:
         return True
 
 
+def delete_conversations_bulk(conv_ids: list[str]) -> int:
+    """Borra varias conversaciones de una. Devuelve cuántas borró."""
+    if not conv_ids:
+        return 0
+    ids = set(conv_ids)
+    with _LOCK:
+        convs = _load_all()
+        before = len(convs)
+        convs = [c for c in convs if c.get("id") not in ids]
+        deleted = before - len(convs)
+        if deleted:
+            _save_all(convs)
+        return deleted
+
+
+def delete_all_conversations() -> int:
+    """Wipe completo del historial. Devuelve cuántas borró."""
+    with _LOCK:
+        convs = _load_all()
+        n = len(convs)
+        if n == 0:
+            return 0
+        _save_all([])
+        return n
+
+
 class ConversationSession:
     """Sesión activa: agrupa los mensajes y persiste al disco en cada add()."""
 

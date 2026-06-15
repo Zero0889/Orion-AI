@@ -85,6 +85,26 @@ export function MCPPanel() {
     } catch (e) { setError(String(e)); }
   }
 
+  async function handleToggleEnabled(s: MCPServerStatus) {
+    // Optimismo: actualizamos el estado local primero para que el switch
+    // se sienta instantáneo. Si el PUT falla, refetch revierte al real.
+    setServers((prev) => prev.map((x) =>
+      x.id === s.id ? { ...x, enabled: !s.enabled } : x,
+    ));
+    try {
+      await api.mcpUpdateServer(s.id, {
+        command:         s.command,
+        args:            s.args,
+        env:             s.env,
+        enabled:         !s.enabled,
+        cwd:             s.cwd,
+        startup_timeout: s.startup_timeout,
+        call_timeout:    s.call_timeout,
+      });
+    } catch (e) { setError(String(e)); }
+    refetch();
+  }
+
   async function handleReloadAll() {
     try {
       await api.mcpReload();
@@ -200,6 +220,7 @@ export function MCPPanel() {
                     server={s}
                     expanded={expanded.has(s.id)}
                     onToggleExpand={() => toggleExpand(s.id)}
+                    onToggleEnabled={() => handleToggleEnabled(s)}
                     onEdit={() => openEdit(s)}
                     onDelete={() => handleDelete(s.id)}
                     onRestart={() => handleRestart(s.id)}
@@ -588,11 +609,12 @@ function RegistryRow({
 /* ── Card de un server individual ─────────────────────────────────── */
 
 function ServerCard({
-  server, expanded, onToggleExpand, onEdit, onDelete, onRestart,
+  server, expanded, onToggleExpand, onToggleEnabled, onEdit, onDelete, onRestart,
 }: {
   server: MCPServerStatus;
   expanded: boolean;
-  onToggleExpand: () => void;
+  onToggleExpand:  () => void;
+  onToggleEnabled: () => void;
   onEdit:    () => void;
   onDelete:  () => void;
   onRestart: () => void;
@@ -641,8 +663,15 @@ function ServerCard({
         </div>
 
         <div className="flex items-center gap-1 shrink-0">
+          <Switch
+            on={server.enabled}
+            onClick={onToggleEnabled}
+            size="sm"
+            className={server.enabled ? "" : "opacity-70"}
+          />
           <Button variant="ghost" size="sm" icon="orbit" onClick={onRestart}
-                  title="Restart subprocess">
+                  title="Restart subprocess"
+                  disabled={!server.enabled}>
             Restart
           </Button>
           <Button variant="ghost" size="sm" icon="edit" onClick={onEdit} />

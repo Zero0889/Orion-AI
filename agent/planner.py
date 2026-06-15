@@ -115,6 +115,19 @@ Steps:
 
 mathematician | generated_code | description: "Solve quadratic 17*x**2 - 4*x + 9 = 0 with sympy, print roots and discriminant"
 
+Goal: "Investigá la conquista del Perú con 10 fuentes"
+Steps:
+
+researcher | ask_user | question: "¿Qué período histórico te interesa?", options: [{{"label":"Conquista temprana 1532-1572","description":"Pizarro y caída de Atahualpa"}},{{"label":"Virreinato 1542-1824","description":"Toda la dominación colonial"}},{{"label":"Cubrir ambos","description":"Visión panorámica"}}]
+researcher | notebooklm_research | topic: "Conquista del Perú [período elegido]", n_sources: 10, mode: deep, source: web
+
+IMPORTANT — ask_user UX RULES:
+- Para pedidos de investigación/redacción/código con ambigüedad sustancial (período, profundidad, tono, audiencia, lenguaje), PRIMER step = ask_user.
+- UNA sola pregunta por plan. Encadenar preguntas frustra al usuario.
+- NO uses ask_user para comandos directos del sistema (abrir app, enviar mensaje, controlar volumen, etc) — ahí asumí y procedé.
+- Las opciones deben ser mutuamente excluyentes y cubrir los casos típicos (2-4 opciones).
+- El step siguiente al ask_user usa la respuesta del usuario para refinar parámetros (topic, mode, n_sources, etc).
+
 OUTPUT — return ONLY valid JSON, no markdown, no explanation, no code blocks:
 {{
   "goal": "...",

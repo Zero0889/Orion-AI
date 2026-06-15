@@ -9,11 +9,17 @@ Endpoints:
 from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException, Request
+from pydantic import BaseModel
 
 from core.logger import get_logger
 from memory.conversations import (
-    delete_conversation, get_conversation, list_conversations,
+    delete_all_conversations, delete_conversation, delete_conversations_bulk,
+    get_conversation, list_conversations,
 )
+
+
+class BulkDeleteBody(BaseModel):
+    ids: list[str]
 
 log = get_logger("server.routes.conversations")
 router = APIRouter()
@@ -58,3 +64,29 @@ def remove_conversation(conv_id: str, request: Request) -> None:
             bus.publish("conversation.deleted", {"id": conv_id})
         except Exception as e:
             log.debug("publish conversation.deleted falló: %s", e)
+
+
+@router.post("/bulk_delete")
+def bulk_remove_conversations(body: BulkDeleteBody, request: Request) -> dict:
+    """Borra varias conversaciones por id. Devuelve ``{deleted: N}``."""
+    deleted = delete_conversations_bulk(body.ids)
+    bus = getattr(request.app.state, "bus", None)
+    if bus is not None and deleted:
+        try:
+            bus.publish("conversation.deleted", {"ids": body.ids, "bulk": True})
+        except Exception as e:
+            log.debug("publish conversation.deleted (bulk) falló: %s", e)
+    return {"deleted": deleted}
+
+
+@router.delete("", status_code=200)
+def remove_all_conversations(request: Request) -> dict:
+    """Wipe completo del historial."""
+    deleted = delete_all_conversations()
+    bus = getattr(request.app.state, "bus", None)
+    if bus is not None and deleted:
+        try:
+            bus.publish("conversation.deleted", {"all": True})
+        except Exception as e:
+            log.debug("publish conversation.deleted (all) falló: %s", e)
+    return {"deleted": deleted}

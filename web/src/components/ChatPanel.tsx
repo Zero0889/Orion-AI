@@ -2,12 +2,14 @@
  * ChatPanel — the core AI conversation surface.
  *
  * Two presentations:
- *   - Empty hero (no messages yet): the OrbHUD is the centerpiece, with
- *     prompt suggestions below.
- *   - Conversation: messages stream into a focused timeline; the orb
- *     becomes a small status marker in the corner. Each message animates
- *     in with fade-in-up; assistant turns are bubbleless prose, user
- *     turns are aligned chips, file/system are timeline rows.
+ *   - Empty hero (no real user/IA turns yet): clean composition with a
+ *     state-tinted status pill, big greeting, and 4 prompt suggestions.
+ *     The BackgroundEye stays hidden in this state — solo aparece tras
+ *     el primer turno real.
+ *   - Conversation: messages stream into a focused timeline; the BG eye
+ *     fade-in detrás. Each message animates in with fade-in-up;
+ *     assistant turns are bubbleless prose, user turns are aligned
+ *     chips, file/system are timeline rows.
  *
  * Backend contract unchanged: send arrives via the `onSend` prop and the
  * store keeps absorbing WS events.
@@ -22,10 +24,14 @@
 
 import { useEffect, useRef, useState } from "react";
 
+import { AskUserPrompt } from "@/components/AskUserPrompt";
 import { AttachmentChip } from "@/components/AttachmentChip";
 import { OrbHUD } from "@/components/OrbHUD";
 import { ToolBanner } from "@/components/ToolBanner";
+import { useEyeState } from "@/hooks/useEyeState";
 import { Markdown } from "@/lib/markdown";
+import { prettyToolName } from "@/lib/toolLabels";
+import { useInteractionStore } from "@/stores/interaction";
 import { useOrionStore } from "@/stores/orion";
 import type { ChatMessage, LogRole } from "@/types";
 import { Icon } from "@/ui/Icon";
@@ -39,14 +45,17 @@ const SUGGESTIONS: { eyebrow: string; prompt: string }[] = [
 ];
 
 interface Props {
-  onSend: (text: string) => void;
+  /** Raw WS sender — acepta cualquier type/payload. ChatPanel lo usa
+   *  para `text`, AskUserPrompt para `ask_user.response/cancel`. */
+  send: (type: string, payload?: Record<string, unknown>) => void;
 }
 
-export function ChatPanel({ onSend }: Props) {
+export function ChatPanel({ send }: Props) {
   const messages    = useOrionStore((s) => s.messages);
   const pushLocal   = useOrionStore((s) => s.pushLocalUserText);
   const state       = useOrionStore((s) => s.state);
   const currentFile = useOrionStore((s) => s.currentFile);
+  const eyeState    = useEyeState();
   const [draft, setDraft] = useState("");
   const scrollRef   = useRef<HTMLDivElement | null>(null);
   const taRef       = useRef<HTMLTextAreaElement | null>(null);
@@ -68,11 +77,16 @@ export function ChatPanel({ onSend }: Props) {
     const t = (text ?? draft).trim();
     if (!t) return;
     pushLocal(t);
-    onSend(t);
+    send("text", { text: t });
     setDraft("");
   }
 
-  const empty = messages.length === 0;
+  // El Hero solo desaparece cuando hay un turno REAL (usuario o IA). Los
+  // mensajes de sistema/archivo/error que el backend pushea al conectar
+  // ("SISTEMA: ORION en línea.", "Reconectando…", etc.) no cuentan — antes
+  // sí contaban, y el Hero se "cerraba" solo sin que el usuario hubiera
+  // hablado, dejando un timeline vacío.
+  const empty = !messages.some((m) => m.role === "user" || m.role === "ai");
 
   return (
     <div className="flex flex-col h-full relative">
@@ -91,8 +105,12 @@ export function ChatPanel({ onSend }: Props) {
       >
         {empty
           ? <Hero onPick={(p) => { setDraft(p); taRef.current?.focus(); }} />
-          : <Timeline messages={messages} state={state} />}
+          : <Timeline messages={messages} state={state} eyeState={eyeState} />}
       </div>
+
+      {/* Pregunta interactiva del agente — solo aparece si hay una
+          ask_user pendiente (researcher pidiendo clarificación, etc). */}
+      <AskUserPrompt send={send} />
 
       {/* composer */}
       <Composer
@@ -106,56 +124,101 @@ export function ChatPanel({ onSend }: Props) {
   );
 }
 
-/* ─── HERO (empty state) ──────────────────────────────────────────── */
+/* ─── HERO (empty state) ──────────────────────────────────────────────
+   El ojo cinemático va arriba como centerpiece (igual que Inicio) con un
+   halo ambiental detrás. Bajo el ojo: greeting + sugerencias. El
+   BackgroundEye gigante sigue oculto en este estado — solo aparece tras
+   el primer turno. Vista estable: no se cierra sola con mensajes de
+   sistema, no parpadea. */
 function Hero({ onPick }: { onPick: (p: string) => void }) {
   return (
-    <div className="h-full flex flex-col items-center justify-center px-6 py-10 animate-fade-in">
-      <OrbHUD />
+    <div className="h-full overflow-y-auto scrollbar-thin">
+      <div className="min-h-full flex flex-col items-center justify-center px-6 py-10 animate-fade-in">
+        {/* OJO centerpiece — mismo OrbHUD de Inicio, con halo ambiental
+            detrás. La etiqueta de estado ("Escuchando", "Pensando", etc)
+            la dibuja el propio OrbHUD debajo del ojo. */}
+        <div className="relative flex flex-col items-center">
+          <div className="absolute top-0 left-1/2 -translate-x-1/2 h-64 w-64 rounded-full
+                          bg-[radial-gradient(circle,rgb(var(--orion-pri-glow)/0.18),transparent_70%)]
+                          blur-3xl pointer-events-none animate-halo" />
+          <OrbHUD />
+        </div>
 
-      <h1 className="mt-10 text-2xl md:text-3xl font-semibold tracking-tight text-text text-center max-w-xl">
-        Bienvenido a Orion
-      </h1>
-      <p className="mt-2 text-sm text-text-dim text-center max-w-md leading-relaxed">
-        Tu sistema operativo asistido por IA. Pídeme algo en voz alta o escribe abajo.
-      </p>
+        <h1 className="mt-10 text-3xl md:text-[36px] font-semibold tracking-tight text-text text-center max-w-2xl leading-[1.15] animate-fade-in-up">
+          ¿En qué te ayudo hoy?
+        </h1>
+        <p className="mt-3 text-sm text-text-dim text-center max-w-md leading-relaxed animate-fade-in-up"
+           style={{ animationDelay: "80ms" }}>
+          Háblame en voz alta o escribí abajo.
+        </p>
 
-      <div className="mt-9 grid grid-cols-1 md:grid-cols-2 gap-2 w-full max-w-2xl">
-        {SUGGESTIONS.map((s, i) => (
-          <button
-            key={s.prompt}
-            onClick={() => onPick(s.prompt)}
-            style={{ animationDelay: `${80 * i}ms` }}
-            className="group relative text-left rounded-lg surface-1 px-4 py-3
-                       hover:border-white/[0.12] hover:bg-elevated/70
-                       transition-all duration-200 ease-out-expo
-                       animate-fade-in-up"
-          >
-            <div className="text-[10px] uppercase tracking-[0.2em] text-pri/80">{s.eyebrow}</div>
-            <div className="mt-1 text-sm text-text leading-snug">{s.prompt}</div>
-            <Icon
-              name="chevron-right"
-              size={14}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted
-                         opacity-0 group-hover:opacity-100 group-hover:translate-x-0.5
-                         transition-all duration-200"
-            />
-          </button>
-        ))}
+        <div className="mt-9 grid grid-cols-1 md:grid-cols-2 gap-2.5 w-full max-w-2xl">
+          {SUGGESTIONS.map((s, i) => (
+            <button
+              key={s.prompt}
+              onClick={() => onPick(s.prompt)}
+              style={{ animationDelay: `${160 + 80 * i}ms` }}
+              className="group relative text-left rounded-lg surface-1 px-4 py-3.5
+                         hover:border-white/[0.12] hover:bg-elevated/70
+                         transition-all duration-200 ease-out-expo
+                         animate-fade-in-up"
+            >
+              <div className="text-[10px] uppercase tracking-[0.22em] text-pri/80 font-mono">
+                {s.eyebrow}
+              </div>
+              <div className="mt-1 text-sm text-text leading-snug">{s.prompt}</div>
+              <Icon
+                name="chevron-right"
+                size={14}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted
+                           opacity-0 group-hover:opacity-100 group-hover:translate-x-0.5
+                           transition-all duration-200"
+              />
+            </button>
+          ))}
+        </div>
+
+        <div className="mt-10 mb-2 text-[10px] uppercase tracking-[0.3em] text-muted font-mono">
+          ────  voz, texto o adjuntá un archivo  ────
+        </div>
       </div>
     </div>
   );
 }
 
 /* ─── TIMELINE ────────────────────────────────────────────────────── */
-function Timeline({ messages, state }: { messages: ChatMessage[]; state: string }) {
+function Timeline({
+  messages, state, eyeState,
+}: {
+  messages: ChatMessage[];
+  state: string;
+  eyeState: ReturnType<typeof useEyeState>;
+}) {
+  const stateLabel =
+      eyeState === "listening" ? "escuchando"
+    : eyeState === "thinking"  ? "procesando"
+    : eyeState === "speaking"  ? "hablando"
+    : eyeState === "error"     ? "error"
+    : state.toLowerCase();
+
   return (
     <div className="mx-auto max-w-3xl px-4 md:px-8 py-6 flex flex-col gap-5">
-      {/* persistent status row at the top */}
-      <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.22em] text-text-dim mb-1">
-        <span className="h-1.5 w-1.5 rounded-full bg-pri shadow-[0_0_8px_rgb(var(--orion-pri))] animate-pulse-soft" />
+      {/* status row HUD — dot teñido del color del estado actual, monospace,
+          tracking ancho. Sticky para que sobreviva al scroll. */}
+      <div className="sticky top-0 z-10 -mx-4 md:-mx-8 px-4 md:px-8 py-2
+                      backdrop-blur-md bg-bg/40 border-b border-white/[0.04]
+                      flex items-center gap-2 text-[10px] uppercase tracking-[0.24em]
+                      text-text-dim font-mono">
+        <span
+          className="h-1.5 w-1.5 rounded-full animate-pulse-soft"
+          style={{
+            background: "rgb(var(--orion-state-rgb))",
+            boxShadow:  "0 0 10px rgb(var(--orion-state-rgb) / 0.7)",
+          }}
+        />
         <span>Sesión activa</span>
         <span className="text-muted">·</span>
-        <span>{state.toLowerCase()}</span>
+        <span style={{ color: "rgb(var(--orion-state-rgb) / 0.95)" }}>{stateLabel}</span>
       </div>
 
       {messages.map((m, i) => (
@@ -169,10 +232,83 @@ function Timeline({ messages, state }: { messages: ChatMessage[]; state: string 
         />
       ))}
 
-      {/* "thinking" indicator when last message is user and orion state is PENSANDO */}
-      {messages[messages.length - 1]?.role === "user" && state === "PENSANDO" && (
-        <TypingDots />
-      )}
+      {/* Indicador inline: aparece cuando el último mensaje es del usuario
+          y aún no llegó respuesta de la IA. Muestra texto contextual
+          según lo que esté pasando (tool activa, agente, o "Pensando").
+          Antes solo aparecía si state === "PENSANDO", pero ese state
+          únicamente se setea por eventos de audio Live — para input de
+          texto nunca se gatillaba y el usuario veía silencio. */}
+      {(() => {
+        const last = messages[messages.length - 1];
+        const awaiting =
+          (last?.role === "user")
+          || (last?.role === "ai" && last.streaming && !last.text.trim());
+        return awaiting ? <ThinkingIndicator /> : null;
+      })()}
+    </div>
+  );
+}
+
+/* ─── INDICADOR CONTEXTUAL "PENSANDO / BUSCANDO…" ─────────────────── */
+function ThinkingIndicator() {
+  const tool  = useInteractionStore((s) => s.tool);
+  const agent = useInteractionStore((s) => s.agent);
+
+  // Prioridad de contenido:
+  //   1) tool activa → label específica ("Buscando en la web", etc)
+  //   2) agente con tarea → "Agente: <goal corto>" o lastSpeech
+  //   3) fallback genérico → "Pensando"
+  let icon = "";
+  let label = "Pensando";
+  let sub: string | null = null;
+
+  if (tool) {
+    const p = prettyToolName(tool.name);
+    icon  = p.icon;
+    label = p.label;
+    // Args principales (1-2) como subtexto
+    const argEntries = Object.entries(tool.args).slice(0, 2);
+    if (argEntries.length) {
+      sub = argEntries.map(([, v]) => String(v).slice(0, 60)).join(" · ");
+    }
+  } else if (agent && (agent.status === "running" || agent.status === "pending")) {
+    icon  = "🎼";
+    label = agent.status === "pending" ? "Agente en cola" : "Agente trabajando";
+    sub   = agent.lastSpeech ?? agent.goal ?? null;
+    if (sub && sub.length > 90) sub = sub.slice(0, 90) + "…";
+  }
+
+  return (
+    <div className="self-start max-w-[90%] animate-fade-in">
+      <div className="flex items-center gap-2 mb-1.5">
+        <span className="relative inline-grid place-items-center h-5 w-5 rounded-full bg-pri/15">
+          <span className="absolute inset-0 rounded-full bg-pri/30 blur-[6px] animate-pulse-soft" />
+          <span className="relative h-2 w-2 rounded-full bg-pri" />
+        </span>
+        <span className="text-[10px] uppercase tracking-[0.22em] text-pri/90 font-medium">
+          Orion
+        </span>
+      </div>
+      <div className="flex items-start gap-3 px-4 py-3 rounded-xl
+                      border border-pri/25 bg-pri/[0.06] backdrop-blur-sm
+                      shadow-[0_0_24px_-8px_rgb(var(--orion-pri-glow)/0.35)]">
+        {icon && <span className="text-xl leading-none mt-0.5">{icon}</span>}
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2.5 text-[15px] text-text font-medium">
+            <span>{label}</span>
+            <span className="flex items-center gap-1">
+              <Dot delay="0s" />
+              <Dot delay="0.18s" />
+              <Dot delay="0.36s" />
+            </span>
+          </div>
+          {sub && (
+            <div className="mt-1 text-[12px] text-text-dim font-mono truncate">
+              {sub}
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
@@ -225,7 +361,10 @@ function MessageRow({ msg, isLastAssistant }: { msg: ChatMessage; isLastAssistan
       </div>
       <div className="relative">
         <Markdown source={msg.text} />
-        {isLastAssistant && <StreamCaret />}
+        {/* Caret solo mientras el mensaje está siendo streameado. Antes
+            quedaba pegado al último mensaje de IA aunque ya hubiera
+            terminado, generando un parpadeo permanente. */}
+        {isLastAssistant && msg.streaming && <StreamCaret />}
       </div>
     </div>
   );
@@ -237,21 +376,6 @@ function StreamCaret() {
   );
 }
 
-function TypingDots() {
-  return (
-    <div className="self-start flex items-center gap-2 animate-fade-in">
-      <span className="relative inline-grid place-items-center h-5 w-5 rounded-full bg-pri/15">
-        <span className="absolute inset-0 rounded-full bg-pri/30 blur-[6px]" />
-        <span className="relative h-2 w-2 rounded-full bg-pri" />
-      </span>
-      <span className="flex items-center gap-1.5">
-        <Dot delay="0s" />
-        <Dot delay="0.18s" />
-        <Dot delay="0.36s" />
-      </span>
-    </div>
-  );
-}
 function Dot({ delay }: { delay: string }) {
   return (
     <span

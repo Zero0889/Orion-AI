@@ -3,60 +3,95 @@
  *
  * Sorted (pinned first → updated desc). Inline edit, pin toggle, delete.
  * Refresh reactively on `note.*` bus events via `rev.notes`.
+ *
+ * Mejoras:
+ *   - Búsqueda local que filtra por contenido.
+ *   - Layout en 2 columnas en pantallas grandes para más densidad.
+ *   - Pinned section visualmente diferenciada arriba.
+ *   - Toasts in-app reemplazando `confirm()` y `alert`.
+ *   - Composer con contador de caracteres + foco mejorado.
  */
 
 import { useEffect, useMemo, useState } from "react";
 
 import { api, type NoteApi } from "@/api/rest";
 import { useOrionStore } from "@/stores/orion";
+import { toast } from "@/stores/toast";
 import { Icon } from "@/ui/Icon";
 import { Badge, Button, Empty, SectionHeader, Surface } from "@/ui/primitives";
 
 export function NotesPanel() {
   const rev = useOrionStore((s) => s.rev.notes);
   const [notes, setNotes] = useState<NoteApi[]>([]);
-  const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [draft, setDraft] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingText, setEditingText] = useState("");
+  const [query, setQuery] = useState("");
 
   useEffect(() => {
     let alive = true;
     setLoading(true);
     api.listNotes()
-      .then((ns) => { if (alive) { setNotes(ns); setError(null); } })
-      .catch((e) => { if (alive) setError(String(e)); })
+      .then((ns) => { if (alive) setNotes(ns); })
+      .catch((e) => { if (alive) toast.error("No pude cargar notas", String(e)); })
       .finally(() => { if (alive) setLoading(false); });
     return () => { alive = false; };
   }, [rev]);
 
-  const sorted = useMemo(() => [...notes].sort((a, b) => {
-    if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
-    return (b.updated ?? "").localeCompare(a.updated ?? "");
-  }), [notes]);
+  // Filtrado por query + orden: pinned arriba, después por updated desc.
+  const { pinned, rest } = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    const filtered = q
+      ? notes.filter((n) => n.text.toLowerCase().includes(q))
+      : notes;
+    const sorted = [...filtered].sort((a, b) =>
+      (b.updated ?? "").localeCompare(a.updated ?? ""),
+    );
+    return {
+      pinned: sorted.filter((n) => n.pinned),
+      rest:   sorted.filter((n) => !n.pinned),
+    };
+  }, [notes, query]);
 
+  const totalShown = pinned.length + rest.length;
+
+  /* ── Acciones ───────────────────────────────────────────────── */
   async function add() {
     const t = draft.trim();
     if (!t) return;
-    try { await api.createNote(t); setDraft(""); }
-    catch (e) { setError(String(e)); }
+    try {
+      await api.createNote(t);
+      setDraft("");
+      toast.success("Nota añadida");
+    } catch (e) { toast.error("No se pudo crear", String(e)); }
   }
   async function togglePin(n: NoteApi) {
     try { await api.updateNote(n.id, { pinned: !n.pinned }); }
-    catch (e) { setError(String(e)); }
+    catch (e) { toast.error("No se pudo cambiar el pin", String(e)); }
   }
   async function saveEdit() {
     if (!editingId) return;
     const t = editingText.trim();
     if (!t) { setEditingId(null); return; }
-    try { await api.updateNote(editingId, { text: t }); setEditingId(null); setEditingText(""); }
-    catch (e) { setError(String(e)); }
+    try {
+      await api.updateNote(editingId, { text: t });
+      setEditingId(null); setEditingText("");
+      toast.success("Nota actualizada");
+    } catch (e) { toast.error("No se pudo guardar", String(e)); }
   }
   async function remove(id: string) {
-    if (!confirm("¿Borrar esta nota?")) return;
-    try { await api.deleteNote(id); }
-    catch (e) { setError(String(e)); }
+    const ok = await toast.confirm({
+      title:        "¿Borrar nota?",
+      detail:       "Esta acción no se puede deshacer.",
+      confirmLabel: "Borrar",
+      danger:       true,
+    });
+    if (!ok) return;
+    try {
+      await api.deleteNote(id);
+      toast.success("Nota borrada");
+    } catch (e) { toast.error("No se pudo borrar", String(e)); }
   }
 
   return (
@@ -68,6 +103,7 @@ export function NotesPanel() {
         action={<Badge tone="neutral">{notes.length}</Badge>}
       />
 
+      {/* ── Composer ─────────────────────────────────────────────── */}
       <div className="px-6 py-4 border-b border-white/[0.06]">
         <div className="rounded-xl border border-white/[0.08] bg-elevated/60
                         focus-within:border-pri/40 focus-within:shadow-glow-soft
@@ -85,7 +121,16 @@ export function NotesPanel() {
             }}
           />
           <div className="flex items-center justify-between px-3 pb-2.5">
-            <span className="text-[10px] uppercase tracking-[0.18em] text-muted">Ctrl/⌘ + Enter</span>
+            <div className="flex items-center gap-3">
+              <span className="text-[10px] uppercase tracking-[0.18em] text-muted font-mono">
+                Ctrl/⌘ + Enter
+              </span>
+              {draft && (
+                <span className="text-[10px] text-text-dim tabular-nums">
+                  {draft.length} chars
+                </span>
+              )}
+            </div>
             <Button
               variant="primary" size="sm" icon="plus"
               onClick={add} disabled={!draft.trim()}
@@ -94,14 +139,41 @@ export function NotesPanel() {
             </Button>
           </div>
         </div>
-      </div>
 
-      {error && <Inline error={error} />}
+        {/* search */}
+        {notes.length > 0 && (
+          <div className="mt-3 relative">
+            <Icon name="search" size={14}
+                  className="absolute left-3 top-1/2 -translate-y-1/2 text-text-dim pointer-events-none" />
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Buscar en notas…"
+              className="w-full h-9 pl-9 pr-9 rounded-md bg-elevated/60 border border-white/[0.08]
+                         text-sm placeholder-muted focus:outline-none focus:border-pri/40
+                         transition-colors"
+            />
+            {query && (
+              <button
+                onClick={() => setQuery("")}
+                className="absolute right-2 top-1/2 -translate-y-1/2 h-6 w-6 grid place-items-center
+                           rounded text-text-dim hover:text-text hover:bg-white/[0.05]"
+                title="Limpiar"
+              >
+                <Icon name="close" size={11} />
+              </button>
+            )}
+          </div>
+        )}
+      </div>
 
       <div className="flex-1 overflow-y-auto scrollbar-thin px-6 py-4">
         {loading && notes.length === 0 && (
-          <div className="space-y-2">
-            <div className="skeleton h-16" /><div className="skeleton h-16" /><div className="skeleton h-16" />
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-2.5">
+            <div className="skeleton h-20" />
+            <div className="skeleton h-20" />
+            <div className="skeleton h-20" />
+            <div className="skeleton h-20" />
           </div>
         )}
         {!loading && notes.length === 0 && (
@@ -111,24 +183,120 @@ export function NotesPanel() {
             hint="Crea la primera arriba o pídele a Orion que la guarde por ti."
           />
         )}
-        <div className="flex flex-col gap-2.5">
-          {sorted.map((n, i) => (
-            <NoteCard
-              key={n.id}
-              note={n}
-              delay={i * 30}
-              isEditing={editingId === n.id}
+        {!loading && notes.length > 0 && totalShown === 0 && (
+          <Empty
+            icon="search"
+            title="Sin coincidencias"
+            hint={`Ninguna nota contiene "${query}".`}
+          />
+        )}
+
+        {pinned.length > 0 && (
+          <Section
+            label="Ancladas"
+            icon="pin"
+            count={pinned.length}
+            tone="pri"
+          >
+            <NoteGrid
+              notes={pinned}
+              editingId={editingId}
               editingText={editingText}
-              onStartEdit={() => { setEditingId(n.id); setEditingText(n.text); }}
+              onStartEdit={(n) => { setEditingId(n.id); setEditingText(n.text); }}
               onCancelEdit={() => { setEditingId(null); setEditingText(""); }}
               onChangeEdit={setEditingText}
               onSaveEdit={saveEdit}
-              onTogglePin={() => togglePin(n)}
-              onRemove={() => remove(n.id)}
+              onTogglePin={togglePin}
+              onRemove={remove}
             />
-          ))}
-        </div>
+          </Section>
+        )}
+
+        {rest.length > 0 && (
+          <Section
+            label={pinned.length > 0 ? "Resto" : "Todas"}
+            icon="notes"
+            count={rest.length}
+            className={pinned.length > 0 ? "mt-6" : ""}
+          >
+            <NoteGrid
+              notes={rest}
+              editingId={editingId}
+              editingText={editingText}
+              onStartEdit={(n) => { setEditingId(n.id); setEditingText(n.text); }}
+              onCancelEdit={() => { setEditingId(null); setEditingText(""); }}
+              onChangeEdit={setEditingText}
+              onSaveEdit={saveEdit}
+              onTogglePin={togglePin}
+              onRemove={remove}
+            />
+          </Section>
+        )}
       </div>
+    </div>
+  );
+}
+
+/* ─── Section header ───────────────────────────────────────────────── */
+function Section({
+  label, icon, count, tone, className, children,
+}: {
+  label: string;
+  icon: "pin" | "notes";
+  count: number;
+  tone?: "pri" | "muted";
+  className?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className={className ?? ""}>
+      <header className="flex items-center gap-2 mb-3 text-[10px] uppercase tracking-[0.24em] font-mono">
+        <Icon name={icon} size={12}
+              className={tone === "pri" ? "text-pri" : "text-text-dim"} />
+        <span className={tone === "pri" ? "text-pri/90" : "text-text-dim"}>
+          {label}
+        </span>
+        <span className="text-muted tabular-nums">· {count}</span>
+        <span className="flex-1 h-px bg-white/[0.05] ml-2" />
+      </header>
+      {children}
+    </section>
+  );
+}
+
+/* ─── Grid (2 columnas en >lg) ─────────────────────────────────────── */
+function NoteGrid({
+  notes, editingId, editingText,
+  onStartEdit, onCancelEdit, onChangeEdit, onSaveEdit,
+  onTogglePin, onRemove,
+}: {
+  notes: NoteApi[];
+  editingId: string | null;
+  editingText: string;
+  onStartEdit: (n: NoteApi) => void;
+  onCancelEdit: () => void;
+  onChangeEdit: (v: string) => void;
+  onSaveEdit: () => void;
+  onTogglePin: (n: NoteApi) => void;
+  onRemove: (id: string) => void;
+}) {
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-2.5">
+      {notes.map((n, i) => (
+        <NoteCard
+          key={n.id}
+          note={n}
+          delay={i * 30}
+          isEditing={editingId === n.id}
+          editingText={editingText}
+          onStartEdit={() => onStartEdit(n)}
+          onCancelEdit={onCancelEdit}
+          onChangeEdit={onChangeEdit}
+          onSaveEdit={onSaveEdit}
+          onTogglePin={() => onTogglePin(n)}
+          onRemove={() => onRemove(n.id)}
+        />
+      ))}
     </div>
   );
 }
@@ -149,15 +317,15 @@ function NoteCard({
     <Surface
       level={2}
       className={[
-        "group p-3.5 animate-fade-in-up transition-colors duration-200",
-        note.pinned && "ring-1 ring-pri/30",
+        "group p-3.5 animate-fade-in-up transition-all duration-200",
+        note.pinned && "ring-1 ring-pri/30 bg-pri/[0.03]",
       ].filter(Boolean).join(" ")}
       style={{ animationDelay: `${delay}ms` }}
     >
-      <header className="flex items-center justify-between gap-2 mb-1.5">
+      <header className="flex items-center justify-between gap-2 mb-2">
         {note.pinned
           ? <Badge tone="info" dot>Anclada</Badge>
-          : <span className="text-[10px] uppercase tracking-[0.18em] text-muted">Nota</span>}
+          : <span className="text-[10px] uppercase tracking-[0.18em] text-muted font-mono">Nota</span>}
         <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
           <IconBtn icon="pin"  active={note.pinned} onClick={onTogglePin}
                    title={note.pinned ? "Desanclar" : "Anclar"} />
@@ -175,8 +343,15 @@ function NoteCard({
             autoFocus
             className="resize-none rounded-lg bg-surface border border-pri/40
                        px-3 py-2 text-sm focus:outline-none focus:border-pri"
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); onSaveEdit(); }
+              if (e.key === "Escape") onCancelEdit();
+            }}
           />
-          <div className="flex gap-2 justify-end">
+          <div className="flex gap-2 justify-end items-center">
+            <span className="text-[10px] uppercase tracking-[0.18em] text-muted font-mono mr-auto">
+              Ctrl/⌘ + Enter
+            </span>
             <Button variant="ghost"   size="sm" onClick={onCancelEdit}>Cancelar</Button>
             <Button variant="primary" size="sm" icon="check" onClick={onSaveEdit}>Guardar</Button>
           </div>
@@ -185,7 +360,7 @@ function NoteCard({
         <p className="whitespace-pre-wrap text-sm leading-relaxed text-text">{note.text}</p>
       )}
 
-      <footer className="mt-2 text-[10px] uppercase tracking-[0.18em] text-muted">
+      <footer className="mt-2 text-[10px] uppercase tracking-[0.18em] text-muted font-mono">
         {note.updated}
       </footer>
     </Surface>
@@ -213,13 +388,5 @@ function IconBtn({
     >
       <Icon name={icon} size={14} />
     </button>
-  );
-}
-
-function Inline({ error }: { error: string }) {
-  return (
-    <div className="mx-6 mt-3 flex items-start gap-2 p-3 rounded-md border border-danger/30 bg-danger/10 text-xs text-danger animate-fade-in">
-      <Icon name="alert" size={14} className="mt-0.5 shrink-0" /><span>{error}</span>
-    </div>
   );
 }

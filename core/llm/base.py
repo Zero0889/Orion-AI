@@ -43,6 +43,22 @@ class LLMResponse:
     model: str
     provider: str
     usage: dict | None = field(default=None)
+    # Tool-calls que el modelo decidió disparar en este turno. Vacío si la
+    # respuesta es solo texto. Cada item: {"id": str, "name": str, "arguments": dict}.
+    tool_calls: list[dict] = field(default_factory=list)
+
+
+@dataclass
+class ToolSpec:
+    """Descripción de una tool tal como la ve el LLM (function-calling).
+
+    Campos minimalistas para que cada provider pueda traducirlos al formato
+    nativo de su API (OpenAI tools, Gemini function_declarations, etc.).
+    """
+
+    name: str
+    description: str
+    parameters: dict = field(default_factory=dict)
 
 
 # ── Interfaz ────────────────────────────────────────────────────────────────
@@ -86,6 +102,37 @@ class LLMProvider(ABC):
     def is_available(self) -> bool:
         """¿El provider tiene credenciales y se puede usar?"""
         return True
+
+    def complete_with_tools(
+        self,
+        turns: list[dict],
+        tools: list["ToolSpec"],
+        *,
+        model: str,
+        temperature: float = 0.7,
+    ) -> LLMResponse:
+        """Variante function-calling de :meth:`complete`.
+
+        ``turns`` usa el formato OpenAI extendido para que el provider lo
+        convierta a su formato nativo. Cada turno:
+
+          - ``{"role": "system",    "content": str}``
+          - ``{"role": "user",      "content": str}``
+          - ``{"role": "assistant", "content": str|None,
+                "tool_calls": [{"id", "name", "arguments": dict}] | None}``
+          - ``{"role": "tool",      "tool_call_id": str, "name": str, "content": str}``
+
+        El provider devuelve ``LLMResponse`` cuyo ``tool_calls`` puede tener
+        0..N entradas. Si tiene 0, la respuesta es final (``text``). Si tiene
+        N, el caller debe ejecutar las tools, añadir los resultados como
+        turnos ``role="tool"`` y volver a llamar.
+
+        Default: providers que no implementen function-calling pueden caer
+        al ``complete`` plano (perdiendo el tool-use).
+        """
+        raise NotImplementedError(
+            f"Provider '{self.name}' no soporta function-calling todavía."
+        )
 
 
 # ── Resolución de credenciales ──────────────────────────────────────────────

@@ -16,6 +16,23 @@ import traceback
 from pathlib import Path
 from typing import Any
 
+# ── UTF-8 stdout/stderr (Windows fix) ────────────────────────────────
+# La consola por defecto en Windows decodifica con cp1252, que NO sabe
+# leer la mayoría de emojis ni caracteres unicode (⏸, —, ✅, etc). Hay
+# decenas de print() con emojis dispersos por el codebase (browser,
+# code_helper, iot, etc); cuando alguno se ejecuta bajo un request HTTP,
+# UnicodeEncodeError revienta el handler entero y el cliente recibe 500.
+# Reconfigurar acá una sola vez resuelve TODOS de un saque, sin tocar
+# cada print individual. `errors="replace"` evita que un caracter raro
+# de un futuro print rompa nada (lo cambia por "?").
+try:
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+except Exception:
+    # En entornos donde stdout no soporta reconfigure (pythonw, sidecar
+    # sin consola), no es bloqueante — los print() simplemente no salen.
+    pass
+
 import sounddevice as sd
 from google import genai
 from google.genai import types
@@ -202,6 +219,24 @@ class OrionLive:
         # del os._exit).
         import atexit
         atexit.register(self._mcp_manager.stop_all)
+
+        # ── ask_user: conecta el manager singleton al bus ──
+        # La tool `ask_user` (registrada en tools_bootstrap) usa este
+        # publisher para emitir `ask_user.start` por WS y bloquear hasta
+        # que el frontend devuelva la respuesta via `ask_user.response`
+        # (manejado en server/ws.py).
+        from core.ask_user import get_ask_user
+        def _publish_ask(qid: str, question: str, options: list, allow_other: bool) -> None:
+            try:
+                self.ui.publish("ask_user.start", {
+                    "question_id": qid,
+                    "question":    question,
+                    "options":     options,
+                    "allow_other": allow_other,
+                })
+            except Exception as e:
+                log.warning("publish ask_user.start falló: %s", e)
+        get_ask_user().set_publisher(_publish_ask)
 
     # ── Callbacks de UI ──────────────────────────────────────────────────
     def _on_text_command(self, text: str):

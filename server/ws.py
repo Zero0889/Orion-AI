@@ -212,6 +212,25 @@ async def _handle_client_message(bus: Any, msg: dict) -> None:
         # Respuesta del cliente a un ping; nada que hacer, llegó vivo.
         pass
 
+    elif msg_type == "ask_user.response":
+        # El usuario respondió a una pregunta interactiva — desbloquea
+        # el thread de la tool ask_user que está esperando.
+        qid    = payload.get("question_id")
+        answer = (payload.get("answer") or "").strip()
+        if qid:
+            from core.ask_user import get_ask_user
+            ok = get_ask_user().submit_answer(qid, answer)
+            if not ok:
+                log.warning("ask_user.response sin pregunta pendiente: %s", qid)
+
+    elif msg_type == "ask_user.cancel":
+        # Usuario clickeó "cancelar" en el menú — el agente recibe un
+        # marcador especial para que sepa que debe abortar.
+        qid = payload.get("question_id")
+        if qid:
+            from core.ask_user import get_ask_user
+            get_ask_user().cancel(qid)
+
     else:
         # Subimos a warning para detectar drift frontend/backend tras
         # refactors (un cliente que manda un type que el server no conoce).

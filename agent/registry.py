@@ -21,7 +21,7 @@ from dataclasses import dataclass, field
 from functools import lru_cache
 
 from config import BASE_DIR
-from core.llm import LLMMessage, LLMResponse, get_provider
+from core.llm import LLMMessage, LLMResponse, ToolSpec, get_provider
 
 
 @dataclass(frozen=True)
@@ -125,34 +125,91 @@ def ask_agent(
     *,
     history: list[dict] | None = None,
     extra_context: str = "",
+    max_tool_iterations: int = 6,
 ) -> str:
-    """Pregunta directa a un agente. Sin tool-use, solo texto in/out.
+    """Pregunta directa a un agente.
 
-    Si se proporciona ``history`` (lista de ``{role, text}``), se incluye
-    como contexto de conversación antes del mensaje actual.
+    Si el agente declara ``tools`` y al menos una está registrada en el
+    ``ToolRegistry``, entra en un **agentic loop**: pasa las tools al LLM,
+    ejecuta los ``tool_calls`` que devuelva, alimenta los resultados de
+    vuelta como turnos ``role=tool``, y repite hasta que el modelo
+    devuelva una respuesta final de texto (o se alcance el límite de
+    iteraciones).
+
+    Si no tiene tools válidas, cae al modo plano (texto in/out) — igual
+    que antes.
 
     Cae al ``fallback_provider`` si el primario no está disponible o
-    devuelve error de credenciales/red.
+    devuelve error de credenciales/red. El fallback puede no soportar
+    function-calling: en ese caso opera en modo texto plano.
     """
     agent = get_agent(agent_id)
 
-    messages: list[LLMMessage] = []
-    if agent.system:
-        messages.append(LLMMessage(role="system", content=agent.system))
-    if extra_context:
-        messages.append(LLMMessage(role="system", content=extra_context))
+    available_tools = _resolve_agent_tools(agent)
 
-    # Conversation history — últimos 20 mensajes para no exceder contexto
+    # Construye los turnos en formato extendido (mismo schema que usan los
+    # providers con function-calling).
+    turns: list[dict] = []
+    if agent.system:
+        turns.append({"role": "system", "content": agent.system})
+    if extra_context:
+        turns.append({"role": "system", "content": extra_context})
     if history:
         for h in history[-20:]:
-            role = h.get("role", "user")
             text = h.get("text", "")
             if not text:
                 continue
-            llm_role = "assistant" if role == "agent" else "user"
-            messages.append(LLMMessage(role=llm_role, content=text))
+            role = "assistant" if h.get("role") == "agent" else "user"
+            turns.append({"role": role, "content": text})
+    turns.append({"role": "user", "content": user_prompt})
 
-    messages.append(LLMMessage(role="user", content=user_prompt))
+    # ── Modo agentic (con tools) ────────────────────────────────────
+    if available_tools:
+        try:
+            provider = get_provider(agent.provider)
+            if provider.is_available():
+                return _run_tool_loop(
+                    provider=provider,
+                    model=agent.model,
+                    temperature=agent.temperature,
+                    turns=turns,
+                    tools=available_tools,
+                    max_iterations=max_tool_iterations,
+                    agent_id=agent.id,
+                )
+        except NotImplementedError:
+            # Provider primario sin function-calling: probamos fallback.
+            print(
+                f"[AgentRegistry] ⚠️ {agent.id}/{agent.provider} "
+                f"no soporta function-calling — intentando fallback."
+            )
+        except Exception as e:
+            print(f"[AgentRegistry] ⚠️ {agent.id}/{agent.provider} falló: {e}")
+
+        if agent.fallback_provider and agent.fallback_model:
+            try:
+                fb = get_provider(agent.fallback_provider)
+                if fb.is_available():
+                    print(
+                        f"[AgentRegistry] 🔄 {agent.id} → fallback "
+                        f"{agent.fallback_provider} (tool-loop)"
+                    )
+                    return _run_tool_loop(
+                        provider=fb,
+                        model=agent.fallback_model,
+                        temperature=agent.temperature,
+                        turns=turns,
+                        tools=available_tools,
+                        max_iterations=max_tool_iterations,
+                        agent_id=agent.id,
+                    )
+            except NotImplementedError:
+                pass  # Fallback tampoco — caemos a texto plano abajo.
+            except Exception as e:
+                print(f"[AgentRegistry] ⚠️ fallback de {agent.id} falló: {e}")
+
+    # ── Modo plano (sin tools o sin soporte function-calling) ───────
+    messages = [LLMMessage(role=t["role"], content=t.get("content") or "") for t in turns]
 
     try:
         provider = get_provider(agent.provider)
@@ -164,7 +221,6 @@ def ask_agent(
     except Exception as e:
         print(f"[AgentRegistry] ⚠️ {agent.id}/{agent.provider} falló: {e}")
 
-    # Fallback declarado en agents.json.
     if agent.fallback_provider and agent.fallback_model:
         print(f"[AgentRegistry] 🔄 {agent.id} → fallback {agent.fallback_provider}")
         provider = get_provider(agent.fallback_provider)
@@ -176,4 +232,104 @@ def ask_agent(
     raise RuntimeError(
         f"Agente '{agent.id}' no pudo responder: provider '{agent.provider}' "
         f"no disponible y sin fallback definido."
+    )
+
+
+# ── Helpers del agentic loop ─────────────────────────────────────────────
+
+def _resolve_agent_tools(agent: AgentDef) -> list[ToolSpec]:
+    """Resuelve la whitelist del agente contra el ToolRegistry.
+
+    - ``"*"`` significa "todas las tools registradas".
+    - Tools que el agente declara pero no existen se ignoran (con log).
+    - Las que tengan ``silent=True`` o ``include_in_planner=False`` se
+      excluyen del expand de ``"*"`` (cumplen el mismo criterio que en el
+      planner: son meta-tools, no acciones).
+    """
+    from core.tool_registry import ToolRegistry
+
+    reg = ToolRegistry()
+    declared = set(agent.tools)
+
+    if "*" in declared:
+        decls = [
+            d for d in reg.all()
+            if not d.silent and d.include_in_planner
+        ]
+    else:
+        decls = []
+        for name in declared:
+            entry = reg.get(name)
+            if entry is None:
+                print(
+                    f"[AgentRegistry] ⚠️ agente {agent.id} declara tool "
+                    f"'{name}' pero no está registrada — la ignoro."
+                )
+                continue
+            decls.append(entry[0])
+
+    return [
+        ToolSpec(name=d.name, description=d.description, parameters=d.parameters)
+        for d in decls
+    ]
+
+
+def _run_tool_loop(
+    *,
+    provider,
+    model: str,
+    temperature: float,
+    turns: list[dict],
+    tools: list[ToolSpec],
+    max_iterations: int,
+    agent_id: str,
+) -> str:
+    """Loop agentic: llama LLM → si tool_calls → ejecuta → vuelve a llamar."""
+    from core.tool_registry import ToolRegistry
+
+    reg = ToolRegistry()
+    working_turns = list(turns)  # copia, no mutamos el original
+
+    for iteration in range(max_iterations):
+        resp: LLMResponse = provider.complete_with_tools(
+            working_turns, tools, model=model, temperature=temperature,
+        )
+
+        # Sin tool_calls: respuesta final.
+        if not resp.tool_calls:
+            return resp.text or ""
+
+        # Append del turno assistant con los tool_calls solicitados.
+        working_turns.append({
+            "role": "assistant",
+            "content": resp.text or None,
+            "tool_calls": resp.tool_calls,
+        })
+
+        # Ejecuta cada tool_call y mete el resultado como turn role=tool.
+        for tc in resp.tool_calls:
+            name = tc.get("name") or ""
+            args = tc.get("arguments") or {}
+            call_id = tc.get("id") or ""
+            try:
+                result = reg.call_sync(name, args)
+            except KeyError:
+                result = f"Error: tool '{name}' no registrada."
+            except Exception as e:
+                result = f"Error ejecutando '{name}': {type(e).__name__}: {e}"
+
+            working_turns.append({
+                "role":         "tool",
+                "tool_call_id": call_id,
+                "name":         name,
+                "content":      str(result),
+            })
+
+    print(
+        f"[AgentRegistry] ⚠️ {agent_id} alcanzó max_tool_iterations="
+        f"{max_iterations}; devolviendo último texto."
+    )
+    return (
+        "(El agente no terminó dentro del límite de iteraciones de tools. "
+        "Resultado parcial guardado en logs.)"
     )

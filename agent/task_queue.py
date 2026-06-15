@@ -3,7 +3,7 @@ import time
 import uuid
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Callable, Any
+from typing import Callable, Any, Optional
 
 
 class TaskStatus(Enum):
@@ -192,37 +192,104 @@ class TaskQueue:
                 return task
         return None
 
+    # Errores transitorios que justifican retry automático. Backoff
+    # exponencial: 2s, 4s — total max ~6s antes de rendirse.
+    _MAX_TRANSIENT_RETRIES = 2
+
+    @staticmethod
+    def _is_transient(err: BaseException) -> bool:
+        """True si el error es típicamente recuperable reintentando
+        unos segundos después (Gemini overloaded, NotebookLM RPC timeout,
+        red transitoria)."""
+        msg = str(err).lower()
+        return (
+            "503" in msg
+            or "unavailable" in msg
+            or "overloaded" in msg
+            or "rate limit" in msg
+            or "429" in msg
+            or "deadline" in msg
+            # NotebookLM-py: TransportServerError + "retries exhausted"
+            # son típicamente recuperables si esperás unos segundos
+            or "transportservererror" in msg
+            or "retries exhausted" in msg
+            or "transport server error" in msg
+            # Network transient
+            or "timed out" in msg
+            or "timeout" in msg
+            or "connection reset" in msg
+            or "connection aborted" in msg
+        )
+
     def _run_task(self, task: Task) -> None:
         print(f"[TaskQueue] ▶️ Running: [{task.task_id}] {task.goal[:60]}")
         should_callback = False
         callback_arg: Any = None
-        try:
-            executor = self._get_executor()
-            result   = executor.execute(
-                goal        = task.goal,
-                speak       = task.speak,
-                cancel_flag = task.cancel_flag,
-            )
-            cancelled = task.cancel_flag.is_set()
-            # Mutamos estado + liberamos slot + notificamos al worker en
-            # un único paso atómico bajo _condition. Sin esto, el worker
-            # podía quedarse esperando hasta el timeout de 1s aunque el
-            # slot ya estuviera libre. Lo importante es notify() ANTES de
-            # ejecutar on_complete (que puede tardar).
-            with self._condition:
-                if cancelled:
-                    task.status = TaskStatus.CANCELLED
-                else:
-                    task.status = TaskStatus.COMPLETED
-                    task.result = result
-                self._active_count -= 1
-                self._condition.notify_all()
-            should_callback = not cancelled
-            callback_arg = result
-            print(f"[TaskQueue] ✅ Completed: [{task.task_id}]")
+        executor = self._get_executor()
+        last_err: Optional[Exception] = None
 
-        except Exception as e:
-            err_msg = str(e)
+        # Loop de retries solo para errores transitorios (Gemini 503,
+        # 429, "overloaded"). Para errores reales (ValueError, KeyError,
+        # etc) fallamos al primer intento — son bugs nuestros, no de red.
+        for attempt in range(self._MAX_TRANSIENT_RETRIES + 1):
+            if task.cancel_flag.is_set():
+                break
+            try:
+                result = executor.execute(
+                    goal        = task.goal,
+                    speak       = task.speak,
+                    cancel_flag = task.cancel_flag,
+                )
+                # éxito — salimos del loop
+                with self._condition:
+                    if task.cancel_flag.is_set():
+                        task.status = TaskStatus.CANCELLED
+                    else:
+                        task.status = TaskStatus.COMPLETED
+                        task.result = result
+                    self._active_count -= 1
+                    self._condition.notify_all()
+                should_callback = not task.cancel_flag.is_set()
+                callback_arg    = result
+                print(f"[TaskQueue] ✅ Completed: [{task.task_id}]"
+                      + (f" (tras {attempt} retries)" if attempt > 0 else ""))
+                break
+
+            except Exception as e:
+                last_err = e
+                if attempt < self._MAX_TRANSIENT_RETRIES and self._is_transient(e):
+                    # Backoff: 2s, 4s
+                    wait = 2 * (2 ** attempt)
+                    print(f"[TaskQueue] ⚠️ Transient error en [{task.task_id}] "
+                          f"(intento {attempt + 1}/{self._MAX_TRANSIENT_RETRIES + 1}): "
+                          f"{str(e)[:80]} — reintento en {wait}s")
+                    # Aviso al usuario via speak si está disponible — UX:
+                    # mejor que escuche "lo intento de nuevo" que ver
+                    # silencio durante el backoff.
+                    if task.speak and attempt == 0:
+                        try:
+                            task.speak("El servicio está saturado, lo intento de nuevo.")
+                        except Exception:
+                            pass
+                    if task.cancel_flag.wait(timeout=wait):
+                        # cancelado durante el backoff
+                        break
+                    continue
+                # No transitorio o se acabaron los retries — fallar
+                err_msg = str(e)
+                with self._condition:
+                    task.status = TaskStatus.FAILED
+                    task.error  = err_msg
+                    self._active_count -= 1
+                    self._condition.notify_all()
+                should_callback = True
+                callback_arg = f"❌ Tarea falló: {err_msg}"
+                print(f"[TaskQueue] ❌ Failed: [{task.task_id}] {err_msg}")
+                break
+        else:
+            # else del for: solo entra si NO hicimos break — el loop
+            # terminó por agotar retries en transient errors.
+            err_msg = f"Servicio no disponible tras {self._MAX_TRANSIENT_RETRIES} reintentos: {last_err}"
             with self._condition:
                 task.status = TaskStatus.FAILED
                 task.error  = err_msg
@@ -230,7 +297,7 @@ class TaskQueue:
                 self._condition.notify_all()
             should_callback = True
             callback_arg = f"❌ Tarea falló: {err_msg}"
-            print(f"[TaskQueue] ❌ Failed: [{task.task_id}] {err_msg}")
+            print(f"[TaskQueue] ❌ Failed (sin retries): [{task.task_id}]")
 
         # on_complete corre FUERA del lock — un callback lento no debe
         # bloquear al worker de despachar la siguiente tarea.

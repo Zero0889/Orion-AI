@@ -8,21 +8,24 @@
 
 import { useEffect, useState } from "react";
 
-import { api, type SharingState, type ThemeInfo } from "@/api/rest";
+import { api, type NotebookLMStatus, type SharingState, type ThemeInfo } from "@/api/rest";
+import { GogAccountsCard } from "@/components/GogAccountsCard";
 import { useOrionStore } from "@/stores/orion";
+import { toast } from "@/stores/toast";
 import { Icon, type IconName } from "@/ui/Icon";
 import { Badge, Button, Empty, SectionHeader, Surface, Switch } from "@/ui/primitives";
 import { toggleLightDark, isLightTheme } from "@/App";
 
 interface Palette { PRI?: string; PANEL?: string; BG?: string; ACC?: string }
 
-type Tab = "appearance" | "network" | "voice" | "data" | "about";
+type Tab = "appearance" | "network" | "integrations" | "voice" | "data" | "about";
 const TABS: { id: Tab; label: string; icon: IconName }[] = [
-  { id: "appearance", label: "Apariencia", icon: "sun"   },
-  { id: "network",    label: "Red",        icon: "wifi"  },
-  { id: "voice",      label: "Voz",        icon: "mic"   },
-  { id: "data",       label: "Datos",      icon: "memory" },
-  { id: "about",      label: "Acerca de",  icon: "info"  },
+  { id: "appearance",   label: "Apariencia",    icon: "sun"      },
+  { id: "network",      label: "Red",           icon: "wifi"     },
+  { id: "integrations", label: "Integraciones", icon: "plug"     },
+  { id: "voice",        label: "Voz",           icon: "mic"      },
+  { id: "data",         label: "Datos",         icon: "memory"   },
+  { id: "about",        label: "Acerca de",     icon: "info"     },
 ];
 
 export function SettingsPanel() {
@@ -99,6 +102,8 @@ export function SettingsPanel() {
           )}
 
           {tab === "network" && <Network onError={setError} />}
+
+          {tab === "integrations" && <Integrations />}
 
           {tab === "voice" && (
             <Section title="Voz">
@@ -398,5 +403,201 @@ function Network({ onError }: { onError: (e: string | null) => void }) {
         </ol>
       </Surface>
     </Section>
+  );
+}
+
+/* ─── INTEGRACIONES ───────────────────────────────────────────────────
+   Acá viven los enlaces a servicios externos. Por ahora solo NotebookLM
+   pero la sección está armada para crecer (Google Drive, Slack, etc).  */
+function Integrations() {
+  return (
+    <Section title="Integraciones">
+      <div className="flex flex-col gap-3">
+        <GogAccountsCard />
+        <NotebookLMCard />
+      </div>
+    </Section>
+  );
+}
+
+function NotebookLMCard() {
+  const [status, setStatus] = useState<NotebookLMStatus | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  // Poll de status. Más rápido cuando hay login en progreso.
+  useEffect(() => {
+    let alive = true;
+    let timer: number | undefined;
+
+    async function tick() {
+      try {
+        const s = await api.notebookLMStatus();
+        if (!alive) return;
+        const prevRunning = status?.login.status === "running";
+        setStatus(s);
+        setLoading(false);
+        // Si el login terminó (running → success/failed), avisamos
+        if (prevRunning && s.login.status !== "running") {
+          if (s.login.status === "success") {
+            toast.success("NotebookLM conectado", "Ya podés volver a investigar.");
+          } else {
+            toast.error("Login falló", s.login.message);
+          }
+        }
+      } catch (e) {
+        if (alive) {
+          setLoading(false);
+        }
+      } finally {
+        if (alive) {
+          // Poll cada 2s si hay login en progreso, sino cada 15s para
+          // no martillar el backend cuando todo está estable.
+          const next = (status?.login.status === "running") ? 2000 : 15000;
+          timer = window.setTimeout(tick, next);
+        }
+      }
+    }
+    tick();
+    return () => {
+      alive = false;
+      if (timer) window.clearTimeout(timer);
+    };
+    // status?.login.status arriba intencional — re-vuelve a programar
+    // el siguiente tick con el intervalo correcto.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status?.login.status]);
+
+  async function login() {
+    try {
+      await api.notebookLMLogin();
+      toast.info("Login iniciado", "Se abrirá Chromium en breve. Iniciá sesión con tu cuenta Google.");
+      // Forzamos refresh inmediato para mostrar el estado 'running'
+      const s = await api.notebookLMStatus();
+      setStatus(s);
+    } catch (e) {
+      toast.error("No se pudo iniciar login", String(e));
+    }
+  }
+
+  async function cancel() {
+    try {
+      await api.notebookLMCancel();
+      const s = await api.notebookLMStatus();
+      setStatus(s);
+      toast.warn("Login cancelado");
+    } catch (e) {
+      toast.error("Cancelación falló", String(e));
+    }
+  }
+
+  if (loading) {
+    return <Surface level={2} className="p-5"><div className="skeleton h-20" /></Surface>;
+  }
+  if (!status) return null;
+
+  const inProgress = status.login.status === "running";
+  const hasSession = status.has_session;
+
+  // Tone + label para el chip de estado de la sesión
+  const sessionTone: "ok" | "warn" | "muted" =
+      inProgress      ? "warn"
+    : hasSession      ? "ok"
+    : "muted";
+  const sessionLabel =
+      inProgress      ? "Autenticando…"
+    : hasSession      ? "Conectado"
+    : "Sin sesión";
+
+  return (
+    <Surface level={2} className="p-5">
+      <div className="flex items-start gap-4">
+        <div className="grid place-items-center h-11 w-11 rounded-xl bg-pri/15 text-pri shrink-0">
+          <Icon name="search" size={20} />
+        </div>
+
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <h4 className="text-sm font-semibold text-text">NotebookLM</h4>
+            <SessionBadge tone={sessionTone} label={sessionLabel} pulse={inProgress} />
+            {!status.installed && (
+              <Badge tone="danger" dot>Sin CLI</Badge>
+            )}
+          </div>
+          <p className="text-xs text-text-dim leading-relaxed mt-1">
+            Investigaciones profundas con auto-import de fuentes via el research agent
+            de Google. Requiere login con tu cuenta Google — la sesión se guarda
+            localmente en <code className="font-mono text-acc/80">~/.notebooklm/</code>.
+          </p>
+
+          {/* Mensaje del último intento */}
+          {status.login.status !== "idle" && status.login.message && (
+            <div className={[
+              "mt-3 text-[11px] leading-relaxed p-2.5 rounded-md border font-mono",
+              status.login.status === "success" ? "text-ok      border-ok/30    bg-ok/5"
+            : status.login.status === "failed"  ? "text-danger  border-danger/30 bg-danger/5"
+            : "text-warn border-warn/30 bg-warn/5",
+            ].join(" ")}>
+              {status.login.message}
+              {inProgress && status.login.elapsed > 0 && (
+                <span className="ml-2 opacity-70 tabular-nums">
+                  · {Math.floor(status.login.elapsed)}s
+                </span>
+              )}
+            </div>
+          )}
+
+          {/* CTA */}
+          <div className="mt-4 flex items-center gap-2">
+            {inProgress ? (
+              <>
+                <Button variant="secondary" size="sm" icon="close" onClick={cancel}>
+                  Cancelar
+                </Button>
+                <span className="text-[11px] text-text-dim">
+                  Mirá la ventana de Chromium que se abrió.
+                </span>
+              </>
+            ) : (
+              <>
+                <Button
+                  variant="primary" size="sm"
+                  icon={hasSession ? "orbit" : "bolt"}
+                  onClick={login}
+                  disabled={!status.installed}
+                >
+                  {hasSession ? "Renovar sesión" : "Iniciar sesión"}
+                </Button>
+                {!status.installed && (
+                  <span className="text-[11px] text-danger">
+                    Instalá: <code className="font-mono">.venv\Scripts\pip.exe install "notebooklm-py[browser]"</code>
+                  </span>
+                )}
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+    </Surface>
+  );
+}
+
+function SessionBadge({ tone, label, pulse }: {
+  tone: "ok" | "warn" | "muted";
+  label: string;
+  pulse?: boolean;
+}) {
+  const dotClass =
+      tone === "ok"   ? "bg-ok   shadow-[0_0_8px_rgb(var(--orion-ok))]"
+    : tone === "warn" ? "bg-warn shadow-[0_0_8px_rgb(var(--orion-warn))]"
+    : "bg-muted";
+  const textClass =
+      tone === "ok"   ? "text-ok"
+    : tone === "warn" ? "text-warn"
+    : "text-text-dim";
+  return (
+    <span className="inline-flex items-center gap-1.5 text-[10px] uppercase tracking-[0.22em] font-mono">
+      <span className={`h-1.5 w-1.5 rounded-full ${dotClass} ${pulse ? "animate-pulse-soft" : ""}`} />
+      <span className={textClass}>{label}</span>
+    </span>
   );
 }

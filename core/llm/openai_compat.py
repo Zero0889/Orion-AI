@@ -27,6 +27,7 @@ from core.llm.base import (
     LLMMessage,
     LLMProvider,
     LLMResponse,
+    ToolSpec,
     get_api_key,
     get_base_url,
 )
@@ -109,6 +110,81 @@ class OpenAICompatProvider(LLMProvider):
             model=model,
             provider=self.name,
             usage=data.get("usage"),
+        )
+
+    def complete_with_tools(
+        self,
+        turns: list[dict],
+        tools: list[ToolSpec],
+        *,
+        model: str,
+        temperature: float = 0.7,
+    ) -> LLMResponse:
+        if not self.is_available():
+            raise RuntimeError(
+                f"Provider '{self.name}' sin credenciales."
+            )
+
+        payload: dict = {
+            "model": model,
+            "messages": _turns_to_openai(turns),
+            "temperature": temperature,
+        }
+        if tools:
+            payload["tools"] = [
+                {
+                    "type": "function",
+                    "function": {
+                        "name": t.name,
+                        "description": t.description,
+                        "parameters": _normalize_openai_schema(t.parameters)
+                            or {"type": "object", "properties": {}},
+                    },
+                }
+                for t in tools
+            ]
+            payload["tool_choice"] = "auto"
+
+        headers = {"Content-Type": "application/json"}
+        if self._api_key:
+            headers["Authorization"] = f"Bearer {self._api_key}"
+        if self.name == "openrouter":
+            headers["HTTP-Referer"] = "https://github.com/zahir/ORION"
+            headers["X-Title"]      = "O.R.I.O.N"
+
+        url = f"{self._base_url}/chat/completions"
+        body = json.dumps(payload).encode("utf-8")
+        data = self._post_with_retry(url, body, headers)
+
+        try:
+            msg = data["choices"][0]["message"]
+        except (KeyError, IndexError, TypeError) as e:
+            raise RuntimeError(
+                f"{self.name} devolvió formato inesperado: {str(data)[:200]}"
+            ) from e
+
+        text = (msg.get("content") or "").strip()
+        raw_calls = msg.get("tool_calls") or []
+        tool_calls: list[dict] = []
+        for tc in raw_calls:
+            fn = tc.get("function") or {}
+            args_raw = fn.get("arguments") or "{}"
+            try:
+                args = json.loads(args_raw) if isinstance(args_raw, str) else dict(args_raw)
+            except (json.JSONDecodeError, TypeError):
+                args = {}
+            tool_calls.append({
+                "id":        tc.get("id") or "",
+                "name":      fn.get("name") or "",
+                "arguments": args,
+            })
+
+        return LLMResponse(
+            text=text,
+            model=model,
+            provider=self.name,
+            usage=data.get("usage"),
+            tool_calls=tool_calls,
         )
 
     def stream(
@@ -228,3 +304,90 @@ class OpenAICompatProvider(LLMProvider):
                 raise RuntimeError(f"{self.name} red: {e.reason}") from e
 
         raise RuntimeError(f"{self.name} agotó reintentos: {last_err}")
+
+
+# ── Normalizador de schema: Gemini-style (MAYÚSCULA) → JSON Schema ──────
+
+# ToolDeclaration de ORION usa los tipos de Gemini Live ("STRING", "INTEGER"…)
+# porque ese es el cliente principal. La API de OpenAI/DeepSeek/Groq quiere
+# JSON Schema canónico (minúsculas). Sin esta conversión, los providers
+# OpenAI-compat devuelven 400 ("'STRING' is not valid under any of…").
+
+_OPENAI_TYPE_MAP = {
+    "STRING":  "string",
+    "INTEGER": "integer",
+    "NUMBER":  "number",
+    "BOOLEAN": "boolean",
+    "OBJECT":  "object",
+    "ARRAY":   "array",
+    "NULL":    "null",
+}
+
+
+def _normalize_openai_schema(schema):
+    """Lower-cases ``type`` recursivamente. Acepta dict | list | escalares."""
+    if isinstance(schema, dict):
+        clean = {}
+        for k, v in schema.items():
+            if k == "type":
+                if isinstance(v, str):
+                    clean[k] = _OPENAI_TYPE_MAP.get(v, v.lower() if v.isupper() else v)
+                elif isinstance(v, list):
+                    clean[k] = [
+                        _OPENAI_TYPE_MAP.get(x, x.lower() if isinstance(x, str) and x.isupper() else x)
+                        for x in v
+                    ]
+                else:
+                    clean[k] = v
+            else:
+                clean[k] = _normalize_openai_schema(v)
+        return clean
+    if isinstance(schema, list):
+        return [_normalize_openai_schema(x) for x in schema]
+    return schema
+
+
+# ── Conversión de turns extendidos → messages OpenAI ───────────────────
+
+def _turns_to_openai(turns: list[dict]) -> list[dict]:
+    """Pasa el formato interno de turnos al schema messages de OpenAI.
+
+    Asistant con tool_calls: ``content`` puede ser null y se añade
+    ``tool_calls`` con la spec de OpenAI. Las respuestas de tool van como
+    ``{"role":"tool","tool_call_id":...,"name":...,"content":...}``.
+    """
+    out: list[dict] = []
+    for turn in turns:
+        role = turn.get("role")
+        if role in ("system", "user"):
+            out.append({"role": role, "content": turn.get("content") or ""})
+            continue
+
+        if role == "assistant":
+            entry: dict = {"role": "assistant"}
+            content = turn.get("content")
+            entry["content"] = content if content else None
+            calls = turn.get("tool_calls") or []
+            if calls:
+                entry["tool_calls"] = [
+                    {
+                        "id":       c.get("id") or "",
+                        "type":     "function",
+                        "function": {
+                            "name":      c.get("name") or "",
+                            "arguments": json.dumps(c.get("arguments") or {}),
+                        },
+                    }
+                    for c in calls
+                ]
+            out.append(entry)
+            continue
+
+        if role == "tool":
+            out.append({
+                "role":         "tool",
+                "tool_call_id": turn.get("tool_call_id") or "",
+                "name":         turn.get("name") or "",
+                "content":      turn.get("content") or "",
+            })
+    return out
