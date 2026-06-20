@@ -20,29 +20,29 @@ import { useEyePulseStore } from "@/stores/eyePulse";
 import { useInteractionStore } from "@/stores/interaction";
 import { useOrionStore } from "@/stores/orion";
 
-const STALE_AFTER_S      = 60;
-const STALE_CHECK_MS     = 10_000;
-const REL_DELTA_THRESHOLD = 0.10;
+const STALE_AFTER_S = 60;
+const STALE_CHECK_MS = 10_000;
+const REL_DELTA_THRESHOLD = 0.1;
 const ABS_DELTA_THRESHOLD = 1;
 
 export function useEventPulses() {
-  const pulse        = useEyePulseStore((s) => s.pulse);
-  const iotSensors   = useOrionStore((s) => s.iotSensors);
+  const pulse = useEyePulseStore((s) => s.pulse);
+  const iotSensors = useOrionStore((s) => s.iotSensors);
   const unreadNotifs = useOrionStore((s) => s.unreadNotifs);
-  const activeTool   = useInteractionStore((s) => s.tool);
+  const activeTool = useInteractionStore((s) => s.tool);
 
-  const seenSensors   = useRef<Set<string>>(new Set());
-  const lastValueOf   = useRef<Record<string, number>>({});
-  const lastTsOf      = useRef<Record<string, number>>({});
+  const seenSensors = useRef<Set<string>>(new Set());
+  const lastValueOf = useRef<Record<string, number>>({});
+  const lastTsOf = useRef<Record<string, number>>({});
   const staleNotified = useRef<Set<string>>(new Set());
-  const prevUnread    = useRef(unreadNotifs);
-  const prevToolName  = useRef<string | null>(null);
+  const prevUnread = useRef(unreadNotifs);
+  const prevToolName = useRef<string | null>(null);
 
   // ── Sensores: primera lectura + cambios significativos ────────────
   useEffect(() => {
     Object.entries(iotSensors).forEach(([id, { value, ts }]) => {
       lastTsOf.current[id] = ts;
-      staleNotified.current.delete(id);  // llegó dato fresco, reset
+      staleNotified.current.delete(id); // llegó dato fresco, reset
 
       const num = Number(value);
       if (!seenSensors.current.has(id)) {
@@ -87,7 +87,7 @@ export function useEventPulses() {
   // ── Tools: pulso al iniciar y al terminar ─────────────────────────
   useEffect(() => {
     const before = prevToolName.current;
-    const after  = activeTool?.name ?? null;
+    const after = activeTool?.name ?? null;
     if (before !== after) {
       if (before === null && after !== null) pulse("tool");
       else if (before !== null && after === null) pulse("tool");

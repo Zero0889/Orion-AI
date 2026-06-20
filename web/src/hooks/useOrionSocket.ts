@@ -18,7 +18,7 @@ export function useOrionSocket(): (type: string, payload?: Record<string, unknow
   useEffect(() => {
     const { ws: wsUrl } = inferBackendUrl();
     const dispatch = useOrionStore.getState().applyEvent;
-    const setConn  = useOrionStore.getState().setConnected;
+    const setConn = useOrionStore.getState().setConnected;
 
     const sock = new OrionSocket(
       wsUrl,

@@ -49,6 +49,22 @@
       "mqtt": {
         "topic_state": "orion/zahir/esp_sensores/lux"
       }
+    },
+    "foco_sala": {
+      "name": "foco de la sala",
+      "transport": "esp32_mqtt",
+      "capabilities": {
+        "on_off": true,
+        "dimmable": false,
+        "rgb": false,
+        "sensor": null
+      },
+      "mqtt": {
+        "topic_command": "orion/zahir/foco_sala/cmd",
+        "topic_state": "orion/zahir/foco_sala/state",
+        "payload_on": "ON",
+        "payload_off": "OFF"
+      }
     }
   },
   "global_commands": {},

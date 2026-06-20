@@ -16,29 +16,27 @@ import { create } from "zustand";
 
 import { useAskUserStore } from "@/stores/askUser";
 import { useInteractionStore } from "@/stores/interaction";
-import type {
-  ChatMessage, LogRole, OrionState, ServerEvent,
-} from "@/types";
+import type { ChatMessage, LogRole, OrionState, ServerEvent } from "@/types";
 
 const MAX_MESSAGES = 300;
 
 interface State {
   // Estado expuesto a los componentes
-  state:     OrionState;
-  muted:     boolean;
+  state: OrionState;
+  muted: boolean;
   connected: boolean;
-  messages:  ChatMessage[];
+  messages: ChatMessage[];
   currentFile: string | null;
 
   // Contadores por tipo de evento — los paneles los observan para
   // refrescar sus datos cuando algo cambia en el backend.
   rev: {
-    notes:     number;
-    memory:    number;
-    convs:     number;
-    theme:     number;
-    agent:     number;
-    iot:       number;
+    notes: number;
+    memory: number;
+    convs: number;
+    theme: number;
+    agent: number;
+    iot: number;
     orchestra: number;
     notifications: number;
   };
@@ -50,8 +48,8 @@ interface State {
 
   // Telemetría: últimos puntos para sparklines (CPU/RAM/disk en 0..1).
   telemetry: {
-    cpu:  number[];
-    ram:  number[];
+    cpu: number[];
+    ram: number[];
     disk: number[];
     last: { cpu: number; ram: number; disk: number; ts: number } | null;
   };
@@ -63,12 +61,12 @@ interface State {
   apiKeyConfigured: boolean;
 
   // Acciones
-  applyEvent:  (evt: ServerEvent) => void;
+  applyEvent: (evt: ServerEvent) => void;
   setConnected: (v: boolean) => void;
-  setMuted:    (v: boolean) => void;
+  setMuted: (v: boolean) => void;
   setApiKeyConfigured: (v: boolean) => void;
   pushLocalUserText: (text: string) => void;
-  clear:        () => void;
+  clear: () => void;
 }
 
 function appendCapped(arr: number[], v: number, max: number): number[] {
@@ -84,13 +82,13 @@ function parseLogRole(text: string): { role: LogRole; body: string } {
     return { role: "user", body: t.split(":").slice(1).join(":").trim() };
   }
   if (tl.startsWith("orion:") || tl.startsWith("o.r.i.o.n:")) {
-    return { role: "ai",   body: t.split(":").slice(1).join(":").trim() };
+    return { role: "ai", body: t.split(":").slice(1).join(":").trim() };
   }
   if (tl.startsWith("sistema:") || tl.startsWith("sys:")) {
-    return { role: "sys",  body: t.split(":").slice(1).join(":").trim() };
+    return { role: "sys", body: t.split(":").slice(1).join(":").trim() };
   }
   if (tl.startsWith("error")) {
-    return { role: "err",  body: t };
+    return { role: "err", body: t };
   }
   if (tl.startsWith("archivo:")) {
     return { role: "file", body: t.split(":").slice(1).join(":").trim() };
@@ -110,16 +108,25 @@ const nextId = (): string => {
 };
 
 export const useOrionStore = create<State>((set, get) => ({
-  state:        "ESCUCHANDO",
-  muted:        false,
-  connected:    false,
-  messages:     [],
-  currentFile:  null,
-  rev: { notes: 0, memory: 0, convs: 0, theme: 0, agent: 0, iot: 0, orchestra: 0, notifications: 0 },
+  state: "ESCUCHANDO",
+  muted: false,
+  connected: false,
+  messages: [],
+  currentFile: null,
+  rev: {
+    notes: 0,
+    memory: 0,
+    convs: 0,
+    theme: 0,
+    agent: 0,
+    iot: 0,
+    orchestra: 0,
+    notifications: 0,
+  },
   unreadNotifs: 0,
-  telemetry:    { cpu: [], ram: [], disk: [], last: null },
-  iotSensors:   {},
-  apiKeyConfigured: true,  // se inicializa con GET /api/settings/api_key
+  telemetry: { cpu: [], ram: [], disk: [], last: null },
+  iotSensors: {},
+  apiKeyConfigured: true, // se inicializa con GET /api/settings/api_key
 
   applyEvent(evt) {
     const { type, payload } = evt;
@@ -146,12 +153,8 @@ export const useOrionStore = create<State>((set, get) => ({
         // lugar de crear un mensaje duplicado. Esto pasa porque el backend
         // emite write_log al final como safety-net.
         const existing = [...get().messages];
-        const lastIdx  = existing.length - 1;
-        if (
-          lastIdx >= 0 &&
-          existing[lastIdx].turnId &&
-          existing[lastIdx].role === role
-        ) {
+        const lastIdx = existing.length - 1;
+        if (lastIdx >= 0 && existing[lastIdx].turnId && existing[lastIdx].role === role) {
           existing[lastIdx] = {
             ...existing[lastIdx],
             text: body,
@@ -175,17 +178,17 @@ export const useOrionStore = create<State>((set, get) => ({
         const rawRole = String(payload?.role ?? "");
         const role: LogRole = rawRole === "user" ? "user" : "ai";
         const turnId = String(payload?.turn_id ?? "");
-        const delta  = String(payload?.delta ?? "");
-        const final  = Boolean(payload?.final);
+        const delta = String(payload?.delta ?? "");
+        const final = Boolean(payload?.final);
         if (!turnId) break;
 
         const ts = Number(payload?.ts ?? Date.now() / 1000);
         const msgs = [...get().messages];
-        const idx  = msgs.findIndex((m) => m.turnId === turnId);
+        const idx = msgs.findIndex((m) => m.turnId === turnId);
 
         if (idx >= 0) {
           const prev = msgs[idx];
-          const nextText = delta ? (prev.text + (prev.text ? " " : "") + delta) : prev.text;
+          const nextText = delta ? prev.text + (prev.text ? " " : "") + delta : prev.text;
           msgs[idx] = { ...prev, text: nextText, streaming: !final };
         } else if (delta) {
           msgs.push({
@@ -233,10 +236,13 @@ export const useOrionStore = create<State>((set, get) => ({
       }
       case "agent.task": {
         set((s) => ({ rev: { ...s.rev, agent: s.rev.agent + 1 } }));
-        const id      = String(payload?.id ?? "");
-        const status  = String(payload?.status ?? "") as
-          "pending" | "running" | "completed" | "cancelled";
-        const goal    = String(payload?.goal ?? "");
+        const id = String(payload?.id ?? "");
+        const status = String(payload?.status ?? "") as
+          | "pending"
+          | "running"
+          | "completed"
+          | "cancelled";
+        const goal = String(payload?.goal ?? "");
         if (id && status) {
           useInteractionStore.getState().upsertAgentTask(id, status, goal);
         }
@@ -244,7 +250,7 @@ export const useOrionStore = create<State>((set, get) => ({
       }
       case "agent.speech": {
         const taskId = payload?.task_id == null ? null : String(payload.task_id);
-        const text   = String(payload?.text ?? "");
+        const text = String(payload?.text ?? "");
         if (text) useInteractionStore.getState().setAgentSpeech(taskId, text);
         break;
       }
@@ -262,22 +268,23 @@ export const useOrionStore = create<State>((set, get) => ({
         // Un agente está pidiendo una clarificación con menú. Lo
         // empujamos al askUser store; el componente AskUserPrompt
         // (montado en ChatPanel) lo renderiza arriba del composer.
-        const qid    = String(payload?.question_id ?? "");
-        const q      = String(payload?.question    ?? "");
-        const opts   = (payload?.options ?? []) as Array<{ label?: unknown; description?: unknown }>;
+        const qid = String(payload?.question_id ?? "");
+        const q = String(payload?.question ?? "");
+        const opts = (payload?.options ?? []) as Array<{ label?: unknown; description?: unknown }>;
         const allowO = Boolean(payload?.allow_other ?? true);
         if (!qid || !q || !Array.isArray(opts)) break;
         const cleanOpts = opts
           .map((o) => ({
-            label:       String((o as { label?: unknown }).label ?? "").trim(),
-            description: String((o as { description?: unknown }).description ?? "").trim() || undefined,
+            label: String((o as { label?: unknown }).label ?? "").trim(),
+            description:
+              String((o as { description?: unknown }).description ?? "").trim() || undefined,
           }))
           .filter((o) => o.label);
         if (cleanOpts.length === 0) break;
         useAskUserStore.getState().setPending({
           questionId: qid,
-          question:   q,
-          options:    cleanOpts,
+          question: q,
+          options: cleanOpts,
           allowOther: allowO,
           receivedAt: Date.now(),
         });
@@ -294,8 +301,8 @@ export const useOrionStore = create<State>((set, get) => ({
       case "notification.new": {
         const count = Number(payload?.count ?? 0);
         set((s) => ({
-          unreadNotifs:  s.unreadNotifs + (count > 0 ? count : 0),
-          rev:           { ...s.rev, notifications: s.rev.notifications + 1 },
+          unreadNotifs: s.unreadNotifs + (count > 0 ? count : 0),
+          rev: { ...s.rev, notifications: s.rev.notifications + 1 },
         }));
         break;
       }
@@ -305,14 +312,14 @@ export const useOrionStore = create<State>((set, get) => ({
         // campana se actualice instantánea.
         const c = Number(payload?.count ?? 0);
         set((s) => ({
-          unreadNotifs:  Math.max(0, s.unreadNotifs - c),
-          rev:           { ...s.rev, notifications: s.rev.notifications + 1 },
+          unreadNotifs: Math.max(0, s.unreadNotifs - c),
+          rev: { ...s.rev, notifications: s.rev.notifications + 1 },
         }));
         break;
       }
       case "iot.sensor": {
         const device = String(payload?.device ?? "");
-        const value  = String(payload?.value  ?? "");
+        const value = String(payload?.value ?? "");
         if (!device) break;
         set((s) => ({
           iotSensors: { ...s.iotSensors, [device]: { value, ts: Date.now() / 1000 } },
@@ -320,15 +327,15 @@ export const useOrionStore = create<State>((set, get) => ({
         break;
       }
       case "telemetry": {
-        const cpu  = Number(payload?.cpu  ?? 0);
-        const ram  = Number(payload?.ram  ?? 0);
+        const cpu = Number(payload?.cpu ?? 0);
+        const ram = Number(payload?.ram ?? 0);
         const disk = Number(payload?.disk ?? 0);
-        const ts   = Number(payload?.ts   ?? Date.now() / 1000);
+        const ts = Number(payload?.ts ?? Date.now() / 1000);
         const MAX = 60;
         set((s) => ({
           telemetry: {
-            cpu:  appendCapped(s.telemetry.cpu,  cpu,  MAX),
-            ram:  appendCapped(s.telemetry.ram,  ram,  MAX),
+            cpu: appendCapped(s.telemetry.cpu, cpu, MAX),
+            ram: appendCapped(s.telemetry.ram, ram, MAX),
             disk: appendCapped(s.telemetry.disk, disk, MAX),
             last: { cpu, ram, disk, ts },
           },
@@ -344,9 +351,15 @@ export const useOrionStore = create<State>((set, get) => ({
     }
   },
 
-  setConnected(v) { set({ connected: v }); },
-  setMuted(v)    { set({ muted: v }); },
-  setApiKeyConfigured(v: boolean) { set({ apiKeyConfigured: v }); },
+  setConnected(v) {
+    set({ connected: v });
+  },
+  setMuted(v) {
+    set({ muted: v });
+  },
+  setApiKeyConfigured(v: boolean) {
+    set({ apiKeyConfigured: v });
+  },
 
   pushLocalUserText(text) {
     const t = text.trim();

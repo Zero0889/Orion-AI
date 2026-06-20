@@ -14,16 +14,16 @@ import { useOrionStore } from "@/stores/orion";
 export type DerivedEyeState = "idle" | "listening" | "thinking" | "speaking" | "error";
 
 export function useEyeState(): DerivedEyeState {
-  const state       = useOrionStore((s) => s.state);
-  const muted       = useOrionStore((s) => s.muted);
-  const connected   = useOrionStore((s) => s.connected);
-  const activeTool  = useInteractionStore((s) => s.tool);
+  const state = useOrionStore((s) => s.state);
+  const muted = useOrionStore((s) => s.muted);
+  const connected = useOrionStore((s) => s.connected);
+  const activeTool = useInteractionStore((s) => s.tool);
   const activeAgent = useInteractionStore((s) => s.agent);
 
   if (!connected || muted) return "idle";
   if (activeTool || activeAgent?.status === "running") return "thinking";
   if (state === "ESCUCHANDO") return "listening";
-  if (state === "PENSANDO")   return "thinking";
-  if (state === "HABLANDO")   return "speaking";
+  if (state === "PENSANDO") return "thinking";
+  if (state === "HABLANDO") return "speaking";
   return "idle";
 }

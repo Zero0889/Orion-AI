@@ -33,7 +33,7 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from fastapi.testclient import TestClient  # noqa: E402
+from fastapi.testclient import TestClient
 
 
 @pytest.fixture
@@ -45,10 +45,12 @@ def fake_manager(monkeypatch):
     mgr.reload_all.return_value = 0
     mgr.restart_server.return_value = 0
     import core.mcp_client as mcp_mod
+
     monkeypatch.setattr(mcp_mod, "_GLOBAL_MANAGER", mgr)
     monkeypatch.setattr(mcp_mod, "get_mcp_manager", lambda: mgr)
     # También parcheamos el import directo en la route
     import server.routes.mcp as mcp_route
+
     monkeypatch.setattr(mcp_route, "get_mcp_manager", lambda: mgr)
     return mgr
 
@@ -59,6 +61,7 @@ def isolated_config(monkeypatch, tmp_path):
     el archivo real."""
     fake_path = tmp_path / "mcp_servers.json"
     import server.routes.mcp as mcp_route
+
     monkeypatch.setattr(mcp_route, "MCP_CONFIG_PATH", fake_path)
     return fake_path
 
@@ -66,8 +69,9 @@ def isolated_config(monkeypatch, tmp_path):
 @pytest.fixture
 def client(fake_manager, isolated_config):
     """TestClient con app real, manager y config mockeados."""
-    from server.event_bus import OrionEventBus
     from server.app import build_app
+    from server.event_bus import OrionEventBus
+
     bus = OrionEventBus()
     app = build_app(bus)
     with TestClient(app) as tc:
@@ -84,11 +88,19 @@ def test_list_servers_empty(client, isolated_config):
 
 
 def test_list_servers_returns_configured(client, isolated_config):
-    isolated_config.write_text(json.dumps({
-        "servers": {
-            "fs": {"command": "npx", "args": ["-y", "@mcp/server-filesystem"], "enabled": True},
-        }
-    }))
+    isolated_config.write_text(
+        json.dumps(
+            {
+                "servers": {
+                    "fs": {
+                        "command": "npx",
+                        "args": ["-y", "@mcp/server-filesystem"],
+                        "enabled": True,
+                    },
+                }
+            }
+        )
+    )
     r = client.get("/api/mcp/servers")
     assert r.status_code == 200
     data = r.json()
@@ -187,10 +199,16 @@ def test_update_server_not_found(client):
 
 
 def test_delete_server_removes_config_and_stops(client, isolated_config, fake_manager):
-    isolated_config.write_text(json.dumps({"servers": {
-        "fs":    {"command": "echo"},
-        "other": {"command": "echo"},
-    }}))
+    isolated_config.write_text(
+        json.dumps(
+            {
+                "servers": {
+                    "fs": {"command": "echo"},
+                    "other": {"command": "echo"},
+                }
+            }
+        )
+    )
     fake_srv = MagicMock()
     fake_manager.servers.return_value = {"fs": fake_srv}
     fake_manager._servers = {"fs": fake_srv}

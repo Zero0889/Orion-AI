@@ -10,24 +10,24 @@ placed in config/credentials.json.
 """
 
 import io
-import json
-import os
 import mimetypes
 from pathlib import Path
 
 # Google API imports
 try:
+    from google.auth.transport.requests import Request
     from google.oauth2.credentials import Credentials
     from google_auth_oauthlib.flow import InstalledAppFlow
-    from google.auth.transport.requests import Request
     from googleapiclient.discovery import build
     from googleapiclient.http import MediaFileUpload, MediaIoBaseDownload, MediaIoBaseUpload
+
     _GOOGLE_AVAILABLE = True
 except ImportError:
     _GOOGLE_AVAILABLE = False
 
 # ── Paths ──────────────────────────────────────────────────────────────────
 from config import BASE_DIR as _BASE_DIR
+
 _CREDENTIALS_PATH = _BASE_DIR / "config" / "credentials.json"
 _TOKEN_PATH = _BASE_DIR / "config" / "gdrive_token.json"
 
@@ -43,7 +43,10 @@ _GFOLDER_MIME = "application/vnd.google-apps.folder"
 _EXPORT_MIMES = {
     _GDOC_MIME: ("application/pdf", ".pdf"),
     _GSHEET_MIME: ("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", ".xlsx"),
-    _GSLIDES_MIME: ("application/vnd.openxmlformats-officedocument.presentationml.presentation", ".pptx"),
+    _GSLIDES_MIME: (
+        "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        ".pptx",
+    ),
 }
 
 
@@ -86,9 +89,7 @@ def _authenticate():
             creds = None
 
     if not creds or not creds.valid:
-        flow = InstalledAppFlow.from_client_secrets_file(
-            str(_CREDENTIALS_PATH), _SCOPES
-        )
+        flow = InstalledAppFlow.from_client_secrets_file(str(_CREDENTIALS_PATH), _SCOPES)
         creds = flow.run_local_server(port=0, open_browser=True)
         _TOKEN_PATH.parent.mkdir(parents=True, exist_ok=True)
         with open(_TOKEN_PATH, "w", encoding="utf-8") as f:
@@ -118,7 +119,9 @@ def _resolve_local_upload(file_path: str) -> "Path | str":
     name = p.name if p.name else file_path
     try:
         from actions.file_controller import (
-            _resolve_file, _resolve_path, _format_disambiguation,
+            _format_disambiguation,
+            _resolve_file,
+            _resolve_path,
         )
     except Exception:
         return f"Archivo no encontrado: {file_path}"
@@ -149,6 +152,7 @@ def _resolve_local_upload(file_path: str) -> "Path | str":
         return uniq[0]
     if len(uniq) > 1:
         from actions.file_controller import _build_disambiguation
+
         return _format_disambiguation(
             _build_disambiguation(uniq),
             action_verb="subir a Drive",
@@ -170,9 +174,11 @@ def _upload_file(service, file_path: str, folder_id: str = None) -> str:
         metadata["parents"] = [folder_id]
 
     media = MediaFileUpload(str(p), mimetype=mime_type, resumable=True)
-    result = service.files().create(
-        body=metadata, media_body=media, fields="id, name, webViewLink"
-    ).execute()
+    result = (
+        service.files()
+        .create(body=metadata, media_body=media, fields="id, name, webViewLink")
+        .execute()
+    )
 
     return (
         f"Archivo subido exitosamente.\n"
@@ -182,8 +188,9 @@ def _upload_file(service, file_path: str, folder_id: str = None) -> str:
     )
 
 
-def _create_document(service, name: str, doc_type: str = "document",
-                     folder_id: str = None, content: str = None) -> str:
+def _create_document(
+    service, name: str, doc_type: str = "document", folder_id: str = None, content: str = None
+) -> str:
     """Create a new Google Workspace document (Doc, Sheet, or Slides)."""
     type_map = {
         "document": _GDOC_MIME,
@@ -204,19 +211,18 @@ def _create_document(service, name: str, doc_type: str = "document",
     if folder_id:
         metadata["parents"] = [folder_id]
 
-    result = service.files().create(
-        body=metadata, fields="id, name, webViewLink, mimeType"
-    ).execute()
+    result = (
+        service.files().create(body=metadata, fields="id, name, webViewLink, mimeType").execute()
+    )
 
     doc_id = result.get("id")
 
     if content and mime == _GDOC_MIME:
         try:
             from googleapiclient.discovery import build as build_svc
+
             docs_service = build_svc("docs", "v1", credentials=service._http.credentials)
-            requests_body = [
-                {"insertText": {"location": {"index": 1}, "text": content}}
-            ]
+            requests_body = [{"insertText": {"location": {"index": 1}, "text": content}}]
             docs_service.documents().batchUpdate(
                 documentId=doc_id, body={"requests": requests_body}
             ).execute()
@@ -243,9 +249,7 @@ def _create_folder(service, name: str, parent_id: str = None) -> str:
     if parent_id:
         metadata["parents"] = [parent_id]
 
-    result = service.files().create(
-        body=metadata, fields="id, name, webViewLink"
-    ).execute()
+    result = service.files().create(body=metadata, fields="id, name, webViewLink").execute()
 
     return (
         f"Carpeta creada exitosamente.\n"
@@ -255,8 +259,7 @@ def _create_folder(service, name: str, parent_id: str = None) -> str:
     )
 
 
-def _list_files(service, folder_id: str = None, query: str = None,
-                max_results: int = 20) -> str:
+def _list_files(service, folder_id: str = None, query: str = None, max_results: int = 20) -> str:
     """List files in Google Drive, optionally filtered by folder or query."""
     q_parts = ["trashed = false"]
 
@@ -268,12 +271,16 @@ def _list_files(service, folder_id: str = None, query: str = None,
 
     q = " and ".join(q_parts)
 
-    results = service.files().list(
-        q=q,
-        pageSize=min(max_results, 100),
-        fields="files(id, name, mimeType, modifiedTime, size, webViewLink)",
-        orderBy="modifiedTime desc",
-    ).execute()
+    results = (
+        service.files()
+        .list(
+            q=q,
+            pageSize=min(max_results, 100),
+            fields="files(id, name, mimeType, modifiedTime, size, webViewLink)",
+            orderBy="modifiedTime desc",
+        )
+        .execute()
+    )
 
     files = results.get("files", [])
 
@@ -284,21 +291,19 @@ def _list_files(service, folder_id: str = None, query: str = None,
     for f in files:
         mime = f.get("mimeType", "")
         if mime == _GFOLDER_MIME:
-            icon = "\U0001F4C1"
+            icon = "\U0001f4c1"
         elif "document" in mime:
-            icon = "\U0001F4DD"
-        elif "spreadsheet" in mime:
-            icon = "\U0001F4CA"
-        elif "presentation" in mime:
-            icon = "\U0001F4CA"
+            icon = "\U0001f4dd"
+        elif "spreadsheet" in mime or "presentation" in mime:
+            icon = "\U0001f4ca"
         elif "image" in mime:
-            icon = "\U0001F5BC"
+            icon = "\U0001f5bc"
         elif "video" in mime:
-            icon = "\U0001F3AC"
+            icon = "\U0001f3ac"
         elif "audio" in mime:
-            icon = "\U0001F3B5"
+            icon = "\U0001f3b5"
         else:
-            icon = "\U0001F4C4"
+            icon = "\U0001f4c4"
 
         size_str = ""
         if f.get("size"):
@@ -318,12 +323,16 @@ def _search_files(service, query: str, max_results: int = 20) -> str:
     """Search files by name or full-text content in Google Drive."""
     q = f"(name contains '{query}' or fullText contains '{query}') and trashed = false"
 
-    results = service.files().list(
-        q=q,
-        pageSize=min(max_results, 100),
-        fields="files(id, name, mimeType, modifiedTime, webViewLink)",
-        orderBy="relevance",
-    ).execute()
+    results = (
+        service.files()
+        .list(
+            q=q,
+            pageSize=min(max_results, 100),
+            fields="files(id, name, mimeType, modifiedTime, webViewLink)",
+            orderBy="relevance",
+        )
+        .execute()
+    )
 
     files = results.get("files", [])
 
@@ -332,25 +341,27 @@ def _search_files(service, query: str, max_results: int = 20) -> str:
 
     lines = [f"Resultados de búsqueda para '{query}' ({len(files)} archivo(s)):"]
     for f in files:
-        lines.append(f"  \U0001F4C4 {f['name']} — ID: {f['id']}")
+        lines.append(f"  \U0001f4c4 {f['name']} — ID: {f['id']}")
 
     return "\n".join(lines)
 
 
 def _move_file(service, file_id: str, destination_folder_id: str) -> str:
     """Move a file to a different folder in Google Drive."""
-    file_info = service.files().get(
-        fileId=file_id, fields="name, parents"
-    ).execute()
+    file_info = service.files().get(fileId=file_id, fields="name, parents").execute()
 
     previous_parents = ",".join(file_info.get("parents", []))
 
-    result = service.files().update(
-        fileId=file_id,
-        addParents=destination_folder_id,
-        removeParents=previous_parents,
-        fields="id, name, webViewLink",
-    ).execute()
+    result = (
+        service.files()
+        .update(
+            fileId=file_id,
+            addParents=destination_folder_id,
+            removeParents=previous_parents,
+            fields="id, name, webViewLink",
+        )
+        .execute()
+    )
 
     return (
         f"Archivo movido exitosamente.\n"
@@ -361,11 +372,15 @@ def _move_file(service, file_id: str, destination_folder_id: str) -> str:
 
 def _rename_file(service, file_id: str, new_name: str) -> str:
     """Rename a file in Google Drive."""
-    result = service.files().update(
-        fileId=file_id,
-        body={"name": new_name},
-        fields="id, name, webViewLink",
-    ).execute()
+    result = (
+        service.files()
+        .update(
+            fileId=file_id,
+            body={"name": new_name},
+            fields="id, name, webViewLink",
+        )
+        .execute()
+    )
 
     return (
         f"Archivo renombrado exitosamente.\n"
@@ -376,22 +391,16 @@ def _rename_file(service, file_id: str, new_name: str) -> str:
 
 def _delete_file(service, file_id: str) -> str:
     """Move a file to trash in Google Drive (not permanent delete)."""
-    file_info = service.files().get(
-        fileId=file_id, fields="name"
-    ).execute()
+    file_info = service.files().get(fileId=file_id, fields="name").execute()
 
-    service.files().update(
-        fileId=file_id, body={"trashed": True}
-    ).execute()
+    service.files().update(fileId=file_id, body={"trashed": True}).execute()
 
     return f"Archivo enviado a la papelera: {file_info.get('name')}"
 
 
 def _download_file(service, file_id: str, destination: str = None) -> str:
     """Download a file from Google Drive to local storage."""
-    file_info = service.files().get(
-        fileId=file_id, fields="name, mimeType, size"
-    ).execute()
+    file_info = service.files().get(fileId=file_id, fields="name, mimeType, size").execute()
 
     name = file_info.get("name", "archivo")
     mime = file_info.get("mimeType", "")
@@ -422,19 +431,19 @@ def _download_file(service, file_id: str, destination: str = None) -> str:
     with open(out_path, "wb") as f:
         f.write(fh.getvalue())
 
-    return (
-        f"Archivo descargado exitosamente.\n"
-        f"  Nombre: {name}\n"
-        f"  Guardado en: {out_path}"
-    )
+    return f"Archivo descargado exitosamente.\n  Nombre: {name}\n  Guardado en: {out_path}"
 
 
 def _get_file_info(service, file_id: str) -> str:
     """Get detailed info about a file in Google Drive."""
-    result = service.files().get(
-        fileId=file_id,
-        fields="id, name, mimeType, size, modifiedTime, createdTime, owners, webViewLink, parents",
-    ).execute()
+    result = (
+        service.files()
+        .get(
+            fileId=file_id,
+            fields="id, name, mimeType, size, modifiedTime, createdTime, owners, webViewLink, parents",
+        )
+        .execute()
+    )
 
     size_str = "N/A"
     if result.get("size"):
@@ -446,8 +455,7 @@ def _get_file_info(service, file_id: str) -> str:
             size_bytes /= 1024
 
     owners = ", ".join(
-        o.get("displayName", o.get("emailAddress", "?"))
-        for o in result.get("owners", [])
+        o.get("displayName", o.get("emailAddress", "?")) for o in result.get("owners", [])
     )
 
     return (
@@ -463,14 +471,11 @@ def _get_file_info(service, file_id: str) -> str:
     )
 
 
-def _update_content(service, file_id: str, content: str = None,
-                    file_path: str = None) -> str:
+def _update_content(service, file_id: str, content: str = None, file_path: str = None) -> str:
     """Update the content of an existing file in Google Drive.
     Either replaces with text content or uploads a new version from a local file.
     """
-    file_info = service.files().get(
-        fileId=file_id, fields="name, mimeType"
-    ).execute()
+    file_info = service.files().get(fileId=file_id, fields="name, mimeType").execute()
 
     name = file_info.get("name", "archivo")
     mime = file_info.get("mimeType", "")
@@ -478,6 +483,7 @@ def _update_content(service, file_id: str, content: str = None,
     if content and mime == _GDOC_MIME:
         try:
             from googleapiclient.discovery import build as build_svc
+
             docs_service = build_svc("docs", "v1", credentials=service._http.credentials)
 
             doc = docs_service.documents().get(documentId=file_id).execute()
@@ -489,24 +495,16 @@ def _update_content(service, file_id: str, content: str = None,
 
             requests_body = []
             if end_index > 2:
-                requests_body.append({
-                    "deleteContentRange": {
-                        "range": {"startIndex": 1, "endIndex": end_index - 1}
-                    }
-                })
-            requests_body.append({
-                "insertText": {"location": {"index": 1}, "text": content}
-            })
+                requests_body.append(
+                    {"deleteContentRange": {"range": {"startIndex": 1, "endIndex": end_index - 1}}}
+                )
+            requests_body.append({"insertText": {"location": {"index": 1}, "text": content}})
 
             docs_service.documents().batchUpdate(
                 documentId=file_id, body={"requests": requests_body}
             ).execute()
 
-            return (
-                f"Contenido del documento actualizado.\n"
-                f"  Nombre: {name}\n"
-                f"  ID: {file_id}"
-            )
+            return f"Contenido del documento actualizado.\n  Nombre: {name}\n  ID: {file_id}"
         except Exception as e:
             return f"Error al actualizar el documento: {e}"
 
@@ -516,9 +514,11 @@ def _update_content(service, file_id: str, content: str = None,
             return f"Archivo local no encontrado: {file_path}"
         upload_mime = mimetypes.guess_type(str(p))[0] or "application/octet-stream"
         media = MediaFileUpload(str(p), mimetype=upload_mime, resumable=True)
-        result = service.files().update(
-            fileId=file_id, media_body=media, fields="id, name, webViewLink"
-        ).execute()
+        result = (
+            service.files()
+            .update(fileId=file_id, media_body=media, fields="id, name, webViewLink")
+            .execute()
+        )
         return (
             f"Archivo actualizado con nueva versión.\n"
             f"  Nombre: {result.get('name')}\n"
@@ -528,9 +528,11 @@ def _update_content(service, file_id: str, content: str = None,
     if content:
         buf = io.BytesIO(content.encode("utf-8"))
         media = MediaIoBaseUpload(buf, mimetype="text/plain", resumable=True)
-        result = service.files().update(
-            fileId=file_id, media_body=media, fields="id, name, webViewLink"
-        ).execute()
+        result = (
+            service.files()
+            .update(fileId=file_id, media_body=media, fields="id, name, webViewLink")
+            .execute()
+        )
         return (
             f"Contenido del archivo actualizado.\n"
             f"  Nombre: {result.get('name')}\n"
@@ -611,7 +613,8 @@ def google_drive(
             if not query:
                 return "No se proporcionó un término de búsqueda."
             return _search_files(
-                service, query=query,
+                service,
+                query=query,
                 max_results=int(params.get("max_results", 20)),
             )
 
@@ -644,7 +647,8 @@ def google_drive(
             if not file_id:
                 return "No se proporcionó el ID del archivo a descargar."
             return _download_file(
-                service, file_id=file_id,
+                service,
+                file_id=file_id,
                 destination=params.get("destination"),
             )
 
@@ -659,7 +663,8 @@ def google_drive(
             if not file_id:
                 return "No se proporcionó el ID del archivo a editar."
             return _update_content(
-                service, file_id=file_id,
+                service,
+                file_id=file_id,
                 content=params.get("content"),
                 file_path=params.get("file_path"),
             )

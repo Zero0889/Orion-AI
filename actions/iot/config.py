@@ -48,12 +48,10 @@ import json
 import shutil
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Optional
 
 from config import IOT_CONFIG_PATH
 
 from .devices import Device
-
 
 SCHEMA_VERSION = 2
 
@@ -68,36 +66,34 @@ DEFAULT_TRANSPORT_ID = "main_arduino"
 class IoTConfig:
     """Configuración IoT completa cargada del JSON."""
 
-    version:         int                = SCHEMA_VERSION
-    transports:      dict               = field(default_factory=dict)
-    devices:         dict[str, Device]  = field(default_factory=dict)
-    global_commands: dict               = field(default_factory=dict)
-    scenes:          dict               = field(default_factory=dict)
+    version: int = SCHEMA_VERSION
+    transports: dict = field(default_factory=dict)
+    devices: dict[str, Device] = field(default_factory=dict)
+    global_commands: dict = field(default_factory=dict)
+    scenes: dict = field(default_factory=dict)
 
     # ── Convertir a/desde dict ───────────────────────────────────────────
     def to_dict(self) -> dict:
         return {
-            "version":         self.version,
-            "transports":      self.transports,
-            "devices":         {k: v.to_dict() for k, v in self.devices.items()},
+            "version": self.version,
+            "transports": self.transports,
+            "devices": {k: v.to_dict() for k, v in self.devices.items()},
             "global_commands": self.global_commands,
-            "scenes":          self.scenes,
+            "scenes": self.scenes,
         }
 
     @classmethod
-    def from_dict(cls, data: dict) -> "IoTConfig":
+    def from_dict(cls, data: dict) -> IoTConfig:
         return cls(
-            version         = int(data.get("version", SCHEMA_VERSION)),
-            transports      = dict(data.get("transports", {})),
-            devices         = {
-                k: Device.from_dict(k, v) for k, v in data.get("devices", {}).items()
-            },
-            global_commands = dict(data.get("global_commands", {})),
-            scenes          = dict(data.get("scenes", {})),
+            version=int(data.get("version", SCHEMA_VERSION)),
+            transports=dict(data.get("transports", {})),
+            devices={k: Device.from_dict(k, v) for k, v in data.get("devices", {}).items()},
+            global_commands=dict(data.get("global_commands", {})),
+            scenes=dict(data.get("scenes", {})),
         )
 
     # ── Atajos ───────────────────────────────────────────────────────────
-    def get_device(self, dev_id: str) -> Optional[Device]:
+    def get_device(self, dev_id: str) -> Device | None:
         return self.devices.get(dev_id)
 
     def devices_by_transport(self, transport_id: str) -> list[Device]:
@@ -112,9 +108,13 @@ def _is_v1(data: dict) -> bool:
     'cmd_all_on' al nivel raíz."""
     if "version" in data or "transports" in data:
         return False
-    return "serial_port" in data or "cmd_all_on" in data or (
-        "devices" in data and data["devices"] and "cmd_on" in next(
-            iter(data["devices"].values()), {}
+    return (
+        "serial_port" in data
+        or "cmd_all_on" in data
+        or (
+            "devices" in data
+            and data["devices"]
+            and "cmd_on" in next(iter(data["devices"].values()), {})
         )
     )
 
@@ -135,31 +135,31 @@ def _migrate_v1_to_v2(v1: dict) -> dict:
     devices: dict = {}
     for dev_id, dev_v1 in (v1.get("devices") or {}).items():
         devices[dev_id] = {
-            "name":         dev_v1.get("name", dev_id),
-            "transport":    DEFAULT_TRANSPORT_ID,
+            "name": dev_v1.get("name", dev_id),
+            "transport": DEFAULT_TRANSPORT_ID,
             "capabilities": {
-                "on_off":   True,   # los focos v1 son simples on/off
+                "on_off": True,  # los focos v1 son simples on/off
                 "dimmable": False,  # opt-in: el usuario lo habilita después
-                "rgb":      False,
-                "sensor":   None,
+                "rgb": False,
+                "sensor": None,
             },
             "serial": {
-                "cmd_on":  dev_v1.get("cmd_on",  f"{dev_id.upper()}_ON"),
+                "cmd_on": dev_v1.get("cmd_on", f"{dev_id.upper()}_ON"),
                 "cmd_off": dev_v1.get("cmd_off", f"{dev_id.upper()}_OFF"),
             },
         }
 
     global_commands = {
-        "all_on":  v1.get("cmd_all_on",  "TODOS_ON"),
+        "all_on": v1.get("cmd_all_on", "TODOS_ON"),
         "all_off": v1.get("cmd_all_off", "TODOS_OFF"),
     }
 
     return {
-        "version":         SCHEMA_VERSION,
-        "transports":      transports,
-        "devices":         devices,
+        "version": SCHEMA_VERSION,
+        "transports": transports,
+        "devices": devices,
         "global_commands": global_commands,
-        "scenes":          {},
+        "scenes": {},
     }
 
 
@@ -181,7 +181,10 @@ def _default_config() -> dict:
                 "name": "foco 1",
                 "transport": DEFAULT_TRANSPORT_ID,
                 "capabilities": {
-                    "on_off": True, "dimmable": False, "rgb": False, "sensor": None,
+                    "on_off": True,
+                    "dimmable": False,
+                    "rgb": False,
+                    "sensor": None,
                 },
                 "serial": {"cmd_on": "FOCO1_ON", "cmd_off": "FOCO1_OFF"},
             },
@@ -189,7 +192,10 @@ def _default_config() -> dict:
                 "name": "foco 2",
                 "transport": DEFAULT_TRANSPORT_ID,
                 "capabilities": {
-                    "on_off": True, "dimmable": False, "rgb": False, "sensor": None,
+                    "on_off": True,
+                    "dimmable": False,
+                    "rgb": False,
+                    "sensor": None,
                 },
                 "serial": {"cmd_on": "FOCO2_ON", "cmd_off": "FOCO2_OFF"},
             },
@@ -335,10 +341,10 @@ def validate_device(dev_data: dict, transports: dict) -> list[str]:
         errs.append(f"transport '{tr}' no existe en transports")
 
     caps = dev_data.get("capabilities") or {}
-    if not any([caps.get("on_off"), caps.get("dimmable"),
-                caps.get("rgb"), caps.get("sensor")]):
-        errs.append("el dispositivo necesita al menos una capability "
-                    "(on_off / dimmable / rgb / sensor)")
+    if not any([caps.get("on_off"), caps.get("dimmable"), caps.get("rgb"), caps.get("sensor")]):
+        errs.append(
+            "el dispositivo necesita al menos una capability (on_off / dimmable / rgb / sensor)"
+        )
 
     # Validación específica por transporte
     ttype = (transports.get(tr, {}).get("type") or "").lower() if tr else ""

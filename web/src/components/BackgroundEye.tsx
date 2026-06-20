@@ -16,30 +16,35 @@ import { useOrionStore } from "@/stores/orion";
 import { useViewStore } from "@/stores/view";
 
 export function BackgroundEye() {
-  const state     = useOrionStore((s) => s.state);
-  const muted     = useOrionStore((s) => s.muted);
+  const state = useOrionStore((s) => s.state);
+  const muted = useOrionStore((s) => s.muted);
   const connected = useOrionStore((s) => s.connected);
-  const messages  = useOrionStore((s) => s.messages);
-  const view      = useViewStore((s) => s.view);
+  const messages = useOrionStore((s) => s.messages);
+  const view = useViewStore((s) => s.view);
 
-  const activeTool  = useInteractionStore((s) => s.tool);
+  const activeTool = useInteractionStore((s) => s.tool);
   const activeAgent = useInteractionStore((s) => s.agent);
 
   const eyeState: EyeState =
-      !connected || muted                       ? "idle"
-    : activeTool                                ? "thinking"
-    : activeAgent?.status === "running"         ? "thinking"
-    : state === "ESCUCHANDO"                    ? "listening"
-    : state === "PENSANDO"                      ? "thinking"
-    : state === "HABLANDO"                      ? "speaking"
-    : "idle";
+    !connected || muted
+      ? "idle"
+      : activeTool
+        ? "thinking"
+        : activeAgent?.status === "running"
+          ? "thinking"
+          : state === "ESCUCHANDO"
+            ? "listening"
+            : state === "PENSANDO"
+              ? "thinking"
+              : state === "HABLANDO"
+                ? "speaking"
+                : "idle";
 
   // En la vista "chat", el ojo grande solo aparece después del primer
   // turno real (usuario o IA). En el estado inicial — el Hero — el ojo
   // queda invisible para que la composición empiece limpia y el ojo
   // "cobre vida" recién al enviar el primer mensaje.
-  const chatEmpty = view === "chat"
-    && !messages.some((m) => m.role === "user" || m.role === "ai");
+  const chatEmpty = view === "chat" && !messages.some((m) => m.role === "user" || m.role === "ai");
 
   return (
     <div

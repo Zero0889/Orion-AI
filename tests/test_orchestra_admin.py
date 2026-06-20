@@ -22,11 +22,13 @@ def tmp_agents(tmp_path, monkeypatch):
     monkeypatch.setattr(orchestra_admin, "_AGENTS_PATH", path)
     # Cada test parte de cero — invalidamos el cache del registry también.
     from agent import registry as reg_mod
+
     reg_mod.reset_cache()
     yield path
 
 
 # ── Validación de inputs ───────────────────────────────────────────────────
+
 
 def test_id_invalido_lanza_valueerror(tmp_agents):
     with pytest.raises(ValueError, match="snake_case"):
@@ -41,7 +43,8 @@ def test_provider_desconocido_rechazado(tmp_agents):
 def test_temperatura_fuera_de_rango_rechazada(tmp_agents):
     with pytest.raises(ValueError, match="temperature"):
         orchestra_admin.upsert_agent(
-            "foo", {"provider": "gemini", "model": "x", "temperature": 5},
+            "foo",
+            {"provider": "gemini", "model": "x", "temperature": 5},
         )
 
 
@@ -51,6 +54,7 @@ def test_falta_provider_o_model_rechazado(tmp_agents):
 
 
 # ── Create / read ──────────────────────────────────────────────────────────
+
 
 def test_create_persiste_con_defaults(tmp_agents):
     saved = orchestra_admin.upsert_agent(
@@ -70,12 +74,15 @@ def test_create_persiste_con_defaults(tmp_agents):
 
 # ── Update parcial ─────────────────────────────────────────────────────────
 
+
 def test_update_es_patch_parcial(tmp_agents):
     orchestra_admin.upsert_agent(
         "translator",
         {
-            "provider": "gemini", "model": "gemini-2.5-flash",
-            "system": "Traduces lenguas humanas.", "temperature": 0.4,
+            "provider": "gemini",
+            "model": "gemini-2.5-flash",
+            "system": "Traduces lenguas humanas.",
+            "temperature": 0.4,
         },
     )
     # Solo cambio el modelo; el system y la temperatura deben sobrevivir.
@@ -90,9 +97,11 @@ def test_update_es_patch_parcial(tmp_agents):
 
 # ── Delete ─────────────────────────────────────────────────────────────────
 
+
 def test_delete_quita_agente(tmp_agents):
     orchestra_admin.upsert_agent(
-        "tmpguy", {"provider": "gemini", "model": "gemini-2.5-flash"},
+        "tmpguy",
+        {"provider": "gemini", "model": "gemini-2.5-flash"},
     )
     assert orchestra_admin.delete_agent("tmpguy") is True
     assert orchestra_admin.get_agent_spec("tmpguy") is None
@@ -100,7 +109,8 @@ def test_delete_quita_agente(tmp_agents):
 
 def test_delete_director_prohibido(tmp_agents):
     orchestra_admin.upsert_agent(
-        "director", {"provider": "gemini", "model": "gemini-2.5-flash"},
+        "director",
+        {"provider": "gemini", "model": "gemini-2.5-flash"},
     )
     with pytest.raises(ValueError, match="Director"):
         orchestra_admin.delete_agent("director")
@@ -112,14 +122,17 @@ def test_delete_inexistente_devuelve_false(tmp_agents):
 
 # ── Integración con registry ───────────────────────────────────────────────
 
+
 def test_upsert_invalida_cache_del_registry(tmp_agents):
     from agent import registry as reg_mod
+
     # Apuntamos el registry al mismo path temporal.
     monkey_path = tmp_agents
     real_loader = reg_mod._load_agents_config
 
     def fake_loader():
         return json.loads(monkey_path.read_text(encoding="utf-8"))
+
     reg_mod._load_agents_config = fake_loader  # type: ignore[assignment]
     try:
         reg_mod.reset_cache()

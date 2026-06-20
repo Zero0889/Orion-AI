@@ -23,25 +23,22 @@ from __future__ import annotations
 
 import json
 import threading
-import time
-from pathlib import Path
-from typing import Optional
 
 from config import CONFIG_DIR
+
 from .base import NotificationItem
 
-
 _STORE_PATH = CONFIG_DIR / "notifications_store.json"
-_MAX_SEEN   = 1000
-_MAX_ITEMS  = 200
+_MAX_SEEN = 1000
+_MAX_ITEMS = 200
 
 
 class NotificationStore:
     def __init__(self) -> None:
         self._lock = threading.Lock()
-        self._seen:   list[str] = []
-        self._unread: set[str]  = set()
-        self._items:  dict[str, dict] = {}   # uid → NotificationItem.to_dict()
+        self._seen: list[str] = []
+        self._unread: set[str] = set()
+        self._items: dict[str, dict] = {}  # uid → NotificationItem.to_dict()
         self._load()
 
     # ── Persistencia ────────────────────────────────────────────────────
@@ -50,9 +47,9 @@ class NotificationStore:
             return
         try:
             data = json.loads(_STORE_PATH.read_text(encoding="utf-8"))
-            self._seen   = list(data.get("seen", []))[-_MAX_SEEN:]
+            self._seen = list(data.get("seen", []))[-_MAX_SEEN:]
             self._unread = set(data.get("unread", []))
-            self._items  = dict(data.get("items", {}))
+            self._items = dict(data.get("items", {}))
         except (json.JSONDecodeError, OSError) as e:
             print(f"[NotifStore] ⚠️ load falló, parto vacío: {e}")
 
@@ -61,12 +58,11 @@ class NotificationStore:
         tmp = _STORE_PATH.with_suffix(".tmp")
         try:
             payload = {
-                "seen":   self._seen,
+                "seen": self._seen,
                 "unread": sorted(self._unread),
-                "items":  self._items,
+                "items": self._items,
             }
-            tmp.write_text(json.dumps(payload, ensure_ascii=False, indent=2),
-                          encoding="utf-8")
+            tmp.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
             tmp.replace(_STORE_PATH)
         except OSError as e:
             print(f"[NotifStore] ⚠️ save falló: {e}")
@@ -95,9 +91,8 @@ class NotificationStore:
                 self._seen = self._seen[-_MAX_SEEN:]
             if len(self._items) > _MAX_ITEMS:
                 # Por received_ts ascendente — descartamos lo más viejo.
-                ordered = sorted(self._items.items(),
-                               key=lambda kv: kv[1].get("received_ts", 0))
-                excess  = len(self._items) - _MAX_ITEMS
+                ordered = sorted(self._items.items(), key=lambda kv: kv[1].get("received_ts", 0))
+                excess = len(self._items) - _MAX_ITEMS
                 for uid, _ in ordered[:excess]:
                     self._items.pop(uid, None)
                     self._unread.discard(uid)
@@ -105,8 +100,7 @@ class NotificationStore:
                 self._save_locked()
         return new
 
-    def list_all(self, *, source: Optional[str] = None,
-                 unread_only: bool = False) -> list[dict]:
+    def list_all(self, *, source: str | None = None, unread_only: bool = False) -> list[dict]:
         with self._lock:
             out = list(self._items.values())
         if source:
@@ -117,13 +111,12 @@ class NotificationStore:
         out.sort(key=lambda it: it.get("received_ts", 0), reverse=True)
         return out
 
-    def unread_count(self, *, source: Optional[str] = None) -> int:
+    def unread_count(self, *, source: str | None = None) -> int:
         with self._lock:
             if source is None:
                 return len(self._unread)
             return sum(
-                1 for uid in self._unread
-                if self._items.get(uid, {}).get("source") == source
+                1 for uid in self._unread if self._items.get(uid, {}).get("source") == source
             )
 
     def mark_read(self, uids: list[str]) -> int:
@@ -137,14 +130,15 @@ class NotificationStore:
                 self._save_locked()
             return n
 
-    def mark_all_read(self, *, source: Optional[str] = None) -> int:
+    def mark_all_read(self, *, source: str | None = None) -> int:
         with self._lock:
             if source is None:
                 n = len(self._unread)
                 self._unread.clear()
             else:
-                to_remove = [uid for uid in self._unread
-                            if self._items.get(uid, {}).get("source") == source]
+                to_remove = [
+                    uid for uid in self._unread if self._items.get(uid, {}).get("source") == source
+                ]
                 for uid in to_remove:
                     self._unread.discard(uid)
                 n = len(to_remove)
@@ -153,8 +147,8 @@ class NotificationStore:
             return n
 
 
-_store: Optional[NotificationStore] = None
-_lock  = threading.Lock()
+_store: NotificationStore | None = None
+_lock = threading.Lock()
 
 
 def get_store() -> NotificationStore:

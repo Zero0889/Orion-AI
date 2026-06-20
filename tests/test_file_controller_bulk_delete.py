@@ -30,8 +30,7 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-import actions.file_controller as fc   # noqa: E402
-
+import actions.file_controller as fc
 
 # ── Helpers ─────────────────────────────────────────────────────────────
 
@@ -46,6 +45,7 @@ def _backdate(p: Path, days_ago: float) -> None:
     """Modifica mtime para simular un archivo de hace N días."""
     ts = time.time() - days_ago * 86400
     import os
+
     os.utime(p, (ts, ts))
 
 
@@ -53,8 +53,9 @@ def _backdate(p: Path, days_ago: float) -> None:
 def sandbox(tmp_path, monkeypatch):
     monkeypatch.setattr(fc, "_safe_roots", lambda: [tmp_path])
     monkeypatch.setattr(
-        fc, "_resolve_path",
-        lambda raw: tmp_path / raw if raw and raw != str(tmp_path) else tmp_path
+        fc,
+        "_resolve_path",
+        lambda raw: tmp_path / raw if raw and raw != str(tmp_path) else tmp_path,
     )
     return tmp_path
 
@@ -64,6 +65,7 @@ def trash_spy(monkeypatch):
     """Reemplaza _safe_trash por uno que solo registra qué se hubiera borrado
     (los tests no deberían tocar la papelera real de Windows)."""
     deleted: list[Path] = []
+
     def fake_trash(target: Path):
         deleted.append(target)
         try:
@@ -71,6 +73,7 @@ def trash_spy(monkeypatch):
         except Exception:
             pass
         return f"Mock-trashed: {target.name}"
+
     monkeypatch.setattr(fc, "_safe_trash", fake_trash)
     return deleted
 
@@ -98,8 +101,7 @@ def test_bulk_dry_run_includes_explanation_for_next_step(sandbox):
 
 def test_bulk_requires_confirm_when_executing(sandbox, trash_spy):
     _write(sandbox / "a.log", b"x")
-    out = fc.delete_bulk(path=str(sandbox), extension="log",
-                         dry_run=False, confirm=False)
+    out = fc.delete_bulk(path=str(sandbox), extension="log", dry_run=False, confirm=False)
     assert "Bloqueado" in out
     assert trash_spy == []
     assert (sandbox / "a.log").exists()
@@ -109,8 +111,7 @@ def test_bulk_executes_when_dry_run_false_and_confirm_true(sandbox, trash_spy):
     _write(sandbox / "a.log", b"x")
     _write(sandbox / "b.log", b"x")
     _write(sandbox / "c.txt", b"x")  # no debe tocarse
-    out = fc.delete_bulk(path=str(sandbox), extension="log",
-                         dry_run=False, confirm=True)
+    out = fc.delete_bulk(path=str(sandbox), extension="log", dry_run=False, confirm=True)
     assert "Listo" in out
     assert "2/2" in out
     names = {p.name for p in trash_spy}
@@ -146,7 +147,7 @@ def test_bulk_older_than_days(sandbox):
 
 def test_bulk_larger_than_mb(sandbox):
     _write(sandbox / "small.bin", b"x" * 1024)
-    _write(sandbox / "big.bin",   b"x" * (3 * 1024 * 1024))
+    _write(sandbox / "big.bin", b"x" * (3 * 1024 * 1024))
     out = fc.delete_bulk(path=str(sandbox), larger_than_mb=1.0, dry_run=True)
     assert "big.bin" in out
     assert "small.bin" not in out
@@ -154,7 +155,7 @@ def test_bulk_larger_than_mb(sandbox):
 
 def test_bulk_smaller_than_mb(sandbox):
     _write(sandbox / "small.bin", b"x" * 1024)
-    _write(sandbox / "big.bin",   b"x" * (3 * 1024 * 1024))
+    _write(sandbox / "big.bin", b"x" * (3 * 1024 * 1024))
     out = fc.delete_bulk(path=str(sandbox), smaller_than_mb=1.0, dry_run=True)
     assert "small.bin" in out
     assert "big.bin" not in out
@@ -162,14 +163,13 @@ def test_bulk_smaller_than_mb(sandbox):
 
 def test_bulk_combines_filters_with_AND(sandbox):
     _write(sandbox / "small.log", b"x" * 100)
-    _write(sandbox / "big.log",   b"x" * (3 * 1024 * 1024))
-    _write(sandbox / "big.txt",   b"x" * (3 * 1024 * 1024))
-    out = fc.delete_bulk(path=str(sandbox), extension="log",
-                         larger_than_mb=1.0, dry_run=True)
+    _write(sandbox / "big.log", b"x" * (3 * 1024 * 1024))
+    _write(sandbox / "big.txt", b"x" * (3 * 1024 * 1024))
+    out = fc.delete_bulk(path=str(sandbox), extension="log", larger_than_mb=1.0, dry_run=True)
     # solo big.log cumple AMBOS (ext=log AND >1MB)
     assert "big.log" in out
     assert "small.log" not in out
-    assert "big.txt"  not in out
+    assert "big.txt" not in out
 
 
 def test_bulk_friendly_empty_when_nothing_matches(sandbox):
@@ -199,8 +199,7 @@ def test_dup_keep_shortest_path_default(sandbox, trash_spy):
     same = b"X" * 4096
     short = _write(sandbox / "x.bin", same)
     long_path = _write(sandbox / "very" / "deeply" / "nested" / "x.bin", same)
-    out = fc.delete_duplicates(path=str(sandbox), min_size_kb=0.1,
-                               dry_run=False, confirm=True)
+    out = fc.delete_duplicates(path=str(sandbox), min_size_kb=0.1, dry_run=False, confirm=True)
     assert "Listo" in out
     assert long_path in trash_spy
     assert short not in trash_spy
@@ -210,10 +209,11 @@ def test_dup_keep_newest_keeps_newer_file(sandbox, trash_spy):
     same = b"X" * 4096
     older = _write(sandbox / "a.bin", same)
     newer = _write(sandbox / "b.bin", same)
-    _backdate(older, 30)   # older = 30 días atrás
+    _backdate(older, 30)  # older = 30 días atrás
     # newer queda con mtime actual
-    fc.delete_duplicates(path=str(sandbox), keep="newest", min_size_kb=0.1,
-                         dry_run=False, confirm=True)
+    fc.delete_duplicates(
+        path=str(sandbox), keep="newest", min_size_kb=0.1, dry_run=False, confirm=True
+    )
     assert older in trash_spy
     assert newer not in trash_spy
 
@@ -223,8 +223,9 @@ def test_dup_keep_oldest_keeps_older_file(sandbox, trash_spy):
     older = _write(sandbox / "a.bin", same)
     newer = _write(sandbox / "b.bin", same)
     _backdate(older, 30)
-    fc.delete_duplicates(path=str(sandbox), keep="oldest", min_size_kb=0.1,
-                         dry_run=False, confirm=True)
+    fc.delete_duplicates(
+        path=str(sandbox), keep="oldest", min_size_kb=0.1, dry_run=False, confirm=True
+    )
     assert newer in trash_spy
     assert older not in trash_spy
 
@@ -240,8 +241,7 @@ def test_dup_refuses_without_confirm(sandbox, trash_spy):
     same = b"X" * 4096
     _write(sandbox / "a.bin", same)
     _write(sandbox / "b.bin", same)
-    out = fc.delete_duplicates(path=str(sandbox), min_size_kb=0.1,
-                               dry_run=False, confirm=False)
+    out = fc.delete_duplicates(path=str(sandbox), min_size_kb=0.1, dry_run=False, confirm=False)
     assert "Bloqueado" in out
     assert trash_spy == []
 
@@ -301,8 +301,7 @@ def test_empty_folders_bottom_up_chain(sandbox, trash_spy):
 
 def test_empty_folders_refuses_without_confirm(sandbox, trash_spy):
     (sandbox / "ghost").mkdir()
-    out = fc.delete_empty_folders(path=str(sandbox),
-                                  dry_run=False, confirm=False)
+    out = fc.delete_empty_folders(path=str(sandbox), dry_run=False, confirm=False)
     assert "Bloqueado" in out
     assert (sandbox / "ghost").exists()
 
@@ -314,10 +313,14 @@ def test_empty_folders_refuses_without_confirm(sandbox, trash_spy):
 
 def test_dispatcher_routes_delete_bulk(sandbox, trash_spy):
     _write(sandbox / "a.tmp", b"x")
-    out = fc.file_controller(parameters={
-        "action": "delete_bulk", "path": str(sandbox),
-        "extension": "tmp", "dry_run": True,
-    })
+    out = fc.file_controller(
+        parameters={
+            "action": "delete_bulk",
+            "path": str(sandbox),
+            "extension": "tmp",
+            "dry_run": True,
+        }
+    )
     assert "PREVIEW" in out
 
 
@@ -325,18 +328,26 @@ def test_dispatcher_routes_delete_duplicates(sandbox, trash_spy):
     same = b"R" * 2048
     _write(sandbox / "a.bin", same)
     _write(sandbox / "b.bin", same)
-    out = fc.file_controller(parameters={
-        "action": "delete_duplicates", "path": str(sandbox),
-        "min_size_kb": 0.1, "dry_run": True,
-    })
+    out = fc.file_controller(
+        parameters={
+            "action": "delete_duplicates",
+            "path": str(sandbox),
+            "min_size_kb": 0.1,
+            "dry_run": True,
+        }
+    )
     assert "PREVIEW" in out
 
 
 def test_dispatcher_routes_delete_empty_folders(sandbox, trash_spy):
     (sandbox / "ghost").mkdir()
-    out = fc.file_controller(parameters={
-        "action": "delete_empty_folders", "path": str(sandbox), "dry_run": True,
-    })
+    out = fc.file_controller(
+        parameters={
+            "action": "delete_empty_folders",
+            "path": str(sandbox),
+            "dry_run": True,
+        }
+    )
     assert "PREVIEW" in out
     assert "ghost" in out
 
@@ -349,6 +360,7 @@ def test_dispatcher_routes_delete_empty_folders(sandbox, trash_spy):
 def test_registry_advertises_bulk_delete_actions():
     from core.tool_registry import ToolRegistry
     from core.tools_bootstrap import register_builtin_tools
+
     ToolRegistry._reset()
     register_builtin_tools()
     decl, _ = ToolRegistry().get("file_controller")

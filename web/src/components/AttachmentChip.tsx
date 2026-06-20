@@ -12,22 +12,28 @@ import { Icon } from "@/ui/Icon";
 
 export function AttachmentChip() {
   const currentFile = useOrionStore((s) => s.currentFile);
-  const inputRef    = useRef<HTMLInputElement | null>(null);
+  const inputRef = useRef<HTMLInputElement | null>(null);
   const [busy, setBusy] = useState(false);
 
   async function pickFile(ev: React.ChangeEvent<HTMLInputElement>) {
     const f = ev.target.files?.[0];
     if (!f) return;
-    try { setBusy(true); await api.uploadFile(f); }
-    catch (e) { console.error(e); }
-    finally  {
+    try {
+      setBusy(true);
+      await api.uploadFile(f);
+    } catch (e) {
+      console.error(e);
+    } finally {
       setBusy(false);
       if (inputRef.current) inputRef.current.value = "";
     }
   }
   async function clear() {
-    try { await api.clearCurrentFile(); }
-    catch (e) { console.error(e); }
+    try {
+      await api.clearCurrentFile();
+    } catch (e) {
+      console.error(e);
+    }
   }
 
   return (
@@ -35,10 +41,14 @@ export function AttachmentChip() {
       <input ref={inputRef} type="file" className="hidden" onChange={pickFile} />
 
       {currentFile ? (
-        <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-full
-                        border border-acc/30 bg-acc/10 text-acc max-w-xs animate-fade-in">
+        <div
+          className="inline-flex items-center gap-2 px-2.5 py-1 rounded-full
+                        border border-acc/30 bg-acc/10 text-acc max-w-xs animate-fade-in"
+        >
           <Icon name="paperclip" size={12} />
-          <span className="truncate" title={currentFile}>{fileLabel(currentFile)}</span>
+          <span className="truncate" title={currentFile}>
+            {fileLabel(currentFile)}
+          </span>
           <button
             onClick={clear}
             title="Quitar adjunto"
@@ -67,7 +77,7 @@ export function AttachmentChip() {
 }
 
 function fileLabel(path: string): string {
-  const base = path.split(/[\\\/]/).pop() ?? path;
+  const base = path.split(/[\\/]/).pop() ?? path;
   const m = base.match(/^\d{10,}_(.+)$/);
   return m ? m[1] : base;
 }

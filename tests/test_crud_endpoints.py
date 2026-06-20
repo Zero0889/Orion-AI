@@ -27,19 +27,24 @@ if str(PROJECT_ROOT) not in sys.path:
 
 @pytest.fixture
 def isolated(tmp_path, monkeypatch):
+    import memory.conversations as cv
     import memory.memory_manager as mm
     import memory.quick_notes as qn
-    import memory.conversations as cv
 
     mem_file = tmp_path / "long_term.json"
-    mem_file.write_text(json.dumps({
-        "identity":      {"nombre": {"value": "Zahir"}},
-        "preferences":   {},
-        "projects":      {},
-        "relationships": {},
-        "wishes":        {},
-        "notes":         {},
-    }), encoding="utf-8")
+    mem_file.write_text(
+        json.dumps(
+            {
+                "identity": {"nombre": {"value": "Zahir"}},
+                "preferences": {},
+                "projects": {},
+                "relationships": {},
+                "wishes": {},
+                "notes": {},
+            }
+        ),
+        encoding="utf-8",
+    )
     monkeypatch.setattr(mm, "MEMORY_PATH", mem_file)
 
     notes_file = tmp_path / "quick_notes.json"
@@ -47,14 +52,20 @@ def isolated(tmp_path, monkeypatch):
     monkeypatch.setattr(qn, "_NOTES_PATH", notes_file)
 
     convs_file = tmp_path / "conversations.json"
-    convs_file.write_text(json.dumps([
-        {"id": "c1", "started": "2026-05-30T10:00:00", "title": "T1", "messages": []},
-        {"id": "c2", "started": "2026-05-30T11:00:00", "title": "T2", "messages": []},
-    ]), encoding="utf-8")
+    convs_file.write_text(
+        json.dumps(
+            [
+                {"id": "c1", "started": "2026-05-30T10:00:00", "title": "T1", "messages": []},
+                {"id": "c2", "started": "2026-05-30T11:00:00", "title": "T2", "messages": []},
+            ]
+        ),
+        encoding="utf-8",
+    )
     monkeypatch.setattr(cv, "_CONVERSATIONS_PATH", convs_file)
 
     theme_file = tmp_path / "theme.json"
     import config.theme as theme_mod
+
     monkeypatch.setattr(theme_mod, "_THEME_CONFIG_PATH", theme_file)
 
     return tmp_path
@@ -62,8 +73,9 @@ def isolated(tmp_path, monkeypatch):
 
 @pytest.fixture
 def client(isolated):
-    from server.event_bus import OrionEventBus
     from server.app import build_app
+    from server.event_bus import OrionEventBus
+
     bus = OrionEventBus()
     app = build_app(bus)
     with TestClient(app) as tc:
@@ -116,7 +128,8 @@ def test_notes_delete(client):
 def test_notes_create_publishes_event(client):
     tc, _ = client
     with tc.websocket_connect("/ws") as ws:
-        ws.receive_json(); ws.receive_json()  # saludo
+        ws.receive_json()
+        ws.receive_json()  # saludo
         tc.post("/api/notes", json={"text": "ping"})
         evt = ws.receive_json()
         assert evt["type"] == "note.changed"
@@ -156,7 +169,8 @@ def test_memory_delete_not_found(client):
 def test_memory_publishes_event(client):
     tc, _ = client
     with tc.websocket_connect("/ws") as ws:
-        ws.receive_json(); ws.receive_json()
+        ws.receive_json()
+        ws.receive_json()
         tc.put("/api/memory/identity/nombre", json={"value": "Z"})
         evt = ws.receive_json()
         assert evt["type"] == "memory.updated"
@@ -182,7 +196,8 @@ def test_conversation_delete_not_found(client):
 def test_conversation_delete_publishes_event(client):
     tc, _ = client
     with tc.websocket_connect("/ws") as ws:
-        ws.receive_json(); ws.receive_json()
+        ws.receive_json()
+        ws.receive_json()
         tc.delete("/api/conversations/c1")
         evt = ws.receive_json()
         assert evt["type"] == "conversation.deleted"
@@ -215,7 +230,8 @@ def test_settings_patch_publishes_event(client):
     if candidate is None:
         pytest.skip("Solo hay un tema disponible")
     with tc.websocket_connect("/ws") as ws:
-        ws.receive_json(); ws.receive_json()
+        ws.receive_json()
+        ws.receive_json()
         tc.patch("/api/settings/theme", json={"name": candidate})
         evt = ws.receive_json()
         assert evt["type"] == "settings.theme"

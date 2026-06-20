@@ -20,14 +20,11 @@ from __future__ import annotations
 import ipaddress
 import json
 import threading
-from pathlib import Path
-from typing import Optional
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
 from config import CONFIG_DIR
-
 
 # ── Persistencia ────────────────────────────────────────────────────────────
 
@@ -36,12 +33,12 @@ SHARING_CONFIG_PATH = CONFIG_DIR / "sharing.json"
 # Rango de IPs que Tailscale asigna a sus dispositivos (CGNAT).
 _TAILSCALE_NET = ipaddress.ip_network("100.64.0.0/10")
 # Loopback siempre permitido (consola local, scripts en el mismo PC).
-_LOOPBACK_NET  = ipaddress.ip_network("127.0.0.0/8")
+_LOOPBACK_NET = ipaddress.ip_network("127.0.0.0/8")
 
 # Estado en memoria; thread-safe porque uvicorn puede atender varias
 # corutinas concurrentes y, por seguridad, queremos lecturas consistentes.
 _state_lock = threading.Lock()
-_enabled    = False
+_enabled = False
 
 
 def _load_from_disk() -> bool:
@@ -85,7 +82,7 @@ def set_sharing(enabled: bool) -> bool:
 # ── Detección de IP Tailscale para mostrar en la UI ─────────────────────────
 
 
-def detect_tailscale_ip() -> Optional[str]:
+def detect_tailscale_ip() -> str | None:
     """Recorre las interfaces de red y devuelve la primera IP del rango
     Tailscale, o None si no hay (no instalado, no conectado, etc.).
     """
@@ -114,7 +111,7 @@ def detect_tailscale_ip() -> Optional[str]:
 # ── Middleware ──────────────────────────────────────────────────────────────
 
 
-def _client_ip(request: Request) -> Optional[ipaddress.IPv4Address | ipaddress.IPv6Address]:
+def _client_ip(request: Request) -> ipaddress.IPv4Address | ipaddress.IPv6Address | None:
     """Obtiene el IP de quien hace la petición. Starlette lo guarda en
     ``request.client`` (host, port)."""
     client = request.client
@@ -169,8 +166,8 @@ class SharingMiddleware:
             response = JSONResponse(
                 {
                     "detail": "Acceso denegado. Tu IP no está en la lista permitida. "
-                              "Activa el toggle 'Compartir vía Tailscale' en Ajustes para "
-                              "permitir conexiones desde tu red privada Tailscale.",
+                    "Activa el toggle 'Compartir vía Tailscale' en Ajustes para "
+                    "permitir conexiones desde tu red privada Tailscale.",
                     "your_ip": str(ip) if ip else "desconocido",
                     "sharing": sharing,
                 },

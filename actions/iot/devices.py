@@ -26,34 +26,33 @@ Cada dispositivo se asocia a UN transporte (definido en
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Optional
 
 
 @dataclass(frozen=True)
 class Capabilities:
     """Qué puede hacer un dispositivo. Todas las flags son opt-in."""
 
-    on_off:   bool = True
+    on_off: bool = True
     dimmable: bool = False
-    rgb:      bool = False
-    sensor:   Optional[str] = None  # "temperature", "humidity", "motion", ...
+    rgb: bool = False
+    sensor: str | None = None  # "temperature", "humidity", "motion", ...
 
     @classmethod
-    def from_dict(cls, data: dict | None) -> "Capabilities":
+    def from_dict(cls, data: dict | None) -> Capabilities:
         data = data or {}
         return cls(
-            on_off  = bool(data.get("on_off", True)),
-            dimmable= bool(data.get("dimmable", False)),
-            rgb     = bool(data.get("rgb", False)),
-            sensor  = data.get("sensor") or None,
+            on_off=bool(data.get("on_off", True)),
+            dimmable=bool(data.get("dimmable", False)),
+            rgb=bool(data.get("rgb", False)),
+            sensor=data.get("sensor") or None,
         )
 
     def to_dict(self) -> dict:
         return {
-            "on_off":   self.on_off,
+            "on_off": self.on_off,
             "dimmable": self.dimmable,
-            "rgb":      self.rgb,
-            "sensor":   self.sensor,
+            "rgb": self.rgb,
+            "sensor": self.sensor,
         }
 
 
@@ -61,30 +60,30 @@ class Capabilities:
 class Device:
     """Un dispositivo IoT con su transporte y capacidades."""
 
-    id:           str
-    name:         str
-    transport:    str                # clave en Config.transports
+    id: str
+    name: str
+    transport: str  # clave en Config.transports
     capabilities: Capabilities
     # Configuración específica del transporte. Para serial: cmd_on/off/dim/rgb.
     # Para mqtt: topics y payloads. Se valida al construir el transport adapter.
-    serial:       dict               = field(default_factory=dict)
-    mqtt:         dict               = field(default_factory=dict)
+    serial: dict = field(default_factory=dict)
+    mqtt: dict = field(default_factory=dict)
 
     @classmethod
-    def from_dict(cls, dev_id: str, data: dict) -> "Device":
+    def from_dict(cls, dev_id: str, data: dict) -> Device:
         return cls(
-            id           = dev_id,
-            name         = data.get("name", dev_id),
-            transport    = data.get("transport", "main_arduino"),
-            capabilities = Capabilities.from_dict(data.get("capabilities")),
-            serial       = dict(data.get("serial", {})),
-            mqtt         = dict(data.get("mqtt", {})),
+            id=dev_id,
+            name=data.get("name", dev_id),
+            transport=data.get("transport", "main_arduino"),
+            capabilities=Capabilities.from_dict(data.get("capabilities")),
+            serial=dict(data.get("serial", {})),
+            mqtt=dict(data.get("mqtt", {})),
         )
 
     def to_dict(self) -> dict:
         out: dict = {
-            "name":         self.name,
-            "transport":    self.transport,
+            "name": self.name,
+            "transport": self.transport,
             "capabilities": self.capabilities.to_dict(),
         }
         if self.serial:
@@ -94,7 +93,7 @@ class Device:
         return out
 
     # ── Helpers de capability con error legible ──────────────────────────
-    def require(self, capability: str) -> Optional[str]:
+    def require(self, capability: str) -> str | None:
         """Devuelve None si la capacidad existe, o un mensaje de error si no.
 
         Se usa antes de ejecutar dim/rgb/etc. para fallar pronto y dar al
@@ -112,9 +111,9 @@ class Device:
             return None
 
         nice = {
-            "on_off":   "encenderse o apagarse",
+            "on_off": "encenderse o apagarse",
             "dimmable": "regulación de intensidad",
-            "rgb":      "cambio de color",
-            "sensor":   "lectura de sensores",
+            "rgb": "cambio de color",
+            "sensor": "lectura de sensores",
         }.get(capability, capability)
         return f"El dispositivo '{self.name}' no soporta {nice}."

@@ -1,12 +1,13 @@
 import hashlib
 import os
-import shutil
 import platform
-from pathlib import Path
+import shutil
 from datetime import datetime
+from pathlib import Path
 
 try:
     import send2trash
+
     _SEND2TRASH = True
 except ImportError:
     _SEND2TRASH = False
@@ -25,8 +26,8 @@ def _windows_known_folder(name: str) -> Path | None:
         return None
     # Mapeo a las claves del registro Shell Folders
     reg_key_map = {
-        "Desktop":   "Desktop",
-        "Personal":  "Personal",     # Documents
+        "Desktop": "Desktop",
+        "Personal": "Personal",  # Documents
         "Documents": "Personal",
         "Downloads": "{374DE290-123F-4565-9164-39C4925E467B}",
         "My Pictures": "My Pictures",
@@ -41,6 +42,7 @@ def _windows_known_folder(name: str) -> Path | None:
         return None
     try:
         import winreg
+
         with winreg.OpenKey(
             winreg.HKEY_CURRENT_USER,
             r"Software\Microsoft\Windows\CurrentVersion\Explorer\Shell Folders",
@@ -83,6 +85,7 @@ def _safe_roots() -> list[Path]:
 
 _SAFE_ROOTS: list[Path] = _safe_roots()
 
+
 def _is_safe_path(target: Path) -> bool:
     """¿La ruta proporcionada está dentro de _SAFE_ROOTS? Si no, rechazar la operación."""
     try:
@@ -93,6 +96,7 @@ def _is_safe_path(target: Path) -> bool:
         )
     except Exception:
         return False
+
 
 def _get_desktop() -> Path:
     if _OS == "Linux":
@@ -105,6 +109,7 @@ def _get_desktop() -> Path:
             return p
     return Path.home() / "Desktop"
 
+
 def _get_downloads() -> Path:
     if _OS == "Linux":
         xdg = os.environ.get("XDG_DOWNLOAD_DIR", "")
@@ -115,6 +120,7 @@ def _get_downloads() -> Path:
         if p:
             return p
     return Path.home() / "Downloads"
+
 
 def _get_documents() -> Path:
     if _OS == "Linux":
@@ -127,6 +133,7 @@ def _get_documents() -> Path:
             return p
     return Path.home() / "Documents"
 
+
 def _get_pictures() -> Path:
     if _OS == "Linux":
         xdg = os.environ.get("XDG_PICTURES_DIR", "")
@@ -138,6 +145,7 @@ def _get_pictures() -> Path:
             return p
     return Path.home() / "Pictures"
 
+
 def _get_music() -> Path:
     if _OS == "Linux":
         xdg = os.environ.get("XDG_MUSIC_DIR", "")
@@ -148,6 +156,7 @@ def _get_music() -> Path:
         if p:
             return p
     return Path.home() / "Music"
+
 
 def _get_videos() -> Path:
     if _OS == "Linux":
@@ -163,13 +172,13 @@ def _get_videos() -> Path:
 
 def _resolve_path(raw: str) -> Path:
     shortcuts: dict[str, Path] = {
-        "desktop":   _get_desktop(),
+        "desktop": _get_desktop(),
         "downloads": _get_downloads(),
         "documents": _get_documents(),
-        "pictures":  _get_pictures(),
-        "music":     _get_music(),
-        "videos":    _get_videos(),
-        "home":      Path.home(),
+        "pictures": _get_pictures(),
+        "music": _get_music(),
+        "videos": _get_videos(),
+        "home": Path.home(),
     }
     lower = raw.strip().lower()
     if lower in shortcuts:
@@ -179,26 +188,64 @@ def _resolve_path(raw: str) -> Path:
 
 # ── Extensiones legibles para el usuario ──────────────────────────────────
 _EXT_LABELS: dict[str, str] = {
-    ".pdf": "PDF", ".doc": "Word", ".docx": "Word",
-    ".xls": "Excel", ".xlsx": "Excel", ".csv": "CSV",
-    ".ppt": "PowerPoint", ".pptx": "PowerPoint",
-    ".txt": "Texto", ".rtf": "RTF", ".odt": "OpenDocument",
-    ".py": "Python", ".js": "JavaScript", ".html": "HTML", ".css": "CSS",
-    ".java": "Java", ".cpp": "C++", ".cs": "C#", ".go": "Go",
-    ".zip": "ZIP", ".rar": "RAR", ".7z": "7-Zip",
-    ".jpg": "Imagen JPEG", ".jpeg": "Imagen JPEG", ".png": "Imagen PNG",
-    ".gif": "GIF", ".bmp": "Bitmap", ".svg": "SVG", ".webp": "WebP",
-    ".mp3": "Audio MP3", ".wav": "Audio WAV", ".flac": "Audio FLAC",
-    ".mp4": "Video MP4", ".avi": "Video AVI", ".mkv": "Video MKV",
-    ".exe": "Ejecutable", ".msi": "Instalador",
-    ".pdsprj": "Proteus Project", ".workspace": "Workspace",
-    ".json": "JSON", ".xml": "XML", ".yaml": "YAML",
-    ".md": "Markdown", ".log": "Log",
-    ".iso": "Imagen ISO", ".torrent": "Torrent",
-    ".apk": "Android APK", ".deb": "Paquete Debian", ".rpm": "Paquete RPM",
-    ".sql": "SQL", ".db": "Base de datos", ".sqlite": "SQLite",
-    ".psd": "Photoshop", ".ai": "Illustrator", ".fig": "Figma",
-    ".blend": "Blender", ".dwg": "AutoCAD", ".stl": "Modelo 3D",
+    ".pdf": "PDF",
+    ".doc": "Word",
+    ".docx": "Word",
+    ".xls": "Excel",
+    ".xlsx": "Excel",
+    ".csv": "CSV",
+    ".ppt": "PowerPoint",
+    ".pptx": "PowerPoint",
+    ".txt": "Texto",
+    ".rtf": "RTF",
+    ".odt": "OpenDocument",
+    ".py": "Python",
+    ".js": "JavaScript",
+    ".html": "HTML",
+    ".css": "CSS",
+    ".java": "Java",
+    ".cpp": "C++",
+    ".cs": "C#",
+    ".go": "Go",
+    ".zip": "ZIP",
+    ".rar": "RAR",
+    ".7z": "7-Zip",
+    ".jpg": "Imagen JPEG",
+    ".jpeg": "Imagen JPEG",
+    ".png": "Imagen PNG",
+    ".gif": "GIF",
+    ".bmp": "Bitmap",
+    ".svg": "SVG",
+    ".webp": "WebP",
+    ".mp3": "Audio MP3",
+    ".wav": "Audio WAV",
+    ".flac": "Audio FLAC",
+    ".mp4": "Video MP4",
+    ".avi": "Video AVI",
+    ".mkv": "Video MKV",
+    ".exe": "Ejecutable",
+    ".msi": "Instalador",
+    ".pdsprj": "Proteus Project",
+    ".workspace": "Workspace",
+    ".json": "JSON",
+    ".xml": "XML",
+    ".yaml": "YAML",
+    ".md": "Markdown",
+    ".log": "Log",
+    ".iso": "Imagen ISO",
+    ".torrent": "Torrent",
+    ".apk": "Android APK",
+    ".deb": "Paquete Debian",
+    ".rpm": "Paquete RPM",
+    ".sql": "SQL",
+    ".db": "Base de datos",
+    ".sqlite": "SQLite",
+    ".psd": "Photoshop",
+    ".ai": "Illustrator",
+    ".fig": "Figma",
+    ".blend": "Blender",
+    ".dwg": "AutoCAD",
+    ".stl": "Modelo 3D",
 }
 
 
@@ -210,6 +257,7 @@ def _friendly_ext(ext: str) -> str:
 def _normalize(s: str) -> str:
     """Normaliza un texto para comparación: minúsculas, sin acentos, sin separadores."""
     import unicodedata
+
     s = unicodedata.normalize("NFKD", s)
     s = "".join(c for c in s if not unicodedata.combining(c))
     return s.lower().replace("_", " ").replace("-", " ").replace(".", " ").strip()
@@ -263,9 +311,11 @@ def _resolve_file(
     # Escanear el directorio
     try:
         if recursive:
-            items = [p for p in base.rglob("*") if not any(
-                part.startswith(".") for part in p.relative_to(base).parts
-            )]
+            items = [
+                p
+                for p in base.rglob("*")
+                if not any(part.startswith(".") for part in p.relative_to(base).parts)
+            ]
         else:
             items = list(base.iterdir())
     except PermissionError:
@@ -307,6 +357,7 @@ def _resolve_file(
 
     # 4) Fuzzy matching (tolerancia a errores de voz/escritura)
     from difflib import SequenceMatcher
+
     scored = []
     for item in items:
         primary = _normalize(_primary_stem(item))
@@ -338,14 +389,16 @@ def _build_disambiguation(matches: list[Path]) -> list[dict]:
             size = _format_size(item.stat().st_size) if item.is_file() else ""
         except Exception:
             size = ""
-        results.append({
-            "path": item,
-            "name": item.name,
-            "stem": item.stem,
-            "ext": ext,
-            "kind": kind,
-            "size": size,
-        })
+        results.append(
+            {
+                "path": item,
+                "name": item.name,
+                "stem": item.stem,
+                "ext": ext,
+                "kind": kind,
+                "size": size,
+            }
+        )
     return results
 
 
@@ -363,10 +416,7 @@ def _format_disambiguation(matches: list[dict], action_verb: str = "procesar") -
     # Resumen amigable agrupado por tipo (lo que ORION debe leer al usuario)
     summary_parts: list[str] = []
     if folders:
-        summary_parts.append(
-            "una carpeta" if len(folders) == 1
-            else f"{len(folders)} carpetas"
-        )
+        summary_parts.append("una carpeta" if len(folders) == 1 else f"{len(folders)} carpetas")
     # Agrupar archivos por extensión legible
     by_ext: dict[str, int] = {}
     for f in files:
@@ -391,7 +441,7 @@ def _format_disambiguation(matches: list[dict], action_verb: str = "procesar") -
         "Coincidencias detalladas:",
     ]
     for i, m in enumerate(matches, 1):
-        size_part = f" ({m['size']})" if m['size'] else ""
+        size_part = f" ({m['size']})" if m["size"] else ""
         lines.append(f"  {i}. {m['kind']} — {m['name']} [{m['ext']}]{size_part}")
     lines.append("")
     lines.append(
@@ -408,6 +458,7 @@ def _format_size(b: int) -> str:
             return f"{b:.1f} {unit}"
         b /= 1024
     return f"{b:.1f} TB"
+
 
 def _safe_trash(target: Path) -> str:
 
@@ -454,7 +505,7 @@ def list_files(path: str = "desktop", show_hidden: bool = False) -> str:
 
 def create_file(path: str, name: str = "", content: str = "") -> str:
     try:
-        base   = _resolve_path(path)
+        base = _resolve_path(path)
         target = (base / name) if name else base
         if not _is_safe_path(target):
             return f"Acceso denegado: {target}"
@@ -467,7 +518,7 @@ def create_file(path: str, name: str = "", content: str = "") -> str:
 
 def create_folder(path: str, name: str = "") -> str:
     try:
-        base   = _resolve_path(path)
+        base = _resolve_path(path)
         target = (base / name) if name else base
         if not _is_safe_path(target):
             return f"Acceso denegado: {target}"
@@ -477,10 +528,16 @@ def create_folder(path: str, name: str = "") -> str:
         return f"No se pudo crear la carpeta: {e}"
 
 
-_PROTECTED_DIRS = lambda: {
-    _get_desktop(), _get_downloads(), _get_documents(),
-    _get_pictures(), _get_music(), _get_videos(), Path.home()
-}
+def _PROTECTED_DIRS():
+    return {
+        _get_desktop(),
+        _get_downloads(),
+        _get_documents(),
+        _get_pictures(),
+        _get_music(),
+        _get_videos(),
+        Path.home(),
+    }
 
 
 def delete_file(path: str, name: str = "", confirm_all: bool = False) -> str:
@@ -652,10 +709,9 @@ def read_file(path: str, name: str = "", max_chars: int = 4000) -> str:
         return f"No se pudo leer el archivo: {e}"
 
 
-def write_file(path: str, name: str = "", content: str = "",
-               append: bool = False) -> str:
+def write_file(path: str, name: str = "", content: str = "", append: bool = False) -> str:
     try:
-        base   = _resolve_path(path)
+        base = _resolve_path(path)
         target = (base / name) if name else base
         if not _is_safe_path(target):
             return f"Acceso denegado: {target}"
@@ -669,8 +725,9 @@ def write_file(path: str, name: str = "", content: str = "",
         return f"No se pudo escribir el archivo: {e}"
 
 
-def find_files(name: str = "", extension: str = "",
-               path: str = "home", max_results: int = 20) -> str:
+def find_files(
+    name: str = "", extension: str = "", path: str = "home", max_results: int = 20
+) -> str:
     try:
         search_path = _resolve_path(path)
         if not _is_safe_path(search_path):
@@ -678,9 +735,9 @@ def find_files(name: str = "", extension: str = "",
         if not search_path.exists():
             return f"Ruta de búsqueda no encontrada: {path}"
 
-        results    = []
-        dir_count  = 0
-        max_dirs   = 500  # límite de rendimiento + seguridad
+        results = []
+        dir_count = 0
+        max_dirs = 500  # límite de rendimiento + seguridad
 
         for item in search_path.rglob("*"):
             if item.is_dir():
@@ -710,8 +767,8 @@ def find_files(name: str = "", extension: str = "",
 
 
 def get_largest_files(
-    path:      str = "downloads",
-    count:     int = 10,
+    path: str = "downloads",
+    count: int = 10,
     extension: str = "",
     min_size_mb: float = 0.0,
 ) -> str:
@@ -742,14 +799,18 @@ def get_largest_files(
 
         if not top:
             crit = []
-            if ext_filter: crit.append(f"extensión .{ext_filter}")
-            if min_size_bytes: crit.append(f"≥ {_format_size(min_size_bytes)}")
+            if ext_filter:
+                crit.append(f"extensión .{ext_filter}")
+            if min_size_bytes:
+                crit.append(f"≥ {_format_size(min_size_bytes)}")
             suffix = f" ({', '.join(crit)})" if crit else ""
             return f"No se encontraron archivos{suffix} en {search_path.name}/."
 
         head = f"Los {len(top)} archivos más grandes en {search_path.name}/"
-        if ext_filter:    head += f" (.{ext_filter})"
-        if min_size_bytes: head += f" ≥ {_format_size(min_size_bytes)}"
+        if ext_filter:
+            head += f" (.{ext_filter})"
+        if min_size_bytes:
+            head += f" ≥ {_format_size(min_size_bytes)}"
         lines = [head + ":"]
         for size, f in top:
             lines.append(f"  {_format_size(size):>10}  {f.name}  ({f.parent})")
@@ -761,6 +822,7 @@ def get_largest_files(
 
 
 # ── Helpers para los modos pesados ──────────────────────────────────────
+
 
 def _walk_files_with_size(root: Path):
     """Generador (path, size) recursivo basado en os.scandir. Más rápido
@@ -774,8 +836,14 @@ def _walk_files_with_size(root: Path):
                         # Skip carpetas que típicamente NO interesan al usuario
                         # y son enormes (cache de paquetes, repos, etc.).
                         if entry.name in {
-                            "node_modules", ".git", "__pycache__",
-                            ".venv", "venv", "dist", "build", ".next",
+                            "node_modules",
+                            ".git",
+                            "__pycache__",
+                            ".venv",
+                            "venv",
+                            "dist",
+                            "build",
+                            ".next",
                             ".cache",
                         }:
                             continue
@@ -795,7 +863,9 @@ def _walk_files_with_size(root: Path):
 _HASH_CHUNK_SIZE = 1024 * 1024  # 1 MiB
 
 
-def _fast_hash(path: Path, head_only: bool = False, chunk_size: int = _HASH_CHUNK_SIZE) -> str | None:
+def _fast_hash(
+    path: Path, head_only: bool = False, chunk_size: int = _HASH_CHUNK_SIZE
+) -> str | None:
     """SHA-256 incremental. Si ``head_only`` solo lee el primer chunk —
     útil para descartar candidatos antes del hash completo."""
     h = hashlib.sha256()
@@ -871,10 +941,10 @@ def _find_duplicate_groups(
 
 
 def find_duplicates(
-    path:        str = "downloads",
+    path: str = "downloads",
     min_size_kb: float = 1.0,
-    max_groups:  int = 20,
-    extension:   str = "",
+    max_groups: int = 20,
+    extension: str = "",
 ) -> str:
     """Busca grupos de archivos con CONTENIDO IDÉNTICO bajo ``path``.
 
@@ -894,14 +964,13 @@ def find_duplicates(
         max_groups = min(max(max_groups, 1), 100)
 
         total_scanned, groups = _find_duplicate_groups(
-            search_path, min_size_bytes, ext_filter,
+            search_path,
+            min_size_bytes,
+            ext_filter,
         )
 
         if not groups:
-            return (
-                f"Sin duplicados en {search_path.name}/ "
-                f"(escaneados {total_scanned} archivos)."
-            )
+            return f"Sin duplicados en {search_path.name}/ (escaneados {total_scanned} archivos)."
 
         top = groups[:max_groups]
         total_recoverable = sum(sz * (len(paths) - 1) for sz, paths in groups)
@@ -914,8 +983,7 @@ def find_duplicates(
         for sz, paths in top:
             recover = sz * (len(paths) - 1)
             lines.append(
-                f"• {_format_size(sz)} × {len(paths)} copias "
-                f"→ {_format_size(recover)} recuperables"
+                f"• {_format_size(sz)} × {len(paths)} copias → {_format_size(recover)} recuperables"
             )
             for p in paths:
                 lines.append(f"    {p}")
@@ -972,6 +1040,7 @@ def tree_size(path: str = "home", depth: int = 1, top: int = 20) -> str:
                                 _collect(p, d - 1)
                 except (OSError, PermissionError):
                     return
+
             _collect(root, depth)
 
         # Tamaños
@@ -1011,8 +1080,8 @@ def tree_size(path: str = "home", depth: int = 1, top: int = 20) -> str:
 def get_disk_usage(path: str = "home") -> str:
     try:
         target = _resolve_path(path)
-        usage  = shutil.disk_usage(target)
-        pct    = usage.used / usage.total * 100
+        usage = shutil.disk_usage(target)
+        pct = usage.used / usage.total * 100
         return (
             f"Uso del disco ({target}):\n"
             f"  Total : {_format_size(usage.total)}\n"
@@ -1055,8 +1124,8 @@ def _delete_paths_with_summary(
 
     preview_lines = [
         f"PREVIEW — {n} archivo(s), {_format_size(total_size)} en total."
-        if dry_run else
-        f"BORRADO — {n} archivo(s), {_format_size(total_size)}."
+        if dry_run
+        else f"BORRADO — {n} archivo(s), {_format_size(total_size)}."
     ]
     sample = paths_to_delete[:15]
     for p in sample:
@@ -1067,8 +1136,7 @@ def _delete_paths_with_summary(
     if dry_run:
         preview_lines.append("")
         preview_lines.append(
-            "Para ejecutar de verdad, volvé a llamar con "
-            "dry_run=false Y confirm=true."
+            "Para ejecutar de verdad, volvé a llamar con dry_run=false Y confirm=true."
         )
         return "\n".join(preview_lines)
 
@@ -1130,8 +1198,11 @@ def delete_bulk(
 
         # Sin filtros = refuse. No queremos "borrá todo" implícito.
         has_filter = bool(
-            pattern.strip() or extension.strip()
-            or older_than_days > 0 or larger_than_mb > 0 or smaller_than_mb > 0
+            pattern.strip()
+            or extension.strip()
+            or older_than_days > 0
+            or larger_than_mb > 0
+            or smaller_than_mb > 0
         )
         if not has_filter:
             return (
@@ -1142,7 +1213,7 @@ def delete_bulk(
 
         ext_filter = extension.lower().lstrip(".")
         pattern = pattern.strip()
-        larger_bytes  = int(larger_than_mb  * 1024 * 1024) if larger_than_mb  > 0 else 0
+        larger_bytes = int(larger_than_mb * 1024 * 1024) if larger_than_mb > 0 else 0
         smaller_bytes = int(smaller_than_mb * 1024 * 1024) if smaller_than_mb > 0 else 0
         cutoff_ts = time.time() - (older_than_days * 86400) if older_than_days > 0 else None
 
@@ -1153,7 +1224,7 @@ def delete_bulk(
                 continue
             if pattern and not fnmatch.fnmatch(fp.name, pattern):
                 continue
-            if larger_bytes  and size <= larger_bytes:
+            if larger_bytes and size <= larger_bytes:
                 continue
             if smaller_bytes and size >= smaller_bytes:
                 continue
@@ -1174,11 +1245,16 @@ def delete_bulk(
             )
 
         crit = []
-        if ext_filter:    crit.append(f"ext=.{ext_filter}")
-        if pattern:       crit.append(f"pattern={pattern}")
-        if larger_bytes:  crit.append(f">{_format_size(larger_bytes)}")
-        if smaller_bytes: crit.append(f"<{_format_size(smaller_bytes)}")
-        if cutoff_ts is not None: crit.append(f"older_than={older_than_days}d")
+        if ext_filter:
+            crit.append(f"ext=.{ext_filter}")
+        if pattern:
+            crit.append(f"pattern={pattern}")
+        if larger_bytes:
+            crit.append(f">{_format_size(larger_bytes)}")
+        if smaller_bytes:
+            crit.append(f"<{_format_size(smaller_bytes)}")
+        if cutoff_ts is not None:
+            crit.append(f"older_than={older_than_days}d")
         context = f"{root.name}/ ({', '.join(crit)})"
 
         return _delete_paths_with_summary(matched, total_size, dry_run, confirm, context)
@@ -1220,7 +1296,9 @@ def delete_duplicates(
         ext_filter = extension.lower().lstrip(".")
 
         total_scanned, groups = _find_duplicate_groups(
-            root, min_size_bytes, ext_filter,
+            root,
+            min_size_bytes,
+            ext_filter,
         )
         if not groups:
             return f"Nada que borrar: 0 duplicados en {root.name}/ (escaneados {total_scanned})."
@@ -1304,8 +1382,7 @@ def delete_empty_folders(
                 lines.append(f"  (+ {len(empty) - 25} más)")
             lines.append("")
             lines.append(
-                "Para ejecutar de verdad, volvé a llamar con "
-                "dry_run=false Y confirm=true."
+                "Para ejecutar de verdad, volvé a llamar con dry_run=false Y confirm=true."
             )
             return "\n".join(lines)
 
@@ -1339,14 +1416,39 @@ def delete_empty_folders(
 
 def organize_desktop() -> str:
     type_map = {
-        "Imagenes":   {".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp", ".svg", ".ico", ".heic"},
-        "Documentos": {".pdf", ".doc", ".docx", ".txt", ".xls", ".xlsx",
-                       ".ppt", ".pptx", ".csv", ".odt", ".ods", ".odp"},
-        "Videos":     {".mp4", ".avi", ".mkv", ".mov", ".wmv", ".flv", ".webm", ".m4v"},
-        "Musica":     {".mp3", ".wav", ".flac", ".aac", ".ogg", ".wma", ".m4a"},
-        "Archivos":   {".zip", ".rar", ".7z", ".tar", ".gz", ".bz2", ".xz"},
-        "Codigo":     {".py", ".js", ".ts", ".html", ".css", ".json", ".xml",
-                       ".cpp", ".java", ".cs", ".go", ".rs", ".sh"},
+        "Imagenes": {".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp", ".svg", ".ico", ".heic"},
+        "Documentos": {
+            ".pdf",
+            ".doc",
+            ".docx",
+            ".txt",
+            ".xls",
+            ".xlsx",
+            ".ppt",
+            ".pptx",
+            ".csv",
+            ".odt",
+            ".ods",
+            ".odp",
+        },
+        "Videos": {".mp4", ".avi", ".mkv", ".mov", ".wmv", ".flv", ".webm", ".m4v"},
+        "Musica": {".mp3", ".wav", ".flac", ".aac", ".ogg", ".wma", ".m4a"},
+        "Archivos": {".zip", ".rar", ".7z", ".tar", ".gz", ".bz2", ".xz"},
+        "Codigo": {
+            ".py",
+            ".js",
+            ".ts",
+            ".html",
+            ".css",
+            ".json",
+            ".xml",
+            ".cpp",
+            ".java",
+            ".cs",
+            ".go",
+            ".rs",
+            ".sh",
+        },
     }
 
     desktop = _get_desktop()
@@ -1360,7 +1462,7 @@ def organize_desktop() -> str:
             if item.name in {k for k in type_map}:
                 continue
 
-            ext        = item.suffix.lower()
+            ext = item.suffix.lower()
             target_dir = desktop / "Otros"
             for folder, exts in type_map.items():
                 if ext in exts:
@@ -1410,18 +1512,19 @@ def get_file_info(path: str, name: str = "") -> str:
 
         stat = target.stat()
         info = {
-            "Nombre":     target.name,
-            "Tipo":       "Carpeta" if target.is_dir() else "Archivo",
-            "Tamaño":     _format_size(stat.st_size),
-            "Ubicación":  str(target.parent),
-            "Creado":     datetime.fromtimestamp(stat.st_ctime).strftime("%Y-%m-%d %H:%M"),
+            "Nombre": target.name,
+            "Tipo": "Carpeta" if target.is_dir() else "Archivo",
+            "Tamaño": _format_size(stat.st_size),
+            "Ubicación": str(target.parent),
+            "Creado": datetime.fromtimestamp(stat.st_ctime).strftime("%Y-%m-%d %H:%M"),
             "Modificado": datetime.fromtimestamp(stat.st_mtime).strftime("%Y-%m-%d %H:%M"),
-            "Extensión":  target.suffix or "—",
+            "Extensión": target.suffix or "—",
         }
         return "\n".join(f"  {k}: {v}" for k, v in info.items())
 
     except Exception as e:
         return f"No se pudo obtener la información del archivo: {e}"
+
 
 def file_controller(
     parameters: dict = None,
@@ -1431,8 +1534,8 @@ def file_controller(
 ) -> str:
     params = parameters or {}
     action = params.get("action", "").lower().strip()
-    path   = params.get("path", "desktop")
-    name   = params.get("name", "")
+    path = params.get("path", "desktop")
+    name = params.get("name", "")
 
     if player:
         player.write_log(f"[file] {action} {name or path}")
@@ -1465,9 +1568,10 @@ def file_controller(
 
         elif action == "write":
             return write_file(
-                path, name=name,
+                path,
+                name=name,
                 content=params.get("content", ""),
-                append=params.get("append", False)
+                append=params.get("append", False),
             )
 
         elif action == "find":

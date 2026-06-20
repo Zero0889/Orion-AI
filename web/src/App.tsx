@@ -12,32 +12,62 @@
  * handle the rest, so we don't need to mutate tailwind at runtime.
  */
 
-import { useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 
-import { AgentsPanel } from "@/components/AgentsPanel";
 import { BackgroundEye } from "@/components/BackgroundEye";
-import { CircuitPanel } from "@/components/CircuitPanel";
-import { EyeCore, type EyePalette } from "@/components/EyeCore";
-import { ChatPanel } from "@/components/ChatPanel";
 import { CommandPalette } from "@/components/CommandPalette";
 import { DropZone } from "@/components/DropZone";
-import { HistoryPanel } from "@/components/HistoryPanel";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { EyeCore, type EyePalette } from "@/components/EyeCore";
 import { HomePanel } from "@/components/HomePanel";
-import { IoTPanel } from "@/components/IoTPanel";
-import { MCPPanel } from "@/components/MCPPanel";
-import { MemoryPanel } from "@/components/MemoryPanel";
-import { NotesPanel } from "@/components/NotesPanel";
-import { NotificationsPanel } from "@/components/NotificationsPanel";
+import { NeuralBackground } from "@/components/NeuralBackground";
 import { Onboarding } from "@/components/Onboarding";
-import { SettingsPanel } from "@/components/SettingsPanel";
 import { Sidebar } from "@/components/Sidebar";
-import { SkillsPanel } from "@/components/SkillsPanel";
-import { TelemetryPanel } from "@/components/TelemetryPanel";
 import { Toaster } from "@/components/Toaster";
 import { TopBar } from "@/components/TopBar";
+
+// ── Paneles bajo demanda ──────────────────────────────────────────────
+// Home es eager (es la vista por defecto al abrir Orion). Todo lo demás
+// se carga sólo cuando el usuario navega ahí. Vite genera un chunk
+// independiente por cada lazy() — la página inicial baja ~150 kB menos.
+// La mayoría de los paneles pesan 15-50 kB cada uno; juntos sumaban una
+// carga inicial que el 80 % de las sesiones nunca necesita.
+const ChatPanel = lazy(() =>
+  import("@/components/ChatPanel").then((m) => ({ default: m.ChatPanel })),
+);
+const NotesPanel = lazy(() =>
+  import("@/components/NotesPanel").then((m) => ({ default: m.NotesPanel })),
+);
+const MemoryPanel = lazy(() =>
+  import("@/components/MemoryPanel").then((m) => ({ default: m.MemoryPanel })),
+);
+const HistoryPanel = lazy(() =>
+  import("@/components/HistoryPanel").then((m) => ({ default: m.HistoryPanel })),
+);
+const TelemetryPanel = lazy(() =>
+  import("@/components/TelemetryPanel").then((m) => ({ default: m.TelemetryPanel })),
+);
+const AgentsPanel = lazy(() =>
+  import("@/components/AgentsPanel").then((m) => ({ default: m.AgentsPanel })),
+);
+const IoTPanel = lazy(() => import("@/components/IoTPanel").then((m) => ({ default: m.IoTPanel })));
+const MCPPanel = lazy(() => import("@/components/MCPPanel").then((m) => ({ default: m.MCPPanel })));
+const SkillsPanel = lazy(() =>
+  import("@/components/SkillsPanel").then((m) => ({ default: m.SkillsPanel })),
+);
+const NotificationsPanel = lazy(() =>
+  import("@/components/NotificationsPanel").then((m) => ({ default: m.NotificationsPanel })),
+);
+const CircuitPanel = lazy(() =>
+  import("@/components/CircuitPanel").then((m) => ({ default: m.CircuitPanel })),
+);
+const SettingsPanel = lazy(() =>
+  import("@/components/SettingsPanel").then((m) => ({ default: m.SettingsPanel })),
+);
 import { useEventPulses } from "@/hooks/useEventPulses";
 import { useEyeState } from "@/hooks/useEyeState";
 import { useOrionSocket } from "@/hooks/useOrionSocket";
+import { useZoomShortcuts } from "@/hooks/useZoomShortcuts";
 import { useOrionStore } from "@/stores/orion";
 import { useViewStore } from "@/stores/view";
 import { Icon } from "@/ui/Icon";
@@ -53,14 +83,16 @@ const THEME_KEY = "orion.theme";
  */
 export function resolveTheme(id: string): string {
   const n = id.toLowerCase();
-  if (n.includes("light") || n.includes("glass_white") || n === "blanco")  return "orion-light";
-  if (n.includes("violet"))                                                  return "orion-violet";
-  if (n.includes("emerald") || n.includes("matrix"))                        return "orion-emerald";
-  if (n.includes("amber")  || n.includes("crt"))                            return "orion-amber";
-  if (n.includes("red")    || n.includes("alert") || n === "black_red")     return "orion-red";
-  if (n.includes("cyan")   || n.includes("arctic") || n.includes("orion_blue") || n.includes("cyber")) return "orion-cyan";
-  if (n.includes("green"))                                                   return "orion-green";
-  if (n.includes("purple") || n.includes("deep_purple") || n.includes("cyberpunk")) return "orion-purple";
+  if (n.includes("light") || n.includes("glass_white") || n === "blanco") return "orion-light";
+  if (n.includes("violet")) return "orion-violet";
+  if (n.includes("emerald") || n.includes("matrix")) return "orion-emerald";
+  if (n.includes("amber") || n.includes("crt")) return "orion-amber";
+  if (n.includes("red") || n.includes("alert") || n === "black_red") return "orion-red";
+  if (n.includes("cyan") || n.includes("arctic") || n.includes("orion_blue") || n.includes("cyber"))
+    return "orion-cyan";
+  if (n.includes("green")) return "orion-green";
+  if (n.includes("purple") || n.includes("deep_purple") || n.includes("cyberpunk"))
+    return "orion-purple";
   return "orion-night";
 }
 
@@ -84,10 +116,10 @@ export function isLightTheme(): boolean {
 }
 
 export default function App() {
-  const send       = useOrionSocket();
-  const view       = useViewStore((s) => s.view);
-  const muted      = useOrionStore((s) => s.muted);
-  const revTheme   = useOrionStore((s) => s.rev.theme);
+  const send = useOrionSocket();
+  const view = useViewStore((s) => s.view);
+  const muted = useOrionStore((s) => s.muted);
+  const revTheme = useOrionStore((s) => s.rev.theme);
   const [version, setVersion] = useState<string>("");
   const [collapsed, setCollapsed] = useState<boolean>(
     () => typeof window !== "undefined" && window.localStorage.getItem(RAIL_KEY) === "1",
@@ -103,14 +135,17 @@ export default function App() {
 
   // React to backend theme switches by setting data-theme on <html>.
   useEffect(() => {
-    api.getTheme()
+    api
+      .getTheme()
       .then((info) => {
         const name = (info?.name ?? "").toLowerCase();
         const slug = resolveTheme(name);
         document.documentElement.setAttribute("data-theme", slug);
         window.localStorage.setItem(THEME_KEY, slug);
       })
-      .catch(() => { /* leave default */ });
+      .catch(() => {
+        /* leave default */
+      });
   }, [revTheme]);
 
   // restore saved light/dark preference on mount
@@ -139,69 +174,145 @@ export default function App() {
   // qué amerita pulso vive en useEventPulses.
   useEventPulses();
 
+  // Atajos Ctrl + / Ctrl - / Ctrl 0 (+ Ctrl + wheel) para escalar todo
+  // el chrome. Persiste el factor en localStorage.
+  useZoomShortcuts();
+
+  // Prefetch del panel "Conversación" cuando el browser está idle. Es
+  // de lejos la siguiente vista más probable después de Inicio (el
+  // input del Home redirige ahí). Con requestIdleCallback no robamos
+  // ciclos del primer paint — sólo se dispara cuando la main thread
+  // queda libre. Si el navegador no soporta rIC (Safari < 17),
+  // fallback a setTimeout 1500ms.
+  useEffect(() => {
+    const prefetch = () => {
+      void import("@/components/ChatPanel");
+    };
+    const ric = (window as unknown as { requestIdleCallback?: (cb: () => void) => number })
+      .requestIdleCallback;
+    const handle = ric ? ric(prefetch) : window.setTimeout(prefetch, 1500);
+    return () => {
+      const cic = (window as unknown as { cancelIdleCallback?: (h: number) => void })
+        .cancelIdleCallback;
+      if (ric && cic) cic(handle);
+      else window.clearTimeout(handle as number);
+    };
+  }, []);
+
   const railW = collapsed ? "72px" : "264px";
 
   return (
-    <div
-      className="h-screen w-screen grid overflow-hidden bg-bg text-text noise"
-      style={{ gridTemplateColumns: `${railW} 1fr` }}
-    >
-      {/* ── Sidebar ───────────────────────────────────────────────── */}
-      <aside className="relative flex flex-col p-3 border-r border-white/[0.06] bg-sunken/50 backdrop-blur-sm chrome-edge-right">
-        {/* brand */}
-        <div className={collapsed ? "flex justify-center py-2 mb-3" : "flex items-center gap-2.5 px-2 py-2 mb-4"}>
-          <BrandMark />
-          {!collapsed && (
-            <div className="leading-tight">
-              <div className="text-[13px] font-semibold tracking-[0.18em] text-text">ORION</div>
-              <div className="text-[9px] uppercase tracking-[0.22em] text-muted numeric">OS · v{version || "…"}</div>
-            </div>
-          )}
-        </div>
+    <div className="relative h-full w-full overflow-hidden bg-bg text-text noise">
+      {/* ── Neural background GLOBAL — debajo del sidebar, topbar y main.
+          Posición absoluta sobre el viewport entero para que la grilla y
+          los anillos continúen visualmente por debajo del sidebar (que es
+          translúcido). */}
+      <div className="absolute inset-0 z-0">
+        <NeuralBackground intensity={view === "home" ? "full" : "ambient"} />
+      </div>
 
-        <Sidebar collapsed={collapsed} />
-
-        <div className="flex-1" />
-
-        {/* status footer */}
-        <div className="flex flex-col gap-2">
-          {!collapsed && <ThemeToggle />}
-          <FooterStatus collapsed={collapsed} muted={muted} />
-        </div>
-      </aside>
-
-      {/* ── Main column ───────────────────────────────────────────── */}
-      <div className="flex flex-col overflow-hidden">
-        <TopBar
-          version={version}
-          collapsed={collapsed}
-          onToggleRail={() => setCollapsed((v) => !v)}
-          onToggleMute={() => send("mute", { value: !muted })}
-          onInterrupt={() => send("interrupt")}
-        />
-
-        <main key={view} className="relative flex-1 overflow-hidden bg-bg animate-fade-in">
-          {/* ojo ambiental detrás de todas las vistas != home — reacciona
-              al estado real del backend (escuchando/pensando/hablando/error) */}
-          {view !== "home" && <BackgroundEye />}
-
-          {/* las vistas viven sobre el ojo, en su propio plano */}
-          <div className="relative z-10 h-full">
-            {view === "home"      && <HomePanel />}
-            {view === "chat"      && <ChatPanel send={send} />}
-            {view === "notes"     && <NotesPanel />}
-            {view === "memory"    && <MemoryPanel />}
-            {view === "history"   && <HistoryPanel />}
-            {view === "telemetry" && <TelemetryPanel />}
-            {view === "agents"    && <AgentsPanel />}
-            {view === "iot"       && <IoTPanel />}
-            {view === "mcp"       && <MCPPanel />}
-            {view === "skills"    && <SkillsPanel />}
-            {view === "notifications" && <NotificationsPanel />}
-            {view === "circuit"   && <CircuitPanel />}
-            {view === "settings"  && <SettingsPanel />}
+      <div
+        className="relative z-10 h-full w-full grid overflow-hidden"
+        style={{ gridTemplateColumns: `${railW} 1fr` }}
+      >
+        {/* ── Sidebar ───────────────────────────────────────────────── */}
+        {/* min-h-0 + flex column con un scroller interno: brand pinned arriba,
+          footer (tema + sistema) pinned abajo, y los items navegables hacen
+          scroll cuando crecen — esto sobrevive a cualquier nivel de zoom.
+          bg translúcido para que el NeuralBackground se vea atrás. */}
+        <aside className="relative flex flex-col p-3 border-r border-white/[0.06] bg-sunken/25 backdrop-blur-md chrome-edge-right min-h-0 overflow-hidden">
+          {/* brand */}
+          <div
+            className={
+              collapsed
+                ? "flex justify-center py-2 mb-3 shrink-0"
+                : "flex items-center gap-2.5 px-2 py-2 mb-4 shrink-0"
+            }
+          >
+            <BrandMark />
+            {!collapsed && (
+              <div className="leading-tight">
+                <div className="text-[13px] font-semibold tracking-[0.18em] text-text">ORION</div>
+                <div className="text-[9px] uppercase tracking-[0.22em] text-muted numeric">
+                  OS · v{version || "…"}
+                </div>
+              </div>
+            )}
           </div>
-        </main>
+
+          {/* scroll area: ocupa todo el espacio entre brand y footer; si los
+            items no caben, scrollea acá sin tapar el footer. */}
+          <div className="flex-1 min-h-0 overflow-y-auto scrollbar-thin -mx-1 px-1">
+            <Sidebar collapsed={collapsed} />
+          </div>
+
+          {/* status footer — sticky por estructura (flex column con el scroller
+            arriba), con un fade superior que sugiere que hay más por scrollear. */}
+          <div className="relative flex flex-col gap-2 pt-3 shrink-0">
+            <div
+              aria-hidden
+              className="pointer-events-none absolute -top-4 left-0 right-0 h-4
+                       bg-gradient-to-b from-transparent to-[rgb(var(--orion-sunken)/0.9)]"
+            />
+            {!collapsed && <ThemeToggle />}
+            <FooterStatus collapsed={collapsed} muted={muted} />
+          </div>
+        </aside>
+
+        {/* ── Main column ───────────────────────────────────────────── */}
+        <div className="flex flex-col overflow-hidden">
+          <TopBar
+            version={version}
+            collapsed={collapsed}
+            onToggleRail={() => setCollapsed((v) => !v)}
+            onToggleMute={() => send("mute", { value: !muted })}
+            onInterrupt={() => send("interrupt")}
+          />
+
+          <main
+            key={view}
+            className="relative flex-1 overflow-hidden bg-transparent animate-fade-in"
+          >
+            {/* Capa 0 — ojo ambiental detrás de las vistas != home,
+              reacciona al estado real del backend. El NeuralBackground
+              vive a nivel raíz, debajo de todo. */}
+            {view !== "home" && <BackgroundEye />}
+
+            {/* Capa 1 — las vistas viven sobre el fondo, en su propio plano.
+              Home es eager (sin Suspense); el resto va dentro del
+              Suspense con un fallback minimalista para el primer paint
+              mientras Vite trae el chunk del panel. Después del primer
+              load el panel queda cacheado en memoria por React.lazy.
+              ErrorBoundary captura tanto fallos de descarga del chunk
+              como crashes de render dentro del panel — el `key={view}`
+              resetea el boundary al cambiar de vista. */}
+            <div className="relative z-10 h-full">
+              {view === "home" && (
+                <ErrorBoundary key="home">
+                  <HomePanel />
+                </ErrorBoundary>
+              )}
+              {view !== "home" && (
+                <ErrorBoundary key={view}>
+                  <Suspense fallback={<PanelLoader />}>
+                    {view === "chat" && <ChatPanel send={send} />}
+                    {view === "notes" && <NotesPanel />}
+                    {view === "memory" && <MemoryPanel />}
+                    {view === "history" && <HistoryPanel />}
+                    {view === "telemetry" && <TelemetryPanel />}
+                    {view === "agents" && <AgentsPanel />}
+                    {view === "iot" && <IoTPanel />}
+                    {view === "mcp" && <MCPPanel />}
+                    {view === "skills" && <SkillsPanel />}
+                    {view === "notifications" && <NotificationsPanel />}
+                    {view === "circuit" && <CircuitPanel />}
+                    {view === "settings" && <SettingsPanel />}
+                  </Suspense>
+                </ErrorBoundary>
+              )}
+            </div>
+          </main>
+        </div>
       </div>
 
       {/* overlays */}
@@ -223,9 +334,9 @@ export default function App() {
    el mouse está encima. La paleta queda FIJA en blanco-azul: nunca
    cambia de color con el estado de Orion. */
 const SIDEBAR_EYE_PALETTE: EyePalette = {
-  main:   "rgba(200, 225, 255, 0.95)",
+  main: "rgba(200, 225, 255, 0.95)",
   second: "rgba(120, 165, 230, 0.85)",
-  glow:   "rgba(200, 225, 255, 0.45)",
+  glow: "rgba(200, 225, 255, 0.45)",
 };
 
 function BrandMark() {
@@ -248,7 +359,7 @@ function BrandMark() {
   );
 }
 
-/* ─── theme toggle — quick light/dark switch in sidebar ───────────── */
+/* ─── theme toggle — card estilo Gemini con icono coloreado ───────── */
 function ThemeToggle() {
   const [light, setLight] = useState(() => isLightTheme());
 
@@ -261,48 +372,94 @@ function ThemeToggle() {
     <button
       onClick={flip}
       title={light ? "Cambiar a modo oscuro" : "Cambiar a modo claro"}
-      className="flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg
-                 border border-white/[0.05] bg-elevated/40
-                 hover:bg-elevated/70 hover:border-pri/30
+      className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg
+                 border border-pri/20 bg-pri/[0.04]
+                 hover:bg-pri/[0.08] hover:border-pri/35
                  transition-all duration-200 ease-out-expo group"
     >
-      <span className="grid place-items-center h-6 w-6 rounded-md bg-pri/15 text-pri
-                       group-hover:bg-pri/25 transition-colors">
-        <Icon name={light ? "sun" : "moon"} size={13} />
+      <span
+        className="grid place-items-center h-7 w-7 rounded-lg bg-pri/15 text-pri
+                       border border-pri/25
+                       group-hover:bg-pri/25 group-hover:shadow-[0_0_12px_rgb(var(--orion-pri-glow)/0.4)]
+                       transition-all"
+      >
+        <Icon name={light ? "sun" : "moon"} size={14} />
       </span>
-      <div className="leading-tight min-w-0">
-        <div className="text-[10px] uppercase tracking-[0.18em] text-text-dim">Tema</div>
-        <div className="text-[10px] text-text truncate font-medium">
+      <div className="leading-tight min-w-0 flex-1 text-left">
+        <div className="text-[9px] uppercase tracking-[0.22em] text-pri/75 font-semibold">Tema</div>
+        <div className="text-[11px] text-text truncate font-medium">
           {light ? "Claro" : "Oscuro"}
         </div>
       </div>
-      <Icon name="sun" size={12} className="ml-auto text-text-dim opacity-50 group-hover:opacity-100" />
+      <Icon
+        name="sun"
+        size={11}
+        className="text-pri/50 opacity-60 group-hover:opacity-100 transition-opacity"
+      />
     </button>
   );
 }
 
-/* ─── footer status — system signal + a tiny shortcut hint ─────────── */
+/* ─── Loader de paneles lazy ───────────────────────────────────────────
+   Fallback minimalista mientras Vite resuelve el chunk del panel.
+   Sin texto ni spinner para evitar parpadeo cuando el chunk ya está en
+   caché del navegador (típicamente <50 ms). Sólo en la primera carga
+   en frío se aprecia algo visible. */
+function PanelLoader() {
+  return (
+    <div className="h-full grid place-items-center animate-fade-in">
+      <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.28em] text-text-dim">
+        <span className="h-1.5 w-1.5 rounded-full bg-pri animate-pulse" />
+        <span>Cargando…</span>
+      </div>
+    </div>
+  );
+}
+
+/* ─── footer status — card con dot animado de conexión ─────────────── */
 function FooterStatus({ collapsed, muted }: { collapsed: boolean; muted: boolean }) {
   const connected = useOrionStore((s) => s.connected);
-  return collapsed ? (
-    <div className="grid place-items-center pb-1">
-      <span
-        className={`h-2 w-2 rounded-full ${connected ? "bg-ok shadow-[0_0_10px_rgb(var(--orion-ok))]" : "bg-muted"}`}
-        title={connected ? "Conectado" : "Sin conexión"}
-      />
-    </div>
-  ) : (
-    <div className="flex items-center justify-between px-2 py-2 rounded-lg border border-white/[0.05] bg-elevated/40">
-      <div className="flex items-center gap-2 min-w-0">
-        <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${connected ? "bg-ok shadow-[0_0_10px_rgb(var(--orion-ok))]" : "bg-muted"}`} />
+  if (collapsed) {
+    return (
+      <div className="grid place-items-center pb-1">
+        <span
+          className={`h-2 w-2 rounded-full ${connected ? "bg-ok shadow-[0_0_10px_rgb(var(--orion-ok))] animate-pulse" : "bg-muted"}`}
+          title={connected ? "Conectado" : "Sin conexión"}
+        />
+      </div>
+    );
+  }
+
+  const stateText = connected ? (muted ? "En silencio" : "Operativo") : "Reconectando…";
+
+  return (
+    <div
+      className="flex items-center justify-between px-2.5 py-2 rounded-lg
+                    border border-pri/20 bg-pri/[0.04]
+                    hover:bg-pri/[0.06] transition-colors"
+    >
+      <div className="flex items-center gap-2.5 min-w-0">
+        <span className="grid place-items-center h-7 w-7 rounded-lg bg-pri/15 border border-pri/25 relative">
+          <span
+            className={`h-1.5 w-1.5 rounded-full ${connected ? "bg-ok shadow-[0_0_8px_rgb(var(--orion-ok))] animate-pulse" : "bg-muted"}`}
+          />
+        </span>
         <div className="leading-tight min-w-0">
-          <div className="text-[10px] uppercase tracking-[0.2em] text-text-dim">Sistema</div>
-          <div className="text-[10px] text-text truncate">
-            {connected ? (muted ? "En silencio" : "Operativo") : "Reconectando…"}
+          <div className="text-[9px] uppercase tracking-[0.22em] text-pri/75 font-semibold">
+            Sistema
+          </div>
+          <div
+            className={`text-[11px] truncate font-medium ${connected ? "text-ok" : "text-text-dim"}`}
+          >
+            {stateText}
           </div>
         </div>
       </div>
-      <Icon name="bolt" size={14} className="text-pri/70 shrink-0" />
+      <Icon
+        name="bolt"
+        size={13}
+        className={`shrink-0 ${connected ? "text-ok/80" : "text-muted"}`}
+      />
     </div>
   );
 }

@@ -39,16 +39,16 @@ from __future__ import annotations
 
 import threading
 import time
-from typing import Optional
 
 try:
     import serial  # type: ignore
+
     _PYSERIAL_OK = True
 except ImportError:
     _PYSERIAL_OK = False
 
-from .base import Transport
 from ..devices import Device
+from .base import Transport
 
 
 class SerialTransport(Transport):
@@ -58,13 +58,11 @@ class SerialTransport(Transport):
         super().__init__(transport_id, cfg)
 
         if not _PYSERIAL_OK:
-            raise RuntimeError(
-                "pyserial no está instalado. Ejecuta: pip install pyserial"
-            )
+            raise RuntimeError("pyserial no está instalado. Ejecuta: pip install pyserial")
 
-        self._conn: Optional["serial.Serial"] = None
+        self._conn: serial.Serial | None = None
         self._send_lock = threading.Lock()
-        self._reader_thread: Optional[threading.Thread] = None
+        self._reader_thread: threading.Thread | None = None
         self._reader_stop = threading.Event()
         # Prefijos registrados: prefix → device_id
         self._sensor_prefixes: dict[str, str] = {}
@@ -189,7 +187,8 @@ class SerialTransport(Transport):
             return  # nada que leer
         self._reader_stop.clear()
         self._reader_thread = threading.Thread(
-            target=self._read_loop, daemon=True,
+            target=self._read_loop,
+            daemon=True,
             name=f"IoT-Serial-Reader-{self.id}",
         )
         self._reader_thread.start()

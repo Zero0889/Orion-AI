@@ -52,31 +52,39 @@ def main():
             continue
 
         if method == "initialize":
-            respond(req_id, {
-                "protocolVersion": "2024-11-05",
-                "capabilities": {},
-                "serverInfo": {"name": "fake-mcp", "version": "0.0.1"},
-            })
+            respond(
+                req_id,
+                {
+                    "protocolVersion": "2024-11-05",
+                    "capabilities": {},
+                    "serverInfo": {"name": "fake-mcp", "version": "0.0.1"},
+                },
+            )
 
         elif method == "tools/list":
-            respond(req_id, {"tools": [
+            respond(
+                req_id,
                 {
-                    "name": "echo",
-                    "description": "Echoes a message back",
-                    "inputSchema": {
-                        "type": "object",
-                        "properties": {
-                            "message": {"type": "string", "description": "Texto a repetir"},
+                    "tools": [
+                        {
+                            "name": "echo",
+                            "description": "Echoes a message back",
+                            "inputSchema": {
+                                "type": "object",
+                                "properties": {
+                                    "message": {"type": "string", "description": "Texto a repetir"},
+                                },
+                                "required": ["message"],
+                            },
                         },
-                        "required": ["message"],
-                    },
+                        {
+                            "name": "fail",
+                            "description": "Always returns an error",
+                            "inputSchema": {"type": "object", "properties": {}},
+                        },
+                    ]
                 },
-                {
-                    "name": "fail",
-                    "description": "Always returns an error",
-                    "inputSchema": {"type": "object", "properties": {}},
-                },
-            ]})
+            )
 
         elif method == "tools/call":
             name = params.get("name")
@@ -85,10 +93,13 @@ def main():
                 text = f"ECHO: {args.get('message', '')}"
                 respond(req_id, {"content": [{"type": "text", "text": text}]})
             elif name == "fail":
-                respond(req_id, {
-                    "content": [{"type": "text", "text": "intentional failure"}],
-                    "isError": True,
-                })
+                respond(
+                    req_id,
+                    {
+                        "content": [{"type": "text", "text": "intentional failure"}],
+                        "isError": True,
+                    },
+                )
             else:
                 respond_error(req_id, -32601, f"unknown tool: {name}")
 

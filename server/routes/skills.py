@@ -23,26 +23,27 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
 from config import BASE_DIR
-from core.skills import get_skill, list_skills, reset_cache, max_inject_chars
+from core.skills import get_skill, list_skills, max_inject_chars, reset_cache
+import contextlib
 
 router = APIRouter()
 
 # Repo de OpenClaw como registry por defecto. El usuario podría apuntar a
 # un fork desde config/skills.json si quisiera; por ahora hardcodeo el
 # oficial — es lo que llaman "ClawHub" indirectamente.
-_OPENCLAW_REPO   = "openclaw/openclaw"
+_OPENCLAW_REPO = "openclaw/openclaw"
 _OPENCLAW_BRANCH = "main"
-_OPENCLAW_PATH   = "skills"
+_OPENCLAW_PATH = "skills"
 
 
 def _summary(s) -> dict:
     return {
-        "id":             s.id,
-        "name":           s.name,
-        "description":    s.description,
+        "id": s.id,
+        "name": s.name,
+        "description": s.description,
         "user_invocable": s.user_invocable,
-        "char_count":     s.char_count,
-        "path":           str(s.path),
+        "char_count": s.char_count,
+        "path": str(s.path),
     }
 
 
@@ -68,10 +69,13 @@ def _gh_api(path: str) -> list | dict:
     le aparece un 403 explícito y le explicamos que necesita ``gh auth``.
     """
     url = f"https://api.github.com/repos/{_OPENCLAW_REPO}/contents/{path}?ref={_OPENCLAW_BRANCH}"
-    req = urllib.request.Request(url, headers={
-        "Accept":     "application/vnd.github+json",
-        "User-Agent": "ORION-Skills-Installer/0.1",
-    })
+    req = urllib.request.Request(
+        url,
+        headers={
+            "Accept": "application/vnd.github+json",
+            "User-Agent": "ORION-Skills-Installer/0.1",
+        },
+    )
     try:
         with urllib.request.urlopen(req, timeout=15) as r:
             return json.loads(r.read())
@@ -80,12 +84,12 @@ def _gh_api(path: str) -> list | dict:
             raise HTTPException(
                 status_code=503,
                 detail="GitHub API rate-limit. Esperá ~1h o autenticá `gh auth login`.",
-            )
+            ) from e
         if e.code == 404:
-            raise HTTPException(status_code=404, detail="No existe en el repo OpenClaw.")
-        raise HTTPException(status_code=502, detail=f"GitHub API: {e.code} {e.reason}")
+            raise HTTPException(status_code=404, detail="No existe en el repo OpenClaw.") from e
+        raise HTTPException(status_code=502, detail=f"GitHub API: {e.code} {e.reason}") from e
     except urllib.error.URLError as e:
-        raise HTTPException(status_code=502, detail=f"Sin red: {e.reason}")
+        raise HTTPException(status_code=502, detail=f"Sin red: {e.reason}") from e
 
 
 @router.get("/registry/search")
@@ -104,16 +108,18 @@ async def search_registry(q: str = "") -> list[dict]:
         sid = it.get("name", "")
         if needle and needle not in sid.lower():
             continue
-        out.append({
-            "id":       sid,
-            "html_url": it.get("html_url"),
-            "source":   "openclaw",
-        })
+        out.append(
+            {
+                "id": sid,
+                "html_url": it.get("html_url"),
+                "source": "openclaw",
+            }
+        )
     return out
 
 
 class InstallBody(BaseModel):
-    name:   str = Field(..., min_length=1, max_length=80)
+    name: str = Field(..., min_length=1, max_length=80)
     source: str = Field(default="openclaw", description="Por ahora sólo 'openclaw'")
 
 
@@ -150,7 +156,7 @@ def _install_dir(remote_path: str, local_dir, depth: int = 0) -> list[str]:
             written.append(name)
         elif it.get("type") == "dir":
             sub_remote = f"{remote_path}/{name}"
-            sub_local  = local_dir / name
+            sub_local = local_dir / name
             for w in _install_dir(sub_remote, sub_local, depth + 1):
                 written.append(f"{name}/{w}")
     return written
@@ -181,7 +187,7 @@ async def install_skill(body: InstallBody) -> dict:
         raise HTTPException(status_code=400, detail="Nombre de skill inválido.")
 
     local_dir = BASE_DIR / "skills" / sid
-    remote    = f"{_OPENCLAW_PATH}/{sid}"
+    remote = f"{_OPENCLAW_PATH}/{sid}"
 
     files = _install_dir(remote, local_dir)
     if not files:
@@ -197,14 +203,13 @@ async def install_skill(body: InstallBody) -> dict:
     scan_summary: dict = {}
     try:
         from core.skill_scanner import scan_skill_dir
+
         scan = scan_skill_dir(local_dir)
         scan_summary = scan.to_dict()
         if scan.has_critical():
             # Borrar lo descargado y rechazar
-            try:
+            with contextlib.suppress(Exception):
                 shutil.rmtree(local_dir)
-            except Exception:
-                pass
             criticals = [
                 f"[{f.rule_id}] {f.file}:{f.line} — {f.message}"
                 for f in scan.by_severity("critical")
@@ -212,9 +217,9 @@ async def install_skill(body: InstallBody) -> dict:
             raise HTTPException(
                 status_code=400,
                 detail={
-                    "error":     "Skill rechazada por security scanner",
+                    "error": "Skill rechazada por security scanner",
                     "criticals": criticals,
-                    "summary":   scan.summary(),
+                    "summary": scan.summary(),
                 },
             )
     except ImportError:
@@ -222,11 +227,11 @@ async def install_skill(body: InstallBody) -> dict:
 
     # ── Origin tracking ──
     origin = {
-        "version":          1,
-        "registry":         body.source,
-        "slug":             sid,
-        "installed_at":     int(time.time()),
-        "installed_files":  files,
+        "version": 1,
+        "registry": body.source,
+        "slug": sid,
+        "installed_at": int(time.time()),
+        "installed_files": files,
     }
     try:
         (local_dir / ".openclaw-origin.json").write_text(
@@ -239,13 +244,11 @@ async def install_skill(body: InstallBody) -> dict:
     lock_path = BASE_DIR / "config" / "skills.lock.json"
     lock: dict = {"version": 1, "skills": {}}
     if lock_path.exists():
-        try:
+        with contextlib.suppress(json.JSONDecodeError, OSError):
             lock = json.loads(lock_path.read_text(encoding="utf-8"))
-        except (json.JSONDecodeError, OSError):
-            pass
     lock.setdefault("skills", {})
     lock["skills"][sid] = {
-        "registry":     body.source,
+        "registry": body.source,
         "installed_at": origin["installed_at"],
     }
     try:
@@ -255,12 +258,12 @@ async def install_skill(body: InstallBody) -> dict:
 
     reset_cache()
     return {
-        "ok":     True,
-        "id":     sid,
-        "files":  files,
-        "path":   str(local_dir),
+        "ok": True,
+        "id": sid,
+        "files": files,
+        "path": str(local_dir),
         "loaded": any(s.id == sid for s in list_skills(force=True)),
-        "scan":   scan_summary,
+        "scan": scan_summary,
     }
 
 
@@ -271,6 +274,7 @@ async def install_skill(body: InstallBody) -> dict:
 async def list_cli() -> list[dict]:
     """Catálogo completo de CLIs conocidos por el installer con su status."""
     from core.cli_installer import registry_info
+
     return registry_info()
 
 
@@ -278,15 +282,16 @@ async def list_cli() -> list[dict]:
 async def cli_status(name: str) -> dict:
     """Reporta si un binario está disponible y dónde (tools/ o PATH del sistema)."""
     from core.cli_installer import REGISTRY, cli_path
+
     if name not in REGISTRY:
         raise HTTPException(status_code=404, detail=f"CLI '{name}' no registrado.")
     p = cli_path(name)
     return {
-        "name":      name,
+        "name": name,
         "installed": p is not None,
-        "path":      p,
-        "managed":   bool(p and "/tools/" in p.replace("\\", "/")),
-        "version":   REGISTRY[name].version,
+        "path": p,
+        "managed": bool(p and "/tools/" in p.replace("\\", "/")),
+        "version": REGISTRY[name].version,
     }
 
 
@@ -296,6 +301,7 @@ async def cli_install(name: str, force: bool = False) -> dict:
     el executor lo encuentra automáticamente (se mete tools/<name>/ en el
     PATH del subprocess de generated_code)."""
     from core.cli_installer import REGISTRY, install_cli
+
     if name not in REGISTRY:
         raise HTTPException(
             status_code=404,
@@ -321,9 +327,7 @@ async def get_skill_detail(skill_id: str) -> dict:
         raise HTTPException(status_code=404, detail=f"Skill '{skill_id}' no encontrada")
     return {
         **_summary(skill),
-        "body":         skill.body,
-        "frontmatter":  skill.frontmatter,
-        "max_inject":   max_inject_chars(),
+        "body": skill.body,
+        "frontmatter": skill.frontmatter,
+        "max_inject": max_inject_chars(),
     }
-
-

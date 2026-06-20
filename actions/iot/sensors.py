@@ -15,19 +15,18 @@ from __future__ import annotations
 import threading
 import time
 from dataclasses import dataclass
-from typing import Optional
 
 
 @dataclass(frozen=True)
 class SensorReading:
     device_id: str
-    value:     str       # crudo, como llegó del transporte
-    ts:        float     # epoch seconds
+    value: str  # crudo, como llegó del transporte
+    ts: float  # epoch seconds
 
     def age_seconds(self) -> float:
         return time.time() - self.ts
 
-    def numeric(self) -> Optional[float]:
+    def numeric(self) -> float | None:
         try:
             return float(self.value.replace(",", "."))
         except (ValueError, AttributeError):
@@ -39,14 +38,14 @@ class SensorCache:
 
     def __init__(self) -> None:
         self._values: dict[str, SensorReading] = {}
-        self._lock   = threading.Lock()
+        self._lock = threading.Lock()
 
     def update(self, device_id: str, raw_value: str) -> None:
         reading = SensorReading(device_id, raw_value.strip(), time.time())
         with self._lock:
             self._values[device_id] = reading
 
-    def get(self, device_id: str) -> Optional[SensorReading]:
+    def get(self, device_id: str) -> SensorReading | None:
         with self._lock:
             return self._values.get(device_id)
 
@@ -63,7 +62,7 @@ class SensorCache:
 # Double-checked locking: la primera llamada concurrente desde dos threads
 # (típico: serial_tx y mqtt_tx arrancando en paralelo) creaba DOS instancias
 # distintas y las lecturas se perdían en la que no quedaba como singleton.
-_cache: Optional[SensorCache] = None
+_cache: SensorCache | None = None
 _cache_lock = threading.Lock()
 
 

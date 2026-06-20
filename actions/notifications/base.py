@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import time
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, field, asdict
+from dataclasses import asdict, dataclass, field
 from typing import Any
 
 
@@ -17,13 +17,14 @@ class NotificationItem:
     usa ``"<courseId>:<itemId>"``. Lo importante es que sea **estable**
     entre polls.
     """
-    uid:        str
-    source:     str            # "gmail" | "classroom" | "calendar" | ...
-    title:      str            # 1 línea, lo que ve el usuario
-    summary:    str = ""       # 2-3 líneas opcionales
-    url:        str | None = None    # Acción primaria: abrir en navegador
+
+    uid: str
+    source: str  # "gmail" | "classroom" | "calendar" | ...
+    title: str  # 1 línea, lo que ve el usuario
+    summary: str = ""  # 2-3 líneas opcionales
+    url: str | None = None  # Acción primaria: abrir en navegador
     received_ts: float = field(default_factory=time.time)
-    metadata:   dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict:
         return asdict(self)

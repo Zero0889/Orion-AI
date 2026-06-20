@@ -9,8 +9,18 @@ import { create } from "zustand";
 
 export type View =
   | "home"
-  | "chat" | "notes" | "memory" | "history"
-  | "telemetry" | "agents" | "iot" | "mcp" | "skills" | "notifications" | "circuit" | "settings";
+  | "chat"
+  | "notes"
+  | "memory"
+  | "history"
+  | "telemetry"
+  | "agents"
+  | "iot"
+  | "mcp"
+  | "skills"
+  | "notifications"
+  | "circuit"
+  | "settings";
 
 interface ViewState {
   view: View;

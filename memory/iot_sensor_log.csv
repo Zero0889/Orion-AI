@@ -1,0 +1,16 @@
+timestamp,device,value,unit,samples
+2026-06-14 23:48:00,sensor_temperatura,26.2,°C,3
+2026-06-14 23:48:00,sensor_humedad,70.7,%,3
+2026-06-14 23:54:00,sensor_temperatura,26.2,°C,1
+2026-06-14 23:54:00,sensor_humedad,70.7,%,1
+2026-06-15 00:01:00,sensor_temperatura,26.2,°C,1
+2026-06-15 00:01:00,sensor_humedad,70.7,%,1
+2026-06-18 15:16:00,sensor_temperatura,26.773,°C,11
+2026-06-18 15:16:00,sensor_humedad,72.536,%,11
+2026-06-18 15:16:00,sensor_luz,16.585,lx,10
+2026-06-18 15:17:00,sensor_temperatura,26.958,°C,12
+2026-06-18 15:17:00,sensor_humedad,72.067,%,12
+2026-06-18 15:17:00,sensor_luz,23.609,lx,12
+2026-06-18 15:18:00,sensor_temperatura,27.0,°C,10
+2026-06-18 15:18:00,sensor_humedad,72.09,%,10
+2026-06-18 15:18:00,sensor_luz,23.33,lx,10

@@ -16,35 +16,45 @@ import { Icon, type IconName } from "@/ui/Icon";
 import { Badge, Button, Empty, SectionHeader, Surface, Switch } from "@/ui/primitives";
 import { toggleLightDark, isLightTheme } from "@/App";
 
-interface Palette { PRI?: string; PANEL?: string; BG?: string; ACC?: string }
+interface Palette {
+  PRI?: string;
+  PANEL?: string;
+  BG?: string;
+  ACC?: string;
+}
 
 type Tab = "appearance" | "network" | "integrations" | "voice" | "data" | "about";
 const TABS: { id: Tab; label: string; icon: IconName }[] = [
-  { id: "appearance",   label: "Apariencia",    icon: "sun"      },
-  { id: "network",      label: "Red",           icon: "wifi"     },
-  { id: "integrations", label: "Integraciones", icon: "plug"     },
-  { id: "voice",        label: "Voz",           icon: "mic"      },
-  { id: "data",         label: "Datos",         icon: "memory"   },
-  { id: "about",        label: "Acerca de",     icon: "info"     },
+  { id: "appearance", label: "Apariencia", icon: "sun" },
+  { id: "network", label: "Red", icon: "wifi" },
+  { id: "integrations", label: "Integraciones", icon: "plug" },
+  { id: "voice", label: "Voz", icon: "mic" },
+  { id: "data", label: "Datos", icon: "memory" },
+  { id: "about", label: "Acerca de", icon: "info" },
 ];
 
 export function SettingsPanel() {
   const rev = useOrionStore((s) => s.rev.theme);
-  const [tab, setTab]       = useState<Tab>("appearance");
-  const [info, setInfo]     = useState<ThemeInfo | null>(null);
-  const [error, setError]   = useState<string | null>(null);
+  const [tab, setTab] = useState<Tab>("appearance");
+  const [info, setInfo] = useState<ThemeInfo | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [palettes, setPalettes] = useState<Record<string, Palette>>({});
 
   useEffect(() => {
     let alive = true;
-    api.getTheme()
+    api
+      .getTheme()
       .then((i) => {
         if (!alive) return;
         setInfo(i);
         setPalettes({ [i.name]: i.theme as Palette });
       })
-      .catch((e) => { if (alive) setError(String(e)); });
-    return () => { alive = false; };
+      .catch((e) => {
+        if (alive) setError(String(e));
+      });
+    return () => {
+      alive = false;
+    };
   }, [rev]);
 
   async function pick(name: string) {
@@ -52,7 +62,9 @@ export function SettingsPanel() {
     try {
       const r = await api.setTheme(name);
       setPalettes((p) => ({ ...p, [name]: r.theme as Palette }));
-    } catch (e) { setError(String(e)); }
+    } catch (e) {
+      setError(String(e));
+    }
   }
 
   return (
@@ -61,7 +73,13 @@ export function SettingsPanel() {
         eyebrow="Sistema"
         title="Ajustes"
         hint="Personaliza Orion. Los cambios se aplican al instante."
-        action={info ? <Badge tone="info" dot>{info.name}</Badge> : null}
+        action={
+          info ? (
+            <Badge tone="info" dot>
+              {info.name}
+            </Badge>
+          ) : null
+        }
       />
 
       <div className="grid grid-cols-[220px_1fr] flex-1 overflow-hidden">
@@ -81,8 +99,11 @@ export function SettingsPanel() {
                     : "border-transparent text-text-dim hover:text-text hover:bg-white/[0.03]",
                 ].join(" ")}
               >
-                <Icon name={t.icon} size={15}
-                      className={isActive ? "text-pri" : "text-text-dim group-hover:text-text"} />
+                <Icon
+                  name={t.icon}
+                  size={15}
+                  className={isActive ? "text-pri" : "text-text-dim group-hover:text-text"}
+                />
                 <span className="font-medium tracking-tight">{t.label}</span>
               </button>
             );
@@ -93,13 +114,12 @@ export function SettingsPanel() {
         <div className="overflow-y-auto scrollbar-thin px-6 py-6">
           {error && (
             <div className="mb-4 flex items-start gap-2 p-3 rounded-md border border-danger/30 bg-danger/10 text-xs text-danger">
-              <Icon name="alert" size={14} className="mt-0.5 shrink-0" /><span>{error}</span>
+              <Icon name="alert" size={14} className="mt-0.5 shrink-0" />
+              <span>{error}</span>
             </div>
           )}
 
-          {tab === "appearance" && (
-            <Appearance info={info} palettes={palettes} onPick={pick} />
-          )}
+          {tab === "appearance" && <Appearance info={info} palettes={palettes} onPick={pick} />}
 
           {tab === "network" && <Network onError={setError} />}
 
@@ -118,8 +138,8 @@ export function SettingsPanel() {
             <Section title="Datos locales">
               <Surface level={2} className="p-4 text-sm text-text-dim leading-relaxed">
                 Las notas, memoria e historial se almacenan en{" "}
-                <code className="text-acc font-mono">memory/</code> dentro del proyecto.
-                Para exportarlos o moverlos, copia esa carpeta.
+                <code className="text-acc font-mono">memory/</code> dentro del proyecto. Para
+                exportarlos o moverlos, copia esa carpeta.
               </Surface>
             </Section>
           )}
@@ -132,14 +152,18 @@ export function SettingsPanel() {
                     <Icon name="orbit" size={20} className="text-pri" />
                   </div>
                   <div>
-                    <div className="text-[10px] uppercase tracking-[0.22em] text-pri/80">Sistema</div>
-                    <div className="text-base font-semibold tracking-tight text-text">O.R.I.O.N</div>
+                    <div className="text-[10px] uppercase tracking-[0.22em] text-pri/80">
+                      Sistema
+                    </div>
+                    <div className="text-base font-semibold tracking-tight text-text">
+                      O.R.I.O.N
+                    </div>
                   </div>
                 </div>
                 <p className="text-sm text-text-dim leading-relaxed">
                   Operador de Redes Inteligentes y Optimización Neural. Tu sistema operativo
-                  asistido por IA — voz, agentes, IoT, telemetría y memoria persistente en
-                  un solo espacio local.
+                  asistido por IA — voz, agentes, IoT, telemetría y memoria persistente en un solo
+                  espacio local.
                 </p>
               </Surface>
             </Section>
@@ -160,7 +184,9 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 }
 
 function Appearance({
-  info, palettes, onPick,
+  info,
+  palettes,
+  onPick,
 }: {
   info: ThemeInfo | null;
   palettes: Record<string, Palette>;
@@ -190,8 +216,8 @@ function Appearance({
       {/* Light / Dark global toggle */}
       <Section title="Modo">
         <p className="text-xs text-text-dim/80 mb-4 leading-relaxed">
-          Alterna entre modo claro y oscuro al instante. El cambio es inmediato y se
-          guarda en este navegador.
+          Alterna entre modo claro y oscuro al instante. El cambio es inmediato y se guarda en este
+          navegador.
         </p>
         <Surface level={2} className="p-4 mb-6">
           <div className="flex items-center justify-between gap-4">
@@ -217,12 +243,12 @@ function Appearance({
       <Section title="Paleta de color">
         <p className="text-xs text-text-dim/80 mb-4 leading-relaxed">
           Cambia la paleta global. El frontend reacciona al evento{" "}
-          <code className="text-acc font-mono text-[11px]">settings.theme</code>{" "}
-          y aplica el nuevo tema en caliente.
+          <code className="text-acc font-mono text-[11px]">settings.theme</code> y aplica el nuevo
+          tema en caliente.
         </p>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
           {info.available.map((t, i) => {
-            const active  = t.id === info.name;
+            const active = t.id === info.name;
             const palette = palettes[t.id];
             return (
               <button
@@ -239,10 +265,10 @@ function Appearance({
               >
                 <div className="flex items-center gap-3">
                   <div className="flex gap-0.5">
-                    <Swatch color={palette?.BG    ?? "#0A0B0F"} />
+                    <Swatch color={palette?.BG ?? "#0A0B0F"} />
                     <Swatch color={palette?.PANEL ?? "#11131A"} />
-                    <Swatch color={palette?.PRI   ?? "#6D7CFF"} />
-                    <Swatch color={palette?.ACC   ?? "#7EE7FF"} />
+                    <Swatch color={palette?.PRI ?? "#6D7CFF"} />
+                    <Swatch color={palette?.ACC ?? "#7EE7FF"} />
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="text-sm font-medium text-text truncate">{t.name}</div>
@@ -271,15 +297,25 @@ function Swatch({ color }: { color: string }) {
 /* ── Network / Tailscale ─────────────────────────────────────────── */
 function Network({ onError }: { onError: (e: string | null) => void }) {
   const [state, setState] = useState<SharingState | null>(null);
-  const [busy, setBusy]   = useState(false);
+  const [busy, setBusy] = useState(false);
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     let alive = true;
-    api.getSharing()
-      .then((s) => { if (alive) { setState(s); onError(null); } })
-      .catch((e) => { if (alive) onError(String(e)); });
-    return () => { alive = false; };
+    api
+      .getSharing()
+      .then((s) => {
+        if (alive) {
+          setState(s);
+          onError(null);
+        }
+      })
+      .catch((e) => {
+        if (alive) onError(String(e));
+      });
+    return () => {
+      alive = false;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -290,8 +326,11 @@ function Network({ onError }: { onError: (e: string | null) => void }) {
       const next = await api.setSharing(!state.enabled);
       setState({ enabled: next.enabled, tailscale_ip: next.tailscale_ip, port: next.port });
       onError(null);
-    } catch (e) { onError(String(e)); }
-    finally { setBusy(false); }
+    } catch (e) {
+      onError(String(e));
+    } finally {
+      setBusy(false);
+    }
   }
 
   function copyUrl() {
@@ -308,8 +347,11 @@ function Network({ onError }: { onError: (e: string | null) => void }) {
       const s = await api.getSharing();
       setState(s);
       onError(null);
-    } catch (e) { onError(String(e)); }
-    finally { setBusy(false); }
+    } catch (e) {
+      onError(String(e));
+    } finally {
+      setBusy(false);
+    }
   }
 
   if (!state) {
@@ -328,11 +370,11 @@ function Network({ onError }: { onError: (e: string | null) => void }) {
   return (
     <Section title="Compartir vía Tailscale">
       <p className="text-xs text-text-dim/80 mb-4 leading-relaxed">
-        Cuando está activado, los dispositivos conectados a tu red privada Tailscale
-        (móvil, otra PC) pueden abrir Orion desde la URL de abajo. Tu PC sigue invisible
-        para el resto de internet — el filtro acepta solo IPs del rango{" "}
-        <code className="text-acc font-mono text-[11px]">100.64.0.0/10</code>{" "}
-        y <code className="text-acc font-mono text-[11px]">127.0.0.1</code>.
+        Cuando está activado, los dispositivos conectados a tu red privada Tailscale (móvil, otra
+        PC) pueden abrir Orion desde la URL de abajo. Tu PC sigue invisible para el resto de
+        internet — el filtro acepta solo IPs del rango{" "}
+        <code className="text-acc font-mono text-[11px]">100.64.0.0/10</code> y{" "}
+        <code className="text-acc font-mono text-[11px]">127.0.0.1</code>.
       </p>
 
       <Surface level={2} className="p-5">
@@ -343,7 +385,11 @@ function Network({ onError }: { onError: (e: string | null) => void }) {
               <span className="text-sm font-medium text-text">
                 {isOn ? "Compartiendo con Tailscale" : "Solo localhost (este PC)"}
               </span>
-              {isOn && <Badge tone="info" dot>activo</Badge>}
+              {isOn && (
+                <Badge tone="info" dot>
+                  activo
+                </Badge>
+              )}
             </div>
             <div className="text-[11px] text-muted mt-0.5">
               {isOn
@@ -364,15 +410,23 @@ function Network({ onError }: { onError: (e: string | null) => void }) {
               <code className="flex-1 px-3 h-9 grid place-items-center rounded-md bg-elevated border border-white/[0.08] font-mono text-sm text-acc truncate">
                 {url}
               </code>
-              <Button variant="secondary" size="sm" icon={copied ? "check" : "paperclip"} onClick={copyUrl}>
+              <Button
+                variant="secondary"
+                size="sm"
+                icon={copied ? "check" : "paperclip"}
+                onClick={copyUrl}
+              >
                 {copied ? "Copiado" : "Copiar"}
               </Button>
             </div>
           ) : (
             <div className="px-3 py-2 rounded-md border border-dashed border-white/[0.08] text-[11px] text-text-dim">
-              No se detectó IP de Tailscale.{" "}
-              ¿Está instalado y conectado? Revisa el ícono en la bandeja del sistema y haz click en{" "}
-              <button className="text-pri underline" onClick={refresh}>Refrescar</button>.
+              No se detectó IP de Tailscale. ¿Está instalado y conectado? Revisa el ícono en la
+              bandeja del sistema y haz click en{" "}
+              <button className="text-pri underline" onClick={refresh}>
+                Refrescar
+              </button>
+              .
             </div>
           )}
         </div>
@@ -384,8 +438,15 @@ function Network({ onError }: { onError: (e: string | null) => void }) {
             <div className="text-[11px] text-warn leading-relaxed">
               Mientras esté activado, cualquier dispositivo con sesión Tailscale en tu cuenta puede
               controlar Orion. Si pierdes el móvil, revoca su acceso desde{" "}
-              <a href="https://login.tailscale.com/admin/machines" target="_blank" rel="noreferrer"
-                 className="underline">tailscale.com/admin/machines</a>.
+              <a
+                href="https://login.tailscale.com/admin/machines"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="underline"
+              >
+                tailscale.com/admin/machines
+              </a>
+              .
             </div>
           </div>
         )}
@@ -399,7 +460,10 @@ function Network({ onError }: { onError: (e: string | null) => void }) {
           <li>Instala Tailscale en el móvil y entra con la misma cuenta que tu PC.</li>
           <li>Asegúrate de que el toggle Tailscale del móvil está en ON.</li>
           <li>Activa el switch de arriba ↑ y copia la URL.</li>
-          <li>Pégala en el navegador del móvil. Funciona desde cualquier red — WiFi, datos, cualquier país.</li>
+          <li>
+            Pégala en el navegador del móvil. Funciona desde cualquier red — WiFi, datos, cualquier
+            país.
+          </li>
         </ol>
       </Surface>
     </Section>
@@ -444,7 +508,7 @@ function NotebookLMCard() {
             toast.error("Login falló", s.login.message);
           }
         }
-      } catch (e) {
+      } catch {
         if (alive) {
           setLoading(false);
         }
@@ -452,7 +516,7 @@ function NotebookLMCard() {
         if (alive) {
           // Poll cada 2s si hay login en progreso, sino cada 15s para
           // no martillar el backend cuando todo está estable.
-          const next = (status?.login.status === "running") ? 2000 : 15000;
+          const next = status?.login.status === "running" ? 2000 : 15000;
           timer = window.setTimeout(tick, next);
         }
       }
@@ -464,13 +528,15 @@ function NotebookLMCard() {
     };
     // status?.login.status arriba intencional — re-vuelve a programar
     // el siguiente tick con el intervalo correcto.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status?.login.status]);
 
   async function login() {
     try {
       await api.notebookLMLogin();
-      toast.info("Login iniciado", "Se abrirá Chromium en breve. Iniciá sesión con tu cuenta Google.");
+      toast.info(
+        "Login iniciado",
+        "Se abrirá Chromium en breve. Iniciá sesión con tu cuenta Google.",
+      );
       // Forzamos refresh inmediato para mostrar el estado 'running'
       const s = await api.notebookLMStatus();
       setStatus(s);
@@ -491,7 +557,11 @@ function NotebookLMCard() {
   }
 
   if (loading) {
-    return <Surface level={2} className="p-5"><div className="skeleton h-20" /></Surface>;
+    return (
+      <Surface level={2} className="p-5">
+        <div className="skeleton h-20" />
+      </Surface>
+    );
   }
   if (!status) return null;
 
@@ -499,14 +569,8 @@ function NotebookLMCard() {
   const hasSession = status.has_session;
 
   // Tone + label para el chip de estado de la sesión
-  const sessionTone: "ok" | "warn" | "muted" =
-      inProgress      ? "warn"
-    : hasSession      ? "ok"
-    : "muted";
-  const sessionLabel =
-      inProgress      ? "Autenticando…"
-    : hasSession      ? "Conectado"
-    : "Sin sesión";
+  const sessionTone: "ok" | "warn" | "muted" = inProgress ? "warn" : hasSession ? "ok" : "muted";
+  const sessionLabel = inProgress ? "Autenticando…" : hasSession ? "Conectado" : "Sin sesión";
 
   return (
     <Surface level={2} className="p-5">
@@ -520,23 +584,29 @@ function NotebookLMCard() {
             <h4 className="text-sm font-semibold text-text">NotebookLM</h4>
             <SessionBadge tone={sessionTone} label={sessionLabel} pulse={inProgress} />
             {!status.installed && (
-              <Badge tone="danger" dot>Sin CLI</Badge>
+              <Badge tone="danger" dot>
+                Sin CLI
+              </Badge>
             )}
           </div>
           <p className="text-xs text-text-dim leading-relaxed mt-1">
-            Investigaciones profundas con auto-import de fuentes via el research agent
-            de Google. Requiere login con tu cuenta Google — la sesión se guarda
-            localmente en <code className="font-mono text-acc/80">~/.notebooklm/</code>.
+            Investigaciones profundas con auto-import de fuentes via el research agent de Google.
+            Requiere login con tu cuenta Google — la sesión se guarda localmente en{" "}
+            <code className="font-mono text-acc/80">~/.notebooklm/</code>.
           </p>
 
           {/* Mensaje del último intento */}
           {status.login.status !== "idle" && status.login.message && (
-            <div className={[
-              "mt-3 text-[11px] leading-relaxed p-2.5 rounded-md border font-mono",
-              status.login.status === "success" ? "text-ok      border-ok/30    bg-ok/5"
-            : status.login.status === "failed"  ? "text-danger  border-danger/30 bg-danger/5"
-            : "text-warn border-warn/30 bg-warn/5",
-            ].join(" ")}>
+            <div
+              className={[
+                "mt-3 text-[11px] leading-relaxed p-2.5 rounded-md border font-mono",
+                status.login.status === "success"
+                  ? "text-ok      border-ok/30    bg-ok/5"
+                  : status.login.status === "failed"
+                    ? "text-danger  border-danger/30 bg-danger/5"
+                    : "text-warn border-warn/30 bg-warn/5",
+              ].join(" ")}
+            >
               {status.login.message}
               {inProgress && status.login.elapsed > 0 && (
                 <span className="ml-2 opacity-70 tabular-nums">
@@ -560,7 +630,8 @@ function NotebookLMCard() {
             ) : (
               <>
                 <Button
-                  variant="primary" size="sm"
+                  variant="primary"
+                  size="sm"
                   icon={hasSession ? "orbit" : "bolt"}
                   onClick={login}
                   disabled={!status.installed}
@@ -569,7 +640,10 @@ function NotebookLMCard() {
                 </Button>
                 {!status.installed && (
                   <span className="text-[11px] text-danger">
-                    Instalá: <code className="font-mono">.venv\Scripts\pip.exe install "notebooklm-py[browser]"</code>
+                    Instalá:{" "}
+                    <code className="font-mono">
+                      .venv\Scripts\pip.exe install "notebooklm-py[browser]"
+                    </code>
                   </span>
                 )}
               </>
@@ -581,22 +655,27 @@ function NotebookLMCard() {
   );
 }
 
-function SessionBadge({ tone, label, pulse }: {
+function SessionBadge({
+  tone,
+  label,
+  pulse,
+}: {
   tone: "ok" | "warn" | "muted";
   label: string;
   pulse?: boolean;
 }) {
   const dotClass =
-      tone === "ok"   ? "bg-ok   shadow-[0_0_8px_rgb(var(--orion-ok))]"
-    : tone === "warn" ? "bg-warn shadow-[0_0_8px_rgb(var(--orion-warn))]"
-    : "bg-muted";
-  const textClass =
-      tone === "ok"   ? "text-ok"
-    : tone === "warn" ? "text-warn"
-    : "text-text-dim";
+    tone === "ok"
+      ? "bg-ok   shadow-[0_0_8px_rgb(var(--orion-ok))]"
+      : tone === "warn"
+        ? "bg-warn shadow-[0_0_8px_rgb(var(--orion-warn))]"
+        : "bg-muted";
+  const textClass = tone === "ok" ? "text-ok" : tone === "warn" ? "text-warn" : "text-text-dim";
   return (
     <span className="inline-flex items-center gap-1.5 text-[10px] uppercase tracking-[0.22em] font-mono">
-      <span className={`h-1.5 w-1.5 rounded-full ${dotClass} ${pulse ? "animate-pulse-soft" : ""}`} />
+      <span
+        className={`h-1.5 w-1.5 rounded-full ${dotClass} ${pulse ? "animate-pulse-soft" : ""}`}
+      />
       <span className={textClass}>{label}</span>
     </span>
   );

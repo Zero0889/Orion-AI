@@ -14,7 +14,7 @@ import { useOrionStore } from "@/stores/orion";
 
 export interface SensorPoint {
   value: number;
-  ts:    number;
+  ts: number;
 }
 
 /**

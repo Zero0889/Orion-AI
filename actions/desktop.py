@@ -1,23 +1,15 @@
-#desktop.py
+# desktop.py
 import os
-import sys
-import json
+import platform
 import shutil
 import subprocess
 import tempfile
-import platform
-from pathlib import Path
 from datetime import datetime
-
-from config import get_api_key
-
-try:
-    import pyautogui
-    _PYAUTOGUI = True
-except ImportError:
-    _PYAUTOGUI = False
+from pathlib import Path
+import contextlib
 
 _OS = platform.system()
+
 
 def _get_desktop() -> Path:
     if _OS == "Linux":
@@ -26,120 +18,22 @@ def _get_desktop() -> Path:
             return Path(xdg)
     return Path.home() / "Desktop"
 
-def _build_sandbox() -> dict:
-    import time
 
-    safe_builtins = {
-        "print": print,
-        "len": len, "str": str, "int": int, "float": float,
-        "bool": bool, "list": list, "dict": dict, "tuple": tuple,
-        "range": range, "enumerate": enumerate, "sorted": sorted,
-        "isinstance": isinstance, "hasattr": hasattr, "getattr": getattr,
-        "max": max, "min": min, "sum": sum, "abs": abs,
-        "zip": zip, "map": map, "filter": filter,
-    }
+# ── Eliminado: ejecución de código LLM-generado ─────────────────────────────
+# Antes esta tool aceptaba `action="task"` con texto libre, le pedía a Gemini
+# que generara código Python y lo ejecutaba con exec() sobre un dict de
+# "safe_builtins". Ese sandbox NO ofrecía garantías reales: el modelo
+# `().__class__.__mro__[1].__subclasses__()` clásico permite escapar de
+# cualquier filtro de builtins en CPython, y el flujo end-to-end era una
+# ruta de RCE accesible por voz / prompt injection.
+#
+# Reemplazo: las 7 acciones explícitas (wallpaper, organize, clean, list,
+# stats, current_wallpaper, wallpaper_url) cubren los casos legítimos sin
+# codegen. Si el modelo intenta `action="task"`, devolvemos un mensaje
+# explicando cómo formular la petición con las acciones disponibles.
+# Para automatización ad-hoc real existen tools dedicadas: file_controller,
+# computer_control, open_app, screen_processor.
 
-    sandbox = {
-        "__builtins__": safe_builtins,
-        "Path": Path,
-        "time": time,
-        "shutil": type("shutil", (), {
-            "copy2":      shutil.copy2,
-            "copytree":   shutil.copytree,
-            "disk_usage": shutil.disk_usage,
-        })(),
-        "os_path": os.path,
-    }
-
-    if _PYAUTOGUI:
-        sandbox["pyautogui"] = pyautogui
-
-    if _OS == "Windows":
-        try:
-            import ctypes
-            import winreg
-            sandbox["ctypes"] = ctypes
-            sandbox["winreg"] = type("winreg", (), {
-                # Sólo lectura
-                "OpenKey":      winreg.OpenKey,
-                "QueryValueEx": winreg.QueryValueEx,
-                "HKEY_CURRENT_USER": winreg.HKEY_CURRENT_USER,
-            })()
-        except ImportError:
-            pass
-
-    return sandbox
-
-
-def _execute_generated_code(code: str, player=None) -> str:
-    if not code or code.strip() == "UNSAFE":
-        return "Esta acción no se puede realizar de manera segura."
-
-    # Limpieza de código
-    if code.startswith("```"):
-        lines = code.split("\n")
-        code  = "\n".join(lines[1:-1]).strip()
-
-    sandbox      = _build_sandbox()
-    output_lines = []
-    sandbox["__builtins__"]["print"] = lambda *a: output_lines.append(" ".join(str(x) for x in a))
-
-    try:
-        exec(compile(code, "<orion_desktop>", "exec"), sandbox)
-        return "\n".join(output_lines) if output_lines else "Listo."
-    except Exception as e:
-        print(f"[Desktop] Error de ejecución: {e}\nCódigo:\n{code[:300]}")
-        return f"Error de ejecución: {e}"
-
-
-def _ask_gemini_for_desktop_action(task: str) -> str:
-
-    from core import gemini
-
-    desktop = str(_get_desktop())
-
-    os_specific = ""
-    if _OS == "Windows":
-        os_specific = "- ctypes (Windows API calls, read-only)\n- winreg (registry, READ-only)"
-    elif _OS == "Darwin":
-        os_specific = "- subprocess is NOT available; use pyautogui or Path only"
-    else:
-        os_specific = "- subprocess is NOT available; use pyautogui or Path only"
-
-    prompt = f"""You are a desktop automation assistant.
-Current OS: {_OS}
-Desktop path: {desktop}
-
-Generate safe Python code to perform the task described below.
-Allowed modules ONLY:
-- pyautogui (mouse, keyboard — if needed)
-- pathlib.Path (file/folder inspection only, no deletion)
-- shutil.copy2, shutil.copytree, shutil.disk_usage (NO move, NO rmtree)
-- os_path (equivalent to os.path, read-only)
-- time.sleep
-{os_specific}
-
-Strict rules:
-- NO deleting files (no unlink, rmtree, remove)
-- NO subprocess calls
-- NO exec() or eval() inside the code
-- NO import statements (modules are pre-injected)
-- NO file write operations unless explicitly requested
-- If the task cannot be done safely with these tools, return exactly: UNSAFE
-
-Return ONLY the Python code. No explanation, no markdown, no backticks.
-
-Task: {task}"""
-
-    try:
-        response = gemini.generate(prompt, model=gemini.FLASH)
-        code = response.text.strip()
-        if code.startswith("```"):
-            lines = code.split("\n")
-            code  = "\n".join(lines[1:-1]).strip()
-        return code
-    except Exception as e:
-        return f"ERROR: {e}"
 
 def set_wallpaper(image_path: str) -> str:
     path = Path(image_path).expanduser().resolve()
@@ -151,9 +45,11 @@ def set_wallpaper(image_path: str) -> str:
     try:
         if _OS == "Windows":
             import ctypes
+
             if path.suffix.lower() in {".webp", ".png"}:
                 try:
                     from PIL import Image
+
                     bmp_path = Path(tempfile.mktemp(suffix=".bmp"))
                     Image.open(path).convert("RGB").save(bmp_path, "BMP")
                     path = bmp_path
@@ -175,14 +71,14 @@ def set_wallpaper(image_path: str) -> str:
             uri = f"file://{path}"
 
             if "gnome" in desktop_env or "unity" in desktop_env:
-                subprocess.run([
-                    "gsettings", "set", "org.gnome.desktop.background",
-                    "picture-uri", uri
-                ], capture_output=True)
-                subprocess.run([
-                    "gsettings", "set", "org.gnome.desktop.background",
-                    "picture-uri-dark", uri
-                ], capture_output=True)
+                subprocess.run(
+                    ["gsettings", "set", "org.gnome.desktop.background", "picture-uri", uri],
+                    capture_output=True,
+                )
+                subprocess.run(
+                    ["gsettings", "set", "org.gnome.desktop.background", "picture-uri-dark", uri],
+                    capture_output=True,
+                )
 
             elif "kde" in desktop_env:
                 # KDE Plasma
@@ -196,23 +92,32 @@ for (var i = 0; i < allDesktops.length; i++) {{
 }}
 """
                 subprocess.run(
-                    ["qdbus", "org.kde.plasmashell", "/PlasmaShell",
-                     "org.kde.PlasmaShell.evaluateScript", script],
-                    capture_output=True
+                    [
+                        "qdbus",
+                        "org.kde.plasmashell",
+                        "/PlasmaShell",
+                        "org.kde.PlasmaShell.evaluateScript",
+                        script,
+                    ],
+                    capture_output=True,
                 )
 
             elif "xfce" in desktop_env:
-                subprocess.run([
-                    "xfconf-query", "-c", "xfce4-desktop",
-                    "-p", "/backdrop/screen0/monitor0/workspace0/last-image",
-                    "-s", str(path)
-                ], capture_output=True)
+                subprocess.run(
+                    [
+                        "xfconf-query",
+                        "-c",
+                        "xfce4-desktop",
+                        "-p",
+                        "/backdrop/screen0/monitor0/workspace0/last-image",
+                        "-s",
+                        str(path),
+                    ],
+                    capture_output=True,
+                )
 
             else:
-                result = subprocess.run(
-                    ["feh", "--bg-scale", str(path)],
-                    capture_output=True
-                )
+                result = subprocess.run(["feh", "--bg-scale", str(path)], capture_output=True)
                 if result.returncode != 0:
                     return (
                         f"No se pudo establecer el fondo de pantalla automáticamente en {desktop_env}. "
@@ -228,14 +133,13 @@ for (var i = 0; i < allDesktops.length; i++) {{
 def set_wallpaper_from_url(url: str) -> str:
     try:
         import urllib.request
+
         suffix = Path(url.split("?")[0]).suffix or ".jpg"
-        tmp    = Path(tempfile.mktemp(suffix=suffix))
+        tmp = Path(tempfile.mktemp(suffix=suffix))
         urllib.request.urlretrieve(url, str(tmp))
         result = set_wallpaper(str(tmp))
-        try:
+        with contextlib.suppress(Exception):
             tmp.unlink()
-        except Exception:
-            pass
         return result
     except Exception as e:
         return f"No se pudo descargar el fondo de pantalla: {e}"
@@ -245,21 +149,15 @@ def get_current_wallpaper() -> str:
     try:
         if _OS == "Windows":
             import winreg
-            key = winreg.OpenKey(
-                winreg.HKEY_CURRENT_USER, r"Control Panel\Desktop"
-            )
+
+            key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Control Panel\Desktop")
             val, _ = winreg.QueryValueEx(key, "Wallpaper")
             winreg.CloseKey(key)
             return f"Fondo de pantalla actual: {val}"
 
         elif _OS == "Darwin":
-            script = (
-                'tell application "System Events" to get picture of desktop 1'
-            )
-            result = subprocess.run(
-                ["osascript", "-e", script],
-                capture_output=True, text=True
-            )
+            script = 'tell application "System Events" to get picture of desktop 1'
+            result = subprocess.run(["osascript", "-e", script], capture_output=True, text=True)
             return f"Fondo de pantalla actual: {result.stdout.strip()}"
 
         else:
@@ -267,7 +165,8 @@ def get_current_wallpaper() -> str:
             if "gnome" in desktop_env or "unity" in desktop_env:
                 result = subprocess.run(
                     ["gsettings", "get", "org.gnome.desktop.background", "picture-uri"],
-                    capture_output=True, text=True
+                    capture_output=True,
+                    text=True,
                 )
                 return f"Fondo de pantalla actual: {result.stdout.strip()}"
             return "La obtención de la ruta del fondo de pantalla no es compatible con este entorno de escritorio."
@@ -275,28 +174,55 @@ def get_current_wallpaper() -> str:
     except Exception as e:
         return f"No se pudo obtener el fondo de pantalla: {e}"
 
+
 FILE_TYPE_MAP = {
-    "Imagenes":    {".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp", ".svg", ".ico", ".heic"},
-    "Documentos":  {".pdf", ".doc", ".docx", ".txt", ".xls", ".xlsx",
-                    ".ppt", ".pptx", ".csv", ".odt", ".ods", ".odp"},
-    "Videos":      {".mp4", ".avi", ".mkv", ".mov", ".wmv", ".flv", ".webm", ".m4v"},
-    "Musica":      {".mp3", ".wav", ".flac", ".aac", ".ogg", ".wma", ".m4a"},
-    "Archivos":    {".zip", ".rar", ".7z", ".tar", ".gz", ".bz2", ".xz"},
-    "Codigo":      {".py", ".js", ".ts", ".html", ".css", ".json", ".xml",
-                    ".cpp", ".java", ".cs", ".go", ".rs", ".sh", ".php"},
+    "Imagenes": {".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp", ".svg", ".ico", ".heic"},
+    "Documentos": {
+        ".pdf",
+        ".doc",
+        ".docx",
+        ".txt",
+        ".xls",
+        ".xlsx",
+        ".ppt",
+        ".pptx",
+        ".csv",
+        ".odt",
+        ".ods",
+        ".odp",
+    },
+    "Videos": {".mp4", ".avi", ".mkv", ".mov", ".wmv", ".flv", ".webm", ".m4v"},
+    "Musica": {".mp3", ".wav", ".flac", ".aac", ".ogg", ".wma", ".m4a"},
+    "Archivos": {".zip", ".rar", ".7z", ".tar", ".gz", ".bz2", ".xz"},
+    "Codigo": {
+        ".py",
+        ".js",
+        ".ts",
+        ".html",
+        ".css",
+        ".json",
+        ".xml",
+        ".cpp",
+        ".java",
+        ".cs",
+        ".go",
+        ".rs",
+        ".sh",
+        ".php",
+    },
     "Ejecutables": {".exe", ".msi", ".bat", ".cmd", ".sh", ".appimage", ".deb", ".rpm"},
 }
 
 _SKIP_EXTENSIONS = {
     "Windows": {".lnk", ".url"},
-    "Darwin":  {".webloc"},
-    "Linux":   {".desktop"},
+    "Darwin": {".webloc"},
+    "Linux": {".desktop"},
 }
 
 
 def organize_desktop(mode: str = "by_type") -> str:
-    desktop       = _get_desktop()
-    skip_exts     = _SKIP_EXTENSIONS.get(_OS, set())
+    desktop = _get_desktop()
+    skip_exts = _SKIP_EXTENSIONS.get(_OS, set())
     moved, skipped = [], []
 
     for item in desktop.iterdir():
@@ -306,10 +232,10 @@ def organize_desktop(mode: str = "by_type") -> str:
             continue
 
         if mode == "by_date":
-            mtime       = datetime.fromtimestamp(item.stat().st_mtime)
+            mtime = datetime.fromtimestamp(item.stat().st_mtime)
             folder_name = mtime.strftime("%Y-%m")
         else:
-            ext         = item.suffix.lower()
+            ext = item.suffix.lower()
             folder_name = "Otros"
             for folder, exts in FILE_TYPE_MAP.items():
                 if ext in exts:
@@ -339,7 +265,7 @@ def organize_desktop(mode: str = "by_type") -> str:
 
 def list_desktop() -> str:
     desktop = _get_desktop()
-    items   = []
+    items = []
     for item in sorted(desktop.iterdir()):
         if item.name.startswith("."):
             continue
@@ -350,10 +276,9 @@ def list_desktop() -> str:
                 count = "?"
             items.append(f"📁 {item.name}/ ({count} elementos)")
         else:
-            size     = item.stat().st_size
+            size = item.stat().st_size
             size_str = (
-                f"{size / 1024:.1f} KB" if size < 1024 * 1024
-                else f"{size / 1024 / 1024:.1f} MB"
+                f"{size / 1024:.1f} KB" if size < 1024 * 1024 else f"{size / 1024 / 1024:.1f} MB"
             )
             items.append(f"📄 {item.name} ({size_str})")
 
@@ -363,9 +288,9 @@ def list_desktop() -> str:
 
 
 def clean_desktop() -> str:
-    desktop     = _get_desktop()
-    skip_exts   = _SKIP_EXTENSIONS.get(_OS, set())
-    today       = datetime.now().strftime("%Y-%m-%d")
+    desktop = _get_desktop()
+    skip_exts = _SKIP_EXTENSIONS.get(_OS, set())
+    today = datetime.now().strftime("%Y-%m-%d")
     archive_dir = desktop / f"Archivo Escritorio {today}"
     archive_dir.mkdir(exist_ok=True)
 
@@ -384,12 +309,13 @@ def clean_desktop() -> str:
 
 
 def get_desktop_stats() -> str:
-    desktop    = _get_desktop()
-    files      = [i for i in desktop.iterdir() if i.is_file()]
-    folders    = [i for i in desktop.iterdir() if i.is_dir()]
+    desktop = _get_desktop()
+    files = [i for i in desktop.iterdir() if i.is_file()]
+    folders = [i for i in desktop.iterdir() if i.is_dir()]
     total_size = sum(f.stat().st_size for f in files if f.exists())
-    size_str   = (
-        f"{total_size / 1024:.1f} KB" if total_size < 1024 * 1024
+    size_str = (
+        f"{total_size / 1024:.1f} KB"
+        if total_size < 1024 * 1024
         else f"{total_size / 1024 / 1024:.1f} MB"
     )
     return (
@@ -399,6 +325,7 @@ def get_desktop_stats() -> str:
         f"  Tamaño   : {size_str}\n"
         f"  Ruta     : {desktop}"
     )
+
 
 def desktop_control(
     parameters: dict = None,
@@ -418,7 +345,7 @@ def desktop_control(
     """
     params = parameters or {}
     action = params.get("action", "").lower().strip()
-    task   = params.get("task", "").strip()
+    task = params.get("task", "").strip()
 
     if player:
         player.write_log(f"[desktop] {action or task[:40]}")
@@ -448,22 +375,25 @@ def desktop_control(
             return get_desktop_stats()
 
         elif action == "task" or task:
-            actual_task = task or params.get("description", "")
-            if not actual_task:
-                return "Por favor, describa lo que desea hacer en el escritorio."
-
-            print(f"[Desktop] Consultando a Gemini: {actual_task}")
-            if player:
-                player.write_log("[Desktop] Generando acción...")
-
-            code = _ask_gemini_for_desktop_action(actual_task)
-            return _execute_generated_code(code, player=player)
+            # Esta rama ejecutaba código LLM-generado vía exec(). Removida
+            # por seguridad — ver comentario al inicio del módulo.
+            return (
+                "Las tareas ad-hoc de escritorio ya no se ejecutan con "
+                "código generado. Use una acción explícita:\n"
+                "  • wallpaper / wallpaper_url / current_wallpaper\n"
+                "  • organize (mode=by_type|by_date) / clean\n"
+                "  • list / stats\n"
+                "Para operaciones de archivos, abrir apps o automatización "
+                "general, use las tools file_controller, open_app o "
+                "computer_control."
+            )
 
         else:
-            if action:
-                code = _ask_gemini_for_desktop_action(action)
-                return _execute_generated_code(code, player=player)
-            return "No se especificó ninguna acción o tarea."
+            return (
+                "Acción de escritorio desconocida. Acciones soportadas: "
+                "wallpaper, wallpaper_url, current_wallpaper, organize, "
+                "clean, list, stats."
+            )
 
     except Exception as e:
         print(f"[Desktop] Error: {e}")

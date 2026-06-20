@@ -40,11 +40,12 @@ import json
 import os
 import time
 from pathlib import Path
-from typing import Optional
 
 from config import BASE_DIR, CONFIG_DIR
 from core.logger import get_logger
+
 from .base import NotificationAdapter, NotificationItem
+import contextlib
 
 log = get_logger("classroom")
 
@@ -57,7 +58,7 @@ log = get_logger("classroom")
 os.environ.setdefault("OAUTHLIB_RELAX_TOKEN_SCOPE", "1")
 
 
-_TOKEN_PATH       = BASE_DIR / "tools" / "classroom" / "token.json"
+_TOKEN_PATH = BASE_DIR / "tools" / "classroom" / "token.json"
 _CLIENT_SECRET_NAME = "client_secret.json"
 
 _SCOPES = [
@@ -71,13 +72,13 @@ _SCOPES = [
 # ── Localización de credenciales ─────────────────────────────────────────
 
 
-def _find_client_secret() -> Optional[Path]:
+def _find_client_secret() -> Path | None:
     candidates = []
     env = os.environ.get("ORION_GOOGLE_CLIENT_SECRET")
     if env:
         candidates.append(Path(env))
     candidates.append(BASE_DIR / "tools" / "classroom" / _CLIENT_SECRET_NAME)
-    candidates.append(BASE_DIR / "tools" / "gog"        / _CLIENT_SECRET_NAME)
+    candidates.append(BASE_DIR / "tools" / "gog" / _CLIENT_SECRET_NAME)
     home = Path.home()
     candidates.append(home / "Documents" / "gog" / _CLIENT_SECRET_NAME)
     for c in candidates:
@@ -120,10 +121,8 @@ def _atomic_write_token(creds) -> None:
         os.replace(str(tmp), str(_TOKEN_PATH))
     except OSError as e:
         log.warning("No pude persistir token refrescado: %s", e)
-        try:
+        with contextlib.suppress(OSError):
             tmp.unlink(missing_ok=True)
-        except OSError:
-            pass
 
 
 def _load_creds():
@@ -144,8 +143,8 @@ def _load_creds():
         preservamos el original (Google solo lo devuelve la primera vez).
     """
     try:
-        from google.oauth2.credentials import Credentials
         from google.auth.transport.requests import Request
+        from google.oauth2.credentials import Credentials
     except ImportError as e:
         raise RuntimeError(
             "Falta google-auth. Reinstalá deps: pip install -r requirements.txt"
@@ -174,10 +173,8 @@ def _load_creds():
         except Exception as e:
             if _is_revocation_error(e):
                 log.warning("token revocado por Google, lo borro: %s", e)
-                try:
+                with contextlib.suppress(OSError):
                     _TOKEN_PATH.unlink(missing_ok=True)
-                except OSError:
-                    pass
                 return None
             # Cualquier otro error: red, 5xx, scope mismatch transient, etc.
             # Conservamos el token y devolvemos None — el próximo poll lo
@@ -190,10 +187,8 @@ def _load_creds():
         # el original explícitamente para que la próxima vez podamos
         # refrescar de nuevo.
         if not creds.refresh_token and original_refresh:
-            try:
+            with contextlib.suppress(Exception):
                 creds._refresh_token = original_refresh
-            except Exception:
-                pass
         _atomic_write_token(creds)
         return creds
 
@@ -203,10 +198,8 @@ def _load_creds():
     # para que el banner aparezca y el usuario re-autorice UNA vez bien.
     if creds and creds.expired and not creds.refresh_token:
         log.warning("token sin refresh_token — re-auth requerida (era OAuth viejo)")
-        try:
+        with contextlib.suppress(OSError):
             _TOKEN_PATH.unlink(missing_ok=True)
-        except OSError:
-            pass
     return None
 
 
@@ -233,7 +226,7 @@ def authorize_interactive() -> str:
             "tools/classroom/client_secret.json o usá el del setup de gog."
         )
     _TOKEN_PATH.parent.mkdir(parents=True, exist_ok=True)
-    flow  = InstalledAppFlow.from_client_secrets_file(str(cs), _SCOPES)
+    flow = InstalledAppFlow.from_client_secrets_file(str(cs), _SCOPES)
     creds = flow.run_local_server(
         port=0,
         open_browser=True,
@@ -257,7 +250,7 @@ def authorize_interactive() -> str:
 # ── URL rewrite (inyectar /u/N/) ─────────────────────────────────────────
 
 
-def _get_user_index() -> Optional[int]:
+def _get_user_index() -> int | None:
     """Lee user_index del config de notificaciones (classroom.user_index)."""
     cfg_path = CONFIG_DIR / "notifications.json"
     if not cfg_path.exists():
@@ -269,18 +262,19 @@ def _get_user_index() -> Optional[int]:
         return None
 
 
-def _rewrite_url(url: Optional[str], user_index: Optional[int]) -> Optional[str]:
+def _rewrite_url(url: str | None, user_index: int | None) -> str | None:
     """Reescribe classroom.google.com/c/… → classroom.google.com/u/N/c/…"""
     if not url or user_index is None:
         return url
     # Already has /u/N/ → replace it
     import re
-    if re.search(r'/u/\d+/', url):
-        return re.sub(r'/u/\d+/', f'/u/{user_index}/', url)
+
+    if re.search(r"/u/\d+/", url):
+        return re.sub(r"/u/\d+/", f"/u/{user_index}/", url)
     # Insert /u/N/ after the domain
     return url.replace(
-        'classroom.google.com/',
-        f'classroom.google.com/u/{user_index}/',
+        "classroom.google.com/",
+        f"classroom.google.com/u/{user_index}/",
         1,
     )
 
@@ -308,18 +302,21 @@ class ClassroomAdapter(NotificationAdapter):
         try:
             from googleapiclient.discovery import build
         except ImportError as e:
-            raise RuntimeError(
-                "Falta google-api-python-client. Reinstalá deps."
-            ) from e
+            raise RuntimeError("Falta google-api-python-client. Reinstalá deps.") from e
 
         service = build("classroom", "v1", credentials=creds, cache_discovery=False)
         user_idx = _get_user_index()
 
         # 1) Cursos activos.
         try:
-            courses_resp = service.courses().list(
-                courseStates=["ACTIVE"], pageSize=30,
-            ).execute()
+            courses_resp = (
+                service.courses()
+                .list(
+                    courseStates=["ACTIVE"],
+                    pageSize=30,
+                )
+                .execute()
+            )
         except Exception as e:
             raise RuntimeError(f"Classroom API courses.list: {e}") from e
 
@@ -331,57 +328,76 @@ class ClassroomAdapter(NotificationAdapter):
         items: list[NotificationItem] = []
         per_course = max(2, max_items // max(len(courses), 1))
         for course in courses:
-            cid   = course["id"]
+            cid = course["id"]
             cname = course.get("name") or f"Curso {cid}"
-            alt   = course.get("alternateLink")
+            alt = course.get("alternateLink")
 
             # Coursework (tareas).
             try:
-                cw_resp = service.courses().courseWork().list(
-                    courseId=cid, pageSize=per_course,
-                    orderBy="updateTime desc",
-                ).execute()
+                cw_resp = (
+                    service.courses()
+                    .courseWork()
+                    .list(
+                        courseId=cid,
+                        pageSize=per_course,
+                        orderBy="updateTime desc",
+                    )
+                    .execute()
+                )
             except Exception as e:
                 log.warning("%s: courseWork falló: %s", cname, e)
                 cw_resp = {}
-            for cw in (cw_resp.get("courseWork") or []):
-                title    = cw.get("title", "Tarea")
-                due      = cw.get("dueDate")
-                due_str  = _format_due(due, cw.get("dueTime"))
-                summary  = f"{cname}" + (f" · entrega {due_str}" if due_str else "")
-                items.append(NotificationItem(
-                    uid        = f"classroom:{cid}:cw:{cw['id']}",
-                    source     = "classroom",
-                    title      = f"📚 {title}",
-                    summary    = summary,
-                    url        = _rewrite_url(cw.get("alternateLink") or alt, user_idx),
-                    received_ts= _ts_from_iso(cw.get("updateTime")) or time.time(),
-                    metadata   = {"course_id": cid, "kind": "coursework",
-                                  "work_type": cw.get("workType")},
-                ))
+            for cw in cw_resp.get("courseWork") or []:
+                title = cw.get("title", "Tarea")
+                due = cw.get("dueDate")
+                due_str = _format_due(due, cw.get("dueTime"))
+                summary = f"{cname}" + (f" · entrega {due_str}" if due_str else "")
+                items.append(
+                    NotificationItem(
+                        uid=f"classroom:{cid}:cw:{cw['id']}",
+                        source="classroom",
+                        title=f"📚 {title}",
+                        summary=summary,
+                        url=_rewrite_url(cw.get("alternateLink") or alt, user_idx),
+                        received_ts=_ts_from_iso(cw.get("updateTime")) or time.time(),
+                        metadata={
+                            "course_id": cid,
+                            "kind": "coursework",
+                            "work_type": cw.get("workType"),
+                        },
+                    )
+                )
 
             # Announcements (avisos).
             try:
-                an_resp = service.courses().announcements().list(
-                    courseId=cid, pageSize=per_course,
-                    orderBy="updateTime desc",
-                ).execute()
+                an_resp = (
+                    service.courses()
+                    .announcements()
+                    .list(
+                        courseId=cid,
+                        pageSize=per_course,
+                        orderBy="updateTime desc",
+                    )
+                    .execute()
+                )
             except Exception as e:
                 log.warning("%s: announcements falló: %s", cname, e)
                 an_resp = {}
-            for an in (an_resp.get("announcements") or []):
+            for an in an_resp.get("announcements") or []:
                 text = (an.get("text") or "").strip().replace("\n", " ")
                 if len(text) > 120:
                     text = text[:117] + "…"
-                items.append(NotificationItem(
-                    uid        = f"classroom:{cid}:an:{an['id']}",
-                    source     = "classroom",
-                    title      = f"📢 {cname}",
-                    summary    = text or "(sin texto)",
-                    url        = _rewrite_url(an.get("alternateLink") or alt, user_idx),
-                    received_ts= _ts_from_iso(an.get("updateTime")) or time.time(),
-                    metadata   = {"course_id": cid, "kind": "announcement"},
-                ))
+                items.append(
+                    NotificationItem(
+                        uid=f"classroom:{cid}:an:{an['id']}",
+                        source="classroom",
+                        title=f"📢 {cname}",
+                        summary=text or "(sin texto)",
+                        url=_rewrite_url(an.get("alternateLink") or alt, user_idx),
+                        received_ts=_ts_from_iso(an.get("updateTime")) or time.time(),
+                        metadata={"course_id": cid, "kind": "announcement"},
+                    )
+                )
 
         items.sort(key=lambda x: x.received_ts, reverse=True)
         return items[:max_items]
@@ -390,16 +406,18 @@ class ClassroomAdapter(NotificationAdapter):
 # ── Helpers ──────────────────────────────────────────────────────────────
 
 
-def _format_due(date: Optional[dict], time_obj: Optional[dict]) -> str:
+def _format_due(date: dict | None, time_obj: dict | None) -> str:
     if not date:
         return ""
     try:
-        y = int(date.get("year", 0)); m = int(date.get("month", 0)); d = int(date.get("day", 0))
+        y = int(date.get("year", 0))
+        m = int(date.get("month", 0))
+        d = int(date.get("day", 0))
         if not (y and m and d):
             return ""
         s = f"{d:02}/{m:02}/{y}"
         if time_obj:
-            h  = int(time_obj.get("hours", 0))
+            h = int(time_obj.get("hours", 0))
             mn = int(time_obj.get("minutes", 0))
             s += f" {h:02}:{mn:02}"
         return s
@@ -407,12 +425,13 @@ def _format_due(date: Optional[dict], time_obj: Optional[dict]) -> str:
         return ""
 
 
-def _ts_from_iso(iso: Optional[str]) -> Optional[float]:
+def _ts_from_iso(iso: str | None) -> float | None:
     if not iso:
         return None
     try:
         # Google devuelve ISO 8601 con sufijo "Z".
         from datetime import datetime
+
         if iso.endswith("Z"):
             iso = iso[:-1] + "+00:00"
         return datetime.fromisoformat(iso).timestamp()

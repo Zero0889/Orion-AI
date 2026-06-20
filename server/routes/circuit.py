@@ -31,17 +31,26 @@ router = APIRouter()
 
 # ── Modelos de request ─────────────────────────────────────────────────
 
+
 class FromImageRequest(BaseModel):
     image_path: str = Field(..., description="Ruta absoluta a la imagen del circuito.")
-    outputs:    list[str] | None = Field(default=None, description="Lista con 'spice' y/o 'kicad'. Default: ambos.")
-    output_dir: str | None = Field(default=None, description="Carpeta destino. Default: la carpeta de la imagen.")
+    outputs: list[str] | None = Field(
+        default=None, description="Lista con 'spice' y/o 'kicad'. Default: ambos."
+    )
+    output_dir: str | None = Field(
+        default=None, description="Carpeta destino. Default: la carpeta de la imagen."
+    )
 
 
 class ProteusAutodrawRequest(BaseModel):
-    cir_path:        str = Field(..., description="Ruta absoluta al .cir generado previamente.")
-    countdown:       int | None = Field(default=3, description="Segundos antes de empezar (para enfocar Proteus).")
-    place_in_canvas: bool | None = Field(default=True, description="Si True, coloca los componentes en el canvas en una grilla.")
-    cols:            int | None = Field(default=3, description="Columnas de la grilla.")
+    cir_path: str = Field(..., description="Ruta absoluta al .cir generado previamente.")
+    countdown: int | None = Field(
+        default=3, description="Segundos antes de empezar (para enfocar Proteus)."
+    )
+    place_in_canvas: bool | None = Field(
+        default=True, description="Si True, coloca los componentes en el canvas en una grilla."
+    )
+    cols: int | None = Field(default=3, description="Columnas de la grilla.")
 
 
 # ── Helpers ────────────────────────────────────────────────────────────
@@ -69,6 +78,7 @@ def _parse_spice_path_from_result(result: str) -> dict[str, str]:
 
 # ── Endpoints ──────────────────────────────────────────────────────────
 
+
 @router.post("/from-image")
 async def from_image(req: FromImageRequest) -> dict[str, Any]:
     """Genera SPICE + KiCad a partir de una imagen ya subida al servidor.
@@ -89,6 +99,7 @@ async def from_image(req: FromImageRequest) -> dict[str, Any]:
 
     def _run() -> str:
         from actions.circuit_from_image import circuit_from_image
+
         return circuit_from_image(params)
 
     try:
@@ -144,13 +155,15 @@ def list_circuits() -> dict[str, Any]:
                 stat = path.stat()
             except OSError:
                 continue
-            items.append({
-                "name":     path.name,
-                "path":     str(path),
-                "kind":     "spice" if path.suffix.lower() == ".cir" else "kicad",
-                "size":     stat.st_size,
-                "modified": stat.st_mtime,
-            })
+            items.append(
+                {
+                    "name": path.name,
+                    "path": str(path),
+                    "kind": "spice" if path.suffix.lower() == ".cir" else "kicad",
+                    "size": stat.st_size,
+                    "modified": stat.st_mtime,
+                }
+            )
 
     items.sort(key=lambda x: x["modified"], reverse=True)
     return {"items": items}
@@ -168,14 +181,15 @@ async def proteus_autodraw_route(req: ProteusAutodrawRequest) -> dict[str, Any]:
         raise HTTPException(status_code=400, detail="El archivo debe ser .cir")
 
     params: dict[str, Any] = {
-        "cir_path":        str(cir_path),
-        "countdown":       req.countdown or 3,
+        "cir_path": str(cir_path),
+        "countdown": req.countdown or 3,
         "place_in_canvas": True if req.place_in_canvas is None else req.place_in_canvas,
-        "cols":            req.cols or 3,
+        "cols": req.cols or 3,
     }
 
     def _run() -> str:
         from actions.proteus_autodraw import proteus_autodraw
+
         return proteus_autodraw(params)
 
     try:
@@ -184,7 +198,11 @@ async def proteus_autodraw_route(req: ProteusAutodrawRequest) -> dict[str, Any]:
         log.exception("proteus_autodraw crashed")
         raise HTTPException(status_code=500, detail=f"Automatización falló: {e}") from e
 
-    if "no está instalado" in result or "no encontrado" in result.lower() or "abortada" in result.lower():
+    if (
+        "no está instalado" in result
+        or "no encontrado" in result.lower()
+        or "abortada" in result.lower()
+    ):
         # Devolvemos 200 con ok=false para que la UI muestre el mensaje
         # como warning en vez de error rojo.
         return {"ok": False, "summary": result}
@@ -198,8 +216,10 @@ def delete_item(path: str) -> dict[str, Any]:
     uploads = (BASE_DIR / "uploads").resolve()
     try:
         p.relative_to(uploads)
-    except ValueError:
-        raise HTTPException(status_code=400, detail="Solo se pueden borrar archivos dentro de uploads/.")
+    except ValueError as e:
+        raise HTTPException(
+            status_code=400, detail="Solo se pueden borrar archivos dentro de uploads/."
+        ) from e
     if p.suffix.lower() not in _OUTPUT_EXTS:
         raise HTTPException(status_code=400, detail="Solo se pueden borrar .cir o .kicad_sch.")
     if not p.exists():

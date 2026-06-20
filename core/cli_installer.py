@@ -36,9 +36,10 @@ import urllib.request
 import zipfile
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 from config import BASE_DIR
+import contextlib
 
 
 @dataclass(frozen=True)
@@ -52,17 +53,24 @@ class CliSpec:
     'windows/darwin/linux' + 'amd64/arm64', otros usan 'win/macos/linux'
     + 'x64/aarch64'…).
     """
-    name:        str
-    repo:        str                          # "owner/repo"
-    version:     str                          # ej: "0.22.0"
-    asset_template: str                       # ej: "gogcli_{version}_{os}_{arch}.zip"
-    bin_name:    str                          # nombre del binario tras extraer
-    os_map:      dict[str, str] = field(default_factory=lambda: {
-                                            "windows": "windows", "darwin": "darwin", "linux": "linux"})
-    arch_map:    dict[str, str] = field(default_factory=lambda: {
-                                            "amd64": "amd64", "x86_64": "amd64",
-                                            "arm64": "arm64", "aarch64": "arm64"})
-    description: str = ""                     # para el UI
+
+    name: str
+    repo: str  # "owner/repo"
+    version: str  # ej: "0.22.0"
+    asset_template: str  # ej: "gogcli_{version}_{os}_{arch}.zip"
+    bin_name: str  # nombre del binario tras extraer
+    os_map: dict[str, str] = field(
+        default_factory=lambda: {"windows": "windows", "darwin": "darwin", "linux": "linux"}
+    )
+    arch_map: dict[str, str] = field(
+        default_factory=lambda: {
+            "amd64": "amd64",
+            "x86_64": "amd64",
+            "arm64": "arm64",
+            "aarch64": "arm64",
+        }
+    )
+    description: str = ""  # para el UI
 
     @property
     def display_name(self) -> str:
@@ -108,8 +116,8 @@ REGISTRY: dict[str, CliSpec] = {
 
 def _platform_tags(spec: CliSpec) -> tuple[str, str]:
     sys_name = platform.system().lower()
-    arch     = platform.machine().lower()
-    os_tag   = spec.os_map.get(sys_name)
+    arch = platform.machine().lower()
+    os_tag = spec.os_map.get(sys_name)
     arch_tag = spec.arch_map.get(arch)
     if not os_tag or not arch_tag:
         raise RuntimeError(
@@ -123,10 +131,13 @@ def _asset_for(spec: CliSpec) -> tuple[str, str]:
     """Devuelve (asset_name, format_ext) para la plataforma actual."""
     os_tag, arch_tag = _platform_tags(spec)
     ext_dot = ".exe" if os_tag == "windows" and spec.name == "jq" else ""
-    ext     = "zip" if os_tag == "windows" else "tar.gz"
-    asset   = spec.asset_template.format(
-        version=spec.version, os=os_tag, arch=arch_tag,
-        ext=ext, ext_dot=ext_dot,
+    ext = "zip" if os_tag == "windows" else "tar.gz"
+    asset = spec.asset_template.format(
+        version=spec.version,
+        os=os_tag,
+        arch=arch_tag,
+        ext=ext,
+        ext_dot=ext_dot,
     )
     return asset, ext
 
@@ -158,7 +169,7 @@ def extra_path_dirs() -> list[str]:
     return out
 
 
-def cli_path(name: str) -> Optional[str]:
+def cli_path(name: str) -> str | None:
     """Ruta absoluta al binario si está disponible (tools/ o PATH del sistema)."""
     spec = REGISTRY.get(name)
     bin_name = spec.bin_name if spec else name
@@ -171,7 +182,7 @@ def cli_path(name: str) -> Optional[str]:
 
 
 # Backwards-compat: el código viejo importaba gog_path() directo.
-def gog_path() -> Optional[str]:
+def gog_path() -> str | None:
     return cli_path("gog")
 
 
@@ -208,9 +219,7 @@ def install_cli(name: str, *, force: bool = False) -> str:
     ruta absoluta del binario. Idempotente."""
     spec = REGISTRY.get(name)
     if spec is None:
-        raise KeyError(
-            f"CLI '{name}' no está en el registry. Conocidos: {', '.join(REGISTRY)}"
-        )
+        raise KeyError(f"CLI '{name}' no está en el registry. Conocidos: {', '.join(REGISTRY)}")
 
     if not force:
         existing = cli_path(name)
@@ -225,12 +234,12 @@ def install_cli(name: str, *, force: bool = False) -> str:
     # bajamos al destino final con el nombre del bin.
     if asset.endswith(".exe"):
         target = dest_dir / f"{spec.bin_name}.exe"
-        url    = f"https://github.com/{spec.repo}/releases/download/v{spec.version}/{asset}"
+        url = f"https://github.com/{spec.repo}/releases/download/v{spec.version}/{asset}"
         print(f"[CLI Installer] ⬇ Bajando {url}")
         _download(url, target)
         if os.name != "nt":
-            try: os.chmod(target, 0o755)
-            except OSError: pass
+            with contextlib.suppress(OSError):
+                os.chmod(target, 0o755)
         print(f"[CLI Installer] ✓ {name} instalado en {target}")
         return str(target)
 
@@ -246,15 +255,13 @@ def install_cli(name: str, *, force: bool = False) -> str:
         print(f"[CLI Installer] 📦 Extrayendo a {dest_dir}")
         _extract(tmp_path, dest_dir)
     finally:
-        try:
+        with contextlib.suppress(OSError):
             tmp_path.unlink()
-        except OSError:
-            pass
 
     # Buscar el binario tras extraer. Algunos archives lo dejan en root,
     # otros en subcarpeta. Lo movemos a la raíz de tools/<name>/.
     bin_name_exe = f"{spec.bin_name}.exe" if os.name == "nt" else spec.bin_name
-    found: Optional[Path] = None
+    found: Path | None = None
     for candidate in dest_dir.rglob(spec.bin_name + "*"):
         if candidate.is_file() and candidate.name in (spec.bin_name, bin_name_exe):
             found = candidate
@@ -271,8 +278,8 @@ def install_cli(name: str, *, force: bool = False) -> str:
         shutil.move(str(found), str(target))
 
     if os.name != "nt":
-        try: os.chmod(target, 0o755)
-        except OSError: pass
+        with contextlib.suppress(OSError):
+            os.chmod(target, 0o755)
 
     print(f"[CLI Installer] ✓ {name} instalado en {target}")
     return str(target)
@@ -291,14 +298,16 @@ def registry_info() -> list[dict]:
     Útil para que el frontend muestre el panel completo en un sólo GET."""
     out: list[dict] = []
     for name, spec in REGISTRY.items():
-        out.append({
-            "name":        name,
-            "repo":        spec.repo,
-            "version":     spec.version,
-            "description": spec.description,
-            "installed":   cli_path(name) is not None,
-            "path":        cli_path(name),
-        })
+        out.append(
+            {
+                "name": name,
+                "repo": spec.repo,
+                "version": spec.version,
+                "description": spec.description,
+                "installed": cli_path(name) is not None,
+                "path": cli_path(name),
+            }
+        )
     return out
 
 
@@ -319,6 +328,7 @@ def required_bins(frontmatter: dict[str, Any]) -> list[str]:
         # A veces viene como bloque YAML/JSON serializado por el parser ingenuo.
         try:
             import json
+
             meta = json.loads(meta)
         except Exception:
             return []

@@ -21,7 +21,7 @@ import json
 import time
 import urllib.error
 import urllib.request
-from typing import Iterator
+from collections.abc import Iterator
 
 from core.llm.base import (
     LLMMessage,
@@ -31,17 +31,17 @@ from core.llm.base import (
     get_api_key,
     get_base_url,
 )
-
+import contextlib
 
 # Defaults si el provider no aparece en config/providers.json -> _endpoints.
 _DEFAULT_ENDPOINTS = {
-    "openrouter":   "https://openrouter.ai/api/v1",
-    "groq":         "https://api.groq.com/openai/v1",
-    "openai":       "https://api.openai.com/v1",
-    "mistral":      "https://api.mistral.ai/v1",
-    "ollama":       "http://localhost:11434/v1",      # local — sin auth
-    "ollama_cloud": "https://ollama.com/v1",          # cloud (Turbo) — requiere key
-    "deepseek":     "https://api.deepseek.com/v1",    # DeepSeek V3 / R1
+    "openrouter": "https://openrouter.ai/api/v1",
+    "groq": "https://api.groq.com/openai/v1",
+    "openai": "https://api.openai.com/v1",
+    "mistral": "https://api.mistral.ai/v1",
+    "ollama": "http://localhost:11434/v1",  # local — sin auth
+    "ollama_cloud": "https://ollama.com/v1",  # cloud (Turbo) — requiere key
+    "deepseek": "https://api.deepseek.com/v1",  # DeepSeek V3 / R1
 }
 
 
@@ -91,7 +91,7 @@ class OpenAICompatProvider(LLMProvider):
             # Recomendados por OpenRouter para que aparezca tu app en su dashboard
             # y obtengas mejores cuotas en el tier gratuito.
             headers["HTTP-Referer"] = "https://github.com/zahir/ORION"
-            headers["X-Title"]      = "O.R.I.O.N"
+            headers["X-Title"] = "O.R.I.O.N"
 
         url = f"{self._base_url}/chat/completions"
         body = json.dumps(payload).encode("utf-8")
@@ -101,9 +101,7 @@ class OpenAICompatProvider(LLMProvider):
         try:
             text = data["choices"][0]["message"]["content"].strip()
         except (KeyError, IndexError, TypeError) as e:
-            raise RuntimeError(
-                f"{self.name} devolvió formato inesperado: {str(data)[:200]}"
-            ) from e
+            raise RuntimeError(f"{self.name} devolvió formato inesperado: {str(data)[:200]}") from e
 
         return LLMResponse(
             text=text,
@@ -121,9 +119,7 @@ class OpenAICompatProvider(LLMProvider):
         temperature: float = 0.7,
     ) -> LLMResponse:
         if not self.is_available():
-            raise RuntimeError(
-                f"Provider '{self.name}' sin credenciales."
-            )
+            raise RuntimeError(f"Provider '{self.name}' sin credenciales.")
 
         payload: dict = {
             "model": model,
@@ -138,7 +134,7 @@ class OpenAICompatProvider(LLMProvider):
                         "name": t.name,
                         "description": t.description,
                         "parameters": _normalize_openai_schema(t.parameters)
-                            or {"type": "object", "properties": {}},
+                        or {"type": "object", "properties": {}},
                     },
                 }
                 for t in tools
@@ -150,7 +146,7 @@ class OpenAICompatProvider(LLMProvider):
             headers["Authorization"] = f"Bearer {self._api_key}"
         if self.name == "openrouter":
             headers["HTTP-Referer"] = "https://github.com/zahir/ORION"
-            headers["X-Title"]      = "O.R.I.O.N"
+            headers["X-Title"] = "O.R.I.O.N"
 
         url = f"{self._base_url}/chat/completions"
         body = json.dumps(payload).encode("utf-8")
@@ -159,9 +155,7 @@ class OpenAICompatProvider(LLMProvider):
         try:
             msg = data["choices"][0]["message"]
         except (KeyError, IndexError, TypeError) as e:
-            raise RuntimeError(
-                f"{self.name} devolvió formato inesperado: {str(data)[:200]}"
-            ) from e
+            raise RuntimeError(f"{self.name} devolvió formato inesperado: {str(data)[:200]}") from e
 
         text = (msg.get("content") or "").strip()
         raw_calls = msg.get("tool_calls") or []
@@ -173,11 +167,13 @@ class OpenAICompatProvider(LLMProvider):
                 args = json.loads(args_raw) if isinstance(args_raw, str) else dict(args_raw)
             except (json.JSONDecodeError, TypeError):
                 args = {}
-            tool_calls.append({
-                "id":        tc.get("id") or "",
-                "name":      fn.get("name") or "",
-                "arguments": args,
-            })
+            tool_calls.append(
+                {
+                    "id": tc.get("id") or "",
+                    "name": fn.get("name") or "",
+                    "arguments": args,
+                }
+            )
 
         return LLMResponse(
             text=text,
@@ -199,9 +195,7 @@ class OpenAICompatProvider(LLMProvider):
         que llega. Si el provider no soporta streaming (raro), cae al
         ``complete`` y emite el resultado entero como un solo chunk."""
         if not self.is_available():
-            raise RuntimeError(
-                f"Provider '{self.name}' sin credenciales."
-            )
+            raise RuntimeError(f"Provider '{self.name}' sin credenciales.")
 
         payload: dict = {
             "model": model,
@@ -217,7 +211,7 @@ class OpenAICompatProvider(LLMProvider):
             headers["Authorization"] = f"Bearer {self._api_key}"
         if self.name == "openrouter":
             headers["HTTP-Referer"] = "https://github.com/zahir/ORION"
-            headers["X-Title"]      = "O.R.I.O.N"
+            headers["X-Title"] = "O.R.I.O.N"
 
         url = f"{self._base_url}/chat/completions"
         body = json.dumps(payload).encode("utf-8")
@@ -244,15 +238,16 @@ class OpenAICompatProvider(LLMProvider):
                         yield delta
         except urllib.error.HTTPError as e:
             detail = ""
-            try:
+            with contextlib.suppress(Exception):
                 detail = e.read().decode("utf-8")[:300]
-            except Exception:
-                pass
             raise RuntimeError(f"{self.name} stream HTTP {e.code}: {detail or e.reason}") from e
-        except urllib.error.URLError as e:
+        except urllib.error.URLError:
             # Fallback al modo no-stream si el endpoint no acepta SSE.
             resp_obj = self.complete(
-                messages, model=model, temperature=temperature, max_tokens=max_tokens,
+                messages,
+                model=model,
+                temperature=temperature,
+                max_tokens=max_tokens,
             )
             yield resp_obj.text
 
@@ -266,7 +261,7 @@ class OpenAICompatProvider(LLMProvider):
                 return float(retry_after)
             except (TypeError, ValueError):
                 pass
-        return min(1.5 ** attempt, 8.0)
+        return min(1.5**attempt, 8.0)
 
     def _post_with_retry(
         self, url: str, body: bytes, headers: dict, *, max_attempts: int = 4
@@ -288,13 +283,9 @@ class OpenAICompatProvider(LLMProvider):
                     continue
                 # Otros 4xx -> error definitivo con detalle del cuerpo.
                 detail = ""
-                try:
+                with contextlib.suppress(Exception):
                     detail = e.read().decode("utf-8")[:300]
-                except Exception:
-                    pass
-                raise RuntimeError(
-                    f"{self.name} HTTP {e.code}: {detail or e.reason}"
-                ) from e
+                raise RuntimeError(f"{self.name} HTTP {e.code}: {detail or e.reason}") from e
 
             except urllib.error.URLError as e:
                 last_err = e
@@ -314,13 +305,13 @@ class OpenAICompatProvider(LLMProvider):
 # OpenAI-compat devuelven 400 ("'STRING' is not valid under any of…").
 
 _OPENAI_TYPE_MAP = {
-    "STRING":  "string",
+    "STRING": "string",
     "INTEGER": "integer",
-    "NUMBER":  "number",
+    "NUMBER": "number",
     "BOOLEAN": "boolean",
-    "OBJECT":  "object",
-    "ARRAY":   "array",
-    "NULL":    "null",
+    "OBJECT": "object",
+    "ARRAY": "array",
+    "NULL": "null",
 }
 
 
@@ -334,7 +325,9 @@ def _normalize_openai_schema(schema):
                     clean[k] = _OPENAI_TYPE_MAP.get(v, v.lower() if v.isupper() else v)
                 elif isinstance(v, list):
                     clean[k] = [
-                        _OPENAI_TYPE_MAP.get(x, x.lower() if isinstance(x, str) and x.isupper() else x)
+                        _OPENAI_TYPE_MAP.get(
+                            x, x.lower() if isinstance(x, str) and x.isupper() else x
+                        )
                         for x in v
                     ]
                 else:
@@ -348,6 +341,7 @@ def _normalize_openai_schema(schema):
 
 
 # ── Conversión de turns extendidos → messages OpenAI ───────────────────
+
 
 def _turns_to_openai(turns: list[dict]) -> list[dict]:
     """Pasa el formato interno de turnos al schema messages de OpenAI.
@@ -371,10 +365,10 @@ def _turns_to_openai(turns: list[dict]) -> list[dict]:
             if calls:
                 entry["tool_calls"] = [
                     {
-                        "id":       c.get("id") or "",
-                        "type":     "function",
+                        "id": c.get("id") or "",
+                        "type": "function",
                         "function": {
-                            "name":      c.get("name") or "",
+                            "name": c.get("name") or "",
                             "arguments": json.dumps(c.get("arguments") or {}),
                         },
                     }
@@ -384,10 +378,12 @@ def _turns_to_openai(turns: list[dict]) -> list[dict]:
             continue
 
         if role == "tool":
-            out.append({
-                "role":         "tool",
-                "tool_call_id": turn.get("tool_call_id") or "",
-                "name":         turn.get("name") or "",
-                "content":      turn.get("content") or "",
-            })
+            out.append(
+                {
+                    "role": "tool",
+                    "tool_call_id": turn.get("tool_call_id") or "",
+                    "name": turn.get("name") or "",
+                    "content": turn.get("content") or "",
+                }
+            )
     return out

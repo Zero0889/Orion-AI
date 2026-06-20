@@ -53,11 +53,9 @@ class PluginBase(ABC):
 
     def on_load(self) -> None:
         """Hook llamado al cargar el plugin. Override para inicialización."""
-        pass
 
     def on_unload(self) -> None:
         """Hook llamado al descargar el plugin. Override para limpieza."""
-        pass
 
     def __repr__(self) -> str:
         return f"<Plugin {self.name} v{self.version}>"
@@ -112,11 +110,7 @@ class PluginRegistry:
 
     def get_tool_handlers(self) -> dict[str, PluginBase]:
         """Retorna un dict name→plugin para los plugins activos."""
-        return {
-            name: plugin
-            for name, plugin in self._plugins.items()
-            if plugin.enabled
-        }
+        return {name: plugin for name, plugin in self._plugins.items() if plugin.enabled}
 
     def get_tool_timeouts(self) -> dict[str, int]:
         """Retorna dict name→timeout para plugins con timeout personalizado."""
@@ -137,6 +131,7 @@ class PluginRegistry:
         """
         if plugins_dir is None:
             from config import PLUGINS_DIR
+
             plugins_dir = PLUGINS_DIR
 
         if not plugins_dir.exists():
@@ -168,8 +163,7 @@ class PluginRegistry:
                             loaded += 1
                         except Exception as e:
                             log.error(
-                                "Error instanciando plugin %s.%s: %s",
-                                py_file.stem, attr_name, e
+                                "Error instanciando plugin %s.%s: %s", py_file.stem, attr_name, e
                             )
 
             except Exception as e:

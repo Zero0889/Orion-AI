@@ -38,10 +38,10 @@ import { Icon } from "@/ui/Icon";
 import { Button, Kbd } from "@/ui/primitives";
 
 const SUGGESTIONS: { eyebrow: string; prompt: string }[] = [
-  { eyebrow: "Sistema",     prompt: "¿Cómo está el sistema ahora mismo?" },
-  { eyebrow: "Memoria",     prompt: "Recuérdame mis proyectos activos." },
-  { eyebrow: "Hogar",       prompt: "Pon una escena tranquila en el salón." },
-  { eyebrow: "Agentes",     prompt: "Lanza una tarea para resumir mis notas." },
+  { eyebrow: "Sistema", prompt: "¿Cómo está el sistema ahora mismo?" },
+  { eyebrow: "Memoria", prompt: "Recuérdame mis proyectos activos." },
+  { eyebrow: "Hogar", prompt: "Pon una escena tranquila en el salón." },
+  { eyebrow: "Agentes", prompt: "Lanza una tarea para resumir mis notas." },
 ];
 
 interface Props {
@@ -51,14 +51,26 @@ interface Props {
 }
 
 export function ChatPanel({ send }: Props) {
-  const messages    = useOrionStore((s) => s.messages);
-  const pushLocal   = useOrionStore((s) => s.pushLocalUserText);
-  const state       = useOrionStore((s) => s.state);
+  const messages = useOrionStore((s) => s.messages);
+  const pushLocal = useOrionStore((s) => s.pushLocalUserText);
+  const clearMsgs = useOrionStore((s) => s.clear);
+  const state = useOrionStore((s) => s.state);
   const currentFile = useOrionStore((s) => s.currentFile);
-  const eyeState    = useEyeState();
+  const eyeState = useEyeState();
   const [draft, setDraft] = useState("");
-  const scrollRef   = useRef<HTMLDivElement | null>(null);
-  const taRef       = useRef<HTMLTextAreaElement | null>(null);
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  const taRef = useRef<HTMLTextAreaElement | null>(null);
+
+  // Pre-fill desde el quick input del HomePanel (si el usuario escribió
+  // algo allí y dio Enter, lo dejamos cargado y enfocado acá).
+  useEffect(() => {
+    const stashed = window.localStorage.getItem("orion.chat.draft");
+    if (stashed) {
+      setDraft(stashed);
+      window.localStorage.removeItem("orion.chat.draft");
+      window.setTimeout(() => taRef.current?.focus(), 20);
+    }
+  }, []);
 
   useEffect(() => {
     const el = scrollRef.current;
@@ -91,21 +103,23 @@ export function ChatPanel({ send }: Props) {
   return (
     <div className="flex flex-col h-full relative">
       {/* ambient atmosphere when empty */}
-      {empty && (
-        <div className="pointer-events-none absolute inset-0 bg-dots opacity-50" />
-      )}
+      {empty && <div className="pointer-events-none absolute inset-0 bg-dots opacity-50" />}
 
       {/* tool / agent activity banner — solo cuando hay actividad real */}
       <ToolBanner />
 
       {/* messages */}
-      <div
-        ref={scrollRef}
-        className="flex-1 overflow-y-auto scrollbar-thin"
-      >
-        {empty
-          ? <Hero onPick={(p) => { setDraft(p); taRef.current?.focus(); }} />
-          : <Timeline messages={messages} state={state} eyeState={eyeState} />}
+      <div ref={scrollRef} className="flex-1 overflow-y-auto scrollbar-thin">
+        {empty ? (
+          <Hero
+            onPick={(p) => {
+              setDraft(p);
+              taRef.current?.focus();
+            }}
+          />
+        ) : (
+          <Timeline messages={messages} state={state} eyeState={eyeState} onNew={clearMsgs} />
+        )}
       </div>
 
       {/* Pregunta interactiva del agente — solo aparece si hay una
@@ -131,56 +145,59 @@ export function ChatPanel({ send }: Props) {
    el primer turno. Vista estable: no se cierra sola con mensajes de
    sistema, no parpadea. */
 function Hero({ onPick }: { onPick: (p: string) => void }) {
+  // El Hero ya vive dentro de un scroll container del ChatPanel. NO
+  // anidamos otro scroll acá: usábamos `h-full overflow-y-auto` +
+  // `min-h-full + justify-center` y cuando la suma de eye + greeting +
+  // 4 suggestions + spacer excedía el viewport, justify-center cortaba
+  // contenido equitativamente arriba y abajo — las suggestions quedaban
+  // ocultas detrás del composer. Ahora dejamos que el padre haga el
+  // scroll y nos posicionamos top-aligned con padding razonable.
   return (
-    <div className="h-full overflow-y-auto scrollbar-thin">
-      <div className="min-h-full flex flex-col items-center justify-center px-6 py-10 animate-fade-in">
-        {/* OJO centerpiece — mismo OrbHUD de Inicio, con halo ambiental
-            detrás. La etiqueta de estado ("Escuchando", "Pensando", etc)
-            la dibuja el propio OrbHUD debajo del ojo. */}
-        <div className="relative flex flex-col items-center">
-          <div className="absolute top-0 left-1/2 -translate-x-1/2 h-64 w-64 rounded-full
-                          bg-[radial-gradient(circle,rgb(var(--orion-pri-glow)/0.18),transparent_70%)]
-                          blur-3xl pointer-events-none animate-halo" />
-          <OrbHUD />
-        </div>
+    <div className="min-h-full flex flex-col items-center px-6 pt-12 pb-6 animate-fade-in">
+      {/* OJO centerpiece. Halo radial detrás. */}
+      <div className="relative flex flex-col items-center">
+        <div
+          className="absolute top-0 left-1/2 -translate-x-1/2 h-56 w-56 rounded-full
+                        bg-[radial-gradient(circle,rgb(var(--orion-pri-glow)/0.18),transparent_70%)]
+                        blur-3xl pointer-events-none animate-halo"
+        />
+        <OrbHUD />
+      </div>
 
-        <h1 className="mt-10 text-3xl md:text-[36px] font-semibold tracking-tight text-text text-center max-w-2xl leading-[1.15] animate-fade-in-up">
-          ¿En qué te ayudo hoy?
-        </h1>
-        <p className="mt-3 text-sm text-text-dim text-center max-w-md leading-relaxed animate-fade-in-up"
-           style={{ animationDelay: "80ms" }}>
-          Háblame en voz alta o escribí abajo.
-        </p>
+      <h1 className="mt-6 text-3xl md:text-[34px] font-semibold tracking-tight text-text text-center max-w-2xl leading-[1.15] animate-fade-in-up">
+        ¿En qué te ayudo hoy?
+      </h1>
+      <p
+        className="mt-2 text-sm text-text-dim text-center max-w-md leading-relaxed animate-fade-in-up"
+        style={{ animationDelay: "80ms" }}
+      >
+        Háblame en voz alta o escribí abajo.
+      </p>
 
-        <div className="mt-9 grid grid-cols-1 md:grid-cols-2 gap-2.5 w-full max-w-2xl">
-          {SUGGESTIONS.map((s, i) => (
-            <button
-              key={s.prompt}
-              onClick={() => onPick(s.prompt)}
-              style={{ animationDelay: `${160 + 80 * i}ms` }}
-              className="group relative text-left rounded-lg surface-1 px-4 py-3.5
-                         hover:border-white/[0.12] hover:bg-elevated/70
-                         transition-all duration-200 ease-out-expo
-                         animate-fade-in-up"
-            >
-              <div className="text-[10px] uppercase tracking-[0.22em] text-pri/80 font-mono">
-                {s.eyebrow}
-              </div>
-              <div className="mt-1 text-sm text-text leading-snug">{s.prompt}</div>
-              <Icon
-                name="chevron-right"
-                size={14}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted
-                           opacity-0 group-hover:opacity-100 group-hover:translate-x-0.5
-                           transition-all duration-200"
-              />
-            </button>
-          ))}
-        </div>
-
-        <div className="mt-10 mb-2 text-[10px] uppercase tracking-[0.3em] text-muted font-mono">
-          ────  voz, texto o adjuntá un archivo  ────
-        </div>
+      <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-2.5 w-full max-w-2xl">
+        {SUGGESTIONS.map((s, i) => (
+          <button
+            key={s.prompt}
+            onClick={() => onPick(s.prompt)}
+            style={{ animationDelay: `${160 + 80 * i}ms` }}
+            className="group relative text-left rounded-lg surface-1 px-4 py-3
+                       hover:border-white/[0.12] hover:bg-elevated/70
+                       transition-all duration-200 ease-out-expo
+                       animate-fade-in-up"
+          >
+            <div className="text-[10px] uppercase tracking-[0.22em] text-pri/80 font-mono">
+              {s.eyebrow}
+            </div>
+            <div className="mt-1 text-sm text-text leading-snug pr-6">{s.prompt}</div>
+            <Icon
+              name="chevron-right"
+              size={14}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted
+                         opacity-0 group-hover:opacity-100 group-hover:translate-x-0.5
+                         transition-all duration-200"
+            />
+          </button>
+        ))}
       </div>
     </div>
   );
@@ -188,47 +205,70 @@ function Hero({ onPick }: { onPick: (p: string) => void }) {
 
 /* ─── TIMELINE ────────────────────────────────────────────────────── */
 function Timeline({
-  messages, state, eyeState,
+  messages,
+  state,
+  eyeState,
+  onNew,
 }: {
   messages: ChatMessage[];
   state: string;
   eyeState: ReturnType<typeof useEyeState>;
+  /** Limpia la conversación y vuelve al Hero. */
+  onNew: () => void;
 }) {
   const stateLabel =
-      eyeState === "listening" ? "escuchando"
-    : eyeState === "thinking"  ? "procesando"
-    : eyeState === "speaking"  ? "hablando"
-    : eyeState === "error"     ? "error"
-    : state.toLowerCase();
+    eyeState === "listening"
+      ? "escuchando"
+      : eyeState === "thinking"
+        ? "procesando"
+        : eyeState === "speaking"
+          ? "hablando"
+          : eyeState === "error"
+            ? "error"
+            : state.toLowerCase();
 
   return (
     <div className="mx-auto max-w-3xl px-4 md:px-8 py-6 flex flex-col gap-5">
       {/* status row HUD — dot teñido del color del estado actual, monospace,
           tracking ancho. Sticky para que sobreviva al scroll. */}
-      <div className="sticky top-0 z-10 -mx-4 md:-mx-8 px-4 md:px-8 py-2
+      <div
+        className="sticky top-0 z-10 -mx-4 md:-mx-8 px-4 md:px-8 py-2
                       backdrop-blur-md bg-bg/40 border-b border-white/[0.04]
                       flex items-center gap-2 text-[10px] uppercase tracking-[0.24em]
-                      text-text-dim font-mono">
+                      text-text-dim font-mono"
+      >
         <span
           className="h-1.5 w-1.5 rounded-full animate-pulse-soft"
           style={{
             background: "rgb(var(--orion-state-rgb))",
-            boxShadow:  "0 0 10px rgb(var(--orion-state-rgb) / 0.7)",
+            boxShadow: "0 0 10px rgb(var(--orion-state-rgb) / 0.7)",
           }}
         />
         <span>Sesión activa</span>
         <span className="text-muted">·</span>
         <span style={{ color: "rgb(var(--orion-state-rgb) / 0.95)" }}>{stateLabel}</span>
+        {/* Nueva conversación — limpia el historial local. No pide
+            confirmación porque los mensajes se persisten server-side
+            (history panel) y un click accidental no destruye nada. */}
+        <button
+          onClick={onNew}
+          title="Limpiar y empezar una nueva conversación"
+          className="ml-auto inline-flex items-center gap-1.5 h-7 px-2.5 rounded-md
+                     border border-white/[0.08] bg-white/[0.03]
+                     text-[10px] uppercase tracking-[0.18em] text-text-dim
+                     hover:text-text hover:border-pri/40 hover:bg-pri/[0.06]
+                     transition-all duration-150"
+        >
+          <Icon name="plus" size={11} />
+          <span>Nueva</span>
+        </button>
       </div>
 
       {messages.map((m, i) => (
         <MessageRow
           key={m.id}
           msg={m}
-          isLastAssistant={
-            m.role === "ai" &&
-            !messages.slice(i + 1).some((x) => x.role === "ai")
-          }
+          isLastAssistant={m.role === "ai" && !messages.slice(i + 1).some((x) => x.role === "ai")}
         />
       ))}
 
@@ -241,8 +281,7 @@ function Timeline({
       {(() => {
         const last = messages[messages.length - 1];
         const awaiting =
-          (last?.role === "user")
-          || (last?.role === "ai" && last.streaming && !last.text.trim());
+          last?.role === "user" || (last?.role === "ai" && last.streaming && !last.text.trim());
         return awaiting ? <ThinkingIndicator /> : null;
       })()}
     </div>
@@ -251,7 +290,7 @@ function Timeline({
 
 /* ─── INDICADOR CONTEXTUAL "PENSANDO / BUSCANDO…" ─────────────────── */
 function ThinkingIndicator() {
-  const tool  = useInteractionStore((s) => s.tool);
+  const tool = useInteractionStore((s) => s.tool);
   const agent = useInteractionStore((s) => s.agent);
 
   // Prioridad de contenido:
@@ -264,7 +303,7 @@ function ThinkingIndicator() {
 
   if (tool) {
     const p = prettyToolName(tool.name);
-    icon  = p.icon;
+    icon = p.icon;
     label = p.label;
     // Args principales (1-2) como subtexto
     const argEntries = Object.entries(tool.args).slice(0, 2);
@@ -272,9 +311,9 @@ function ThinkingIndicator() {
       sub = argEntries.map(([, v]) => String(v).slice(0, 60)).join(" · ");
     }
   } else if (agent && (agent.status === "running" || agent.status === "pending")) {
-    icon  = "🎼";
+    icon = "🎼";
     label = agent.status === "pending" ? "Agente en cola" : "Agente trabajando";
-    sub   = agent.lastSpeech ?? agent.goal ?? null;
+    sub = agent.lastSpeech ?? agent.goal ?? null;
     if (sub && sub.length > 90) sub = sub.slice(0, 90) + "…";
   }
 
@@ -289,9 +328,11 @@ function ThinkingIndicator() {
           Orion
         </span>
       </div>
-      <div className="flex items-start gap-3 px-4 py-3 rounded-xl
+      <div
+        className="flex items-start gap-3 px-4 py-3 rounded-xl
                       border border-pri/25 bg-pri/[0.06] backdrop-blur-sm
-                      shadow-[0_0_24px_-8px_rgb(var(--orion-pri-glow)/0.35)]">
+                      shadow-[0_0_24px_-8px_rgb(var(--orion-pri-glow)/0.35)]"
+      >
         {icon && <span className="text-xl leading-none mt-0.5">{icon}</span>}
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2.5 text-[15px] text-text font-medium">
@@ -302,11 +343,7 @@ function ThinkingIndicator() {
               <Dot delay="0.36s" />
             </span>
           </div>
-          {sub && (
-            <div className="mt-1 text-[12px] text-text-dim font-mono truncate">
-              {sub}
-            </div>
-          )}
+          {sub && <div className="mt-1 text-[12px] text-text-dim font-mono truncate">{sub}</div>}
         </div>
       </div>
     </div>
@@ -357,7 +394,9 @@ function MessageRow({ msg, isLastAssistant }: { msg: ChatMessage; isLastAssistan
           <span className="absolute inset-0 rounded-full bg-pri/30 blur-[6px]" />
           <span className="relative h-2 w-2 rounded-full bg-pri" />
         </span>
-        <span className="text-[10px] uppercase tracking-[0.22em] text-pri/90 font-medium">Orion</span>
+        <span className="text-[10px] uppercase tracking-[0.22em] text-pri/90 font-medium">
+          Orion
+        </span>
       </div>
       <div className="relative">
         <Markdown source={msg.text} />
@@ -387,7 +426,11 @@ function Dot({ delay }: { delay: string }) {
 
 /* ─── COMPOSER ────────────────────────────────────────────────────── */
 function Composer({
-  taRef, draft, onChange, onSubmit, currentFile,
+  taRef,
+  draft,
+  onChange,
+  onSubmit,
+  currentFile,
 }: {
   taRef: React.MutableRefObject<HTMLTextAreaElement | null>;
   draft: string;
@@ -407,9 +450,11 @@ function Composer({
       )}
 
       <div className="mx-auto max-w-3xl px-4 md:px-8 py-3">
-        <div className="group relative rounded-2xl border border-white/[0.08] bg-elevated/60
+        <div
+          className="group relative rounded-2xl border border-white/[0.08] bg-elevated/60
                         focus-within:border-pri/40 focus-within:shadow-glow-soft
-                        transition-all duration-200 ease-out-expo">
+                        transition-all duration-200 ease-out-expo"
+        >
           <textarea
             ref={taRef}
             value={draft}

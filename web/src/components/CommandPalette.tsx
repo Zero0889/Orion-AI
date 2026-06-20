@@ -25,7 +25,7 @@ import { useOrionStore } from "@/stores/orion";
 import { useViewStore, type View } from "@/stores/view";
 import { Icon, type IconName } from "@/ui/Icon";
 import { toggleLightDark, isLightTheme } from "@/App";
-
+import { zoomIn, zoomOut, zoomReset } from "@/hooks/useZoomShortcuts";
 
 // Store global para que cualquier componente (TopBar, atajos, futuros
 // botones) pueda abrir el palette sin tener que pasarse refs/props.
@@ -37,59 +37,105 @@ interface PaletteStore {
 export const useCommandPalette = create<PaletteStore>((set, get) => ({
   open: false,
   setOpen: (v) => set({ open: v }),
-  toggle:  () => set({ open: !get().open }),
+  toggle: () => set({ open: !get().open }),
 }));
 
 type Action = {
-  id:       string;
-  label:    string;
-  hint?:    string;
-  icon:     IconName | string;   // string para emoji
+  id: string;
+  label: string;
+  hint?: string;
+  icon: IconName | string; // string para emoji
   keywords: string[];
-  group:    "Navegar" | "Acción" | "Tema";
-  run:      () => void | Promise<void>;
+  group: "Navegar" | "Acción" | "Tema";
+  run: () => void | Promise<void>;
 };
 
 interface Props {
   send: (type: string, payload?: Record<string, unknown>) => void;
 }
 
-const VIEW_ACTIONS: { view: View; label: string; icon: IconName; hint?: string; keywords: string[] }[] = [
-  { view: "chat",          label: "Ir al chat",                  icon: "chat",          keywords: ["chat", "conversación", "hablar"] },
-  { view: "notes",         label: "Ir a notas rápidas",          icon: "notes",         keywords: ["notas", "apuntes"] },
-  { view: "memory",        label: "Ir a la memoria",             icon: "memory",        keywords: ["memoria", "recordar", "saber"] },
-  { view: "history",       label: "Ir al historial",             icon: "history",       keywords: ["historial", "conversaciones pasadas"] },
-  { view: "telemetry",     label: "Ir a telemetría del sistema", icon: "telemetry",     keywords: ["telemetría", "cpu", "ram", "monitoreo"] },
-  { view: "agents",        label: "Ir a la orquesta de agentes", icon: "agents",        keywords: ["agentes", "orquesta", "tareas"] },
-  { view: "iot",           label: "Ir a IoT",                    icon: "iot",           keywords: ["iot", "casa", "sensores", "dispositivos"] },
-  { view: "mcp",           label: "Ir a MCP servers",            icon: "plug",          keywords: ["mcp", "servidores", "integraciones"] },
-  { view: "skills",        label: "Ir a skills",                 icon: "sparkles",      keywords: ["skills", "habilidades"] },
-  { view: "notifications", label: "Ir a notificaciones",         icon: "bell",          keywords: ["notificaciones", "gmail", "classroom"] },
-  { view: "settings",      label: "Ir a ajustes",                icon: "settings",      keywords: ["ajustes", "configuración", "settings"] },
+const VIEW_ACTIONS: {
+  view: View;
+  label: string;
+  icon: IconName;
+  hint?: string;
+  keywords: string[];
+}[] = [
+  { view: "chat", label: "Ir al chat", icon: "chat", keywords: ["chat", "conversación", "hablar"] },
+  { view: "notes", label: "Ir a notas rápidas", icon: "notes", keywords: ["notas", "apuntes"] },
+  {
+    view: "memory",
+    label: "Ir a la memoria",
+    icon: "memory",
+    keywords: ["memoria", "recordar", "saber"],
+  },
+  {
+    view: "history",
+    label: "Ir al historial",
+    icon: "history",
+    keywords: ["historial", "conversaciones pasadas"],
+  },
+  {
+    view: "telemetry",
+    label: "Ir a telemetría del sistema",
+    icon: "telemetry",
+    keywords: ["telemetría", "cpu", "ram", "monitoreo"],
+  },
+  {
+    view: "agents",
+    label: "Ir a la orquesta de agentes",
+    icon: "agents",
+    keywords: ["agentes", "orquesta", "tareas"],
+  },
+  {
+    view: "iot",
+    label: "Ir a IoT",
+    icon: "iot",
+    keywords: ["iot", "casa", "sensores", "dispositivos"],
+  },
+  {
+    view: "mcp",
+    label: "Ir a MCP servers",
+    icon: "plug",
+    keywords: ["mcp", "servidores", "integraciones"],
+  },
+  { view: "skills", label: "Ir a skills", icon: "sparkles", keywords: ["skills", "habilidades"] },
+  {
+    view: "notifications",
+    label: "Ir a notificaciones",
+    icon: "bell",
+    keywords: ["notificaciones", "gmail", "classroom"],
+  },
+  {
+    view: "settings",
+    label: "Ir a ajustes",
+    icon: "settings",
+    keywords: ["ajustes", "configuración", "settings"],
+  },
 ];
 
 const THEMES: { id: string; label: string }[] = [
-  { id: "orion-night",   label: "Noche (default)" },
-  { id: "orion-light",   label: "Claro (día)" },
-  { id: "orion-violet",  label: "Violeta" },
+  { id: "orion-night", label: "Noche (default)" },
+  { id: "orion-light", label: "Claro (día)" },
+  { id: "orion-violet", label: "Violeta" },
   { id: "orion-emerald", label: "Esmeralda" },
-  { id: "orion-amber",   label: "Ámbar" },
-  { id: "orion-red",     label: "Rojo" },
-  { id: "orion-cyan",    label: "Cyan HUD" },
-  { id: "orion-green",   label: "Matrix Green" },
-  { id: "orion-purple",  label: "Deep Purple" },
+  { id: "orion-amber", label: "Ámbar" },
+  { id: "orion-red", label: "Rojo" },
+  { id: "orion-cyan", label: "Cyan HUD" },
+  { id: "orion-green", label: "Matrix Green" },
+  { id: "orion-purple", label: "Deep Purple" },
 ];
 
 export function CommandPalette({ send }: Props) {
-  const open                  = useCommandPalette((s) => s.open);
-  const setOpen               = useCommandPalette((s) => s.setOpen);
-  const togglePalette         = useCommandPalette((s) => s.toggle);
-  const [query, setQuery]     = useState("");
-  const [cursor, setCursor]   = useState(0);
-  const inputRef              = useRef<HTMLInputElement>(null);
-  const setView               = useViewStore((s) => s.setView);
-  const muted                 = useOrionStore((s) => s.muted);
-  const clearMessages         = useOrionStore((s) => s.clear);
+  const open = useCommandPalette((s) => s.open);
+  const setOpen = useCommandPalette((s) => s.setOpen);
+  const togglePalette = useCommandPalette((s) => s.toggle);
+  const [query, setQuery] = useState("");
+  const [cursor, setCursor] = useState(0);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const setView = useViewStore((s) => s.setView);
+  const muted = useOrionStore((s) => s.muted);
+  const clearMessages = useOrionStore((s) => s.clear);
 
   // Atajos globales:
   //   - Cmd/Ctrl + K  → toggle (atajo estándar)
@@ -136,66 +182,99 @@ export function CommandPalette({ send }: Props) {
 
     for (const v of VIEW_ACTIONS) {
       out.push({
-        id:       `view:${v.view}`,
-        label:    v.label,
-        hint:     v.hint,
-        icon:     v.icon,
+        id: `view:${v.view}`,
+        label: v.label,
+        hint: v.hint,
+        icon: v.icon,
         keywords: v.keywords,
-        group:    "Navegar",
-        run:      () => setView(v.view),
+        group: "Navegar",
+        run: () => setView(v.view),
       });
     }
 
     out.push({
-      id:       "act:mute",
-      label:    muted ? "Activar micrófono" : "Silenciar micrófono",
-      hint:     muted ? "Volver a escuchar" : "Pausar la entrada de audio",
-      icon:     muted ? "mic" : "mic-off",
+      id: "act:mute",
+      label: muted ? "Activar micrófono" : "Silenciar micrófono",
+      hint: muted ? "Volver a escuchar" : "Pausar la entrada de audio",
+      icon: muted ? "mic" : "mic-off",
       keywords: ["mute", "silenciar", "micrófono", "callar"],
-      group:    "Acción",
-      run:      () => send("mute", { value: !muted }),
+      group: "Acción",
+      run: () => send("mute", { value: !muted }),
     });
 
     out.push({
-      id:       "act:interrupt",
-      label:    "Interrumpir a Orion",
-      hint:     "Detener la voz actual",
-      icon:     "stop",
+      id: "act:interrupt",
+      label: "Interrumpir a Orion",
+      hint: "Detener la voz actual",
+      icon: "stop",
       keywords: ["interrumpir", "parar", "stop", "callar"],
-      group:    "Acción",
-      run:      () => send("interrupt"),
+      group: "Acción",
+      run: () => send("interrupt"),
     });
 
     out.push({
-      id:       "act:clear",
-      label:    "Limpiar conversación",
-      hint:     "Borra los mensajes en pantalla (no la memoria)",
-      icon:     "trash",
+      id: "act:clear",
+      label: "Limpiar conversación",
+      hint: "Borra los mensajes en pantalla (no la memoria)",
+      icon: "trash",
       keywords: ["limpiar", "borrar", "clear", "reset"],
-      group:    "Acción",
-      run:      () => clearMessages(),
+      group: "Acción",
+      run: () => clearMessages(),
     });
 
     out.push({
-      id:       "act:lightdark",
-      label:    isLightTheme() ? "Cambiar a modo oscuro" : "Cambiar a modo claro",
-      hint:     "Alterna entre tema claro y oscuro",
-      icon:     isLightTheme() ? "moon" : "sun",
+      id: "act:lightdark",
+      label: isLightTheme() ? "Cambiar a modo oscuro" : "Cambiar a modo claro",
+      hint: "Alterna entre tema claro y oscuro",
+      icon: isLightTheme() ? "moon" : "sun",
       keywords: ["tema", "claro", "oscuro", "light", "dark", "modo"],
-      group:    "Acción",
-      run:      () => { toggleLightDark(); },
+      group: "Acción",
+      run: () => {
+        toggleLightDark();
+      },
+    });
+
+    out.push({
+      id: "act:zoom-in",
+      label: "Acercar (Zoom +)",
+      hint: "Ctrl + (también funciona con Ctrl + rueda del mouse)",
+      icon: "search",
+      keywords: ["zoom", "acercar", "agrandar", "in", "ctrl+"],
+      group: "Acción",
+      run: () => zoomIn(),
+    });
+    out.push({
+      id: "act:zoom-out",
+      label: "Alejar (Zoom -)",
+      hint: "Ctrl -",
+      icon: "search",
+      keywords: ["zoom", "alejar", "reducir", "out", "ctrl-"],
+      group: "Acción",
+      run: () => zoomOut(),
+    });
+    out.push({
+      id: "act:zoom-reset",
+      label: "Restablecer zoom (100%)",
+      hint: "Ctrl 0",
+      icon: "search",
+      keywords: ["zoom", "reset", "100", "ctrl0"],
+      group: "Acción",
+      run: () => zoomReset(),
     });
 
     for (const t of THEMES) {
       out.push({
-        id:       `theme:${t.id}`,
-        label:    `Tema: ${t.label}`,
-        icon:     "sparkles",
+        id: `theme:${t.id}`,
+        label: `Tema: ${t.label}`,
+        icon: "sparkles",
         keywords: ["tema", "theme", "color", t.label.toLowerCase()],
-        group:    "Tema",
-        run:      async () => {
-          try { await api.setTheme(t.id); }
-          catch { /* server propaga el evento; si falla el patch, no nukeamos UI */ }
+        group: "Tema",
+        run: async () => {
+          try {
+            await api.setTheme(t.id);
+          } catch {
+            /* server propaga el evento; si falla el patch, no nukeamos UI */
+          }
         },
       });
     }
@@ -220,7 +299,9 @@ export function CommandPalette({ send }: Props) {
 
   function execute(a: Action) {
     setOpen(false);
-    Promise.resolve(a.run()).catch(() => { /* swallow — el detalle ya se loguea en cada handler */ });
+    Promise.resolve(a.run()).catch(() => {
+      /* swallow — el detalle ya se loguea en cada handler */
+    });
   }
 
   function onKeyDown(e: React.KeyboardEvent) {
@@ -259,7 +340,10 @@ export function CommandPalette({ send }: Props) {
             <input
               ref={inputRef}
               value={query}
-              onChange={(e) => { setQuery(e.target.value); setCursor(0); }}
+              onChange={(e) => {
+                setQuery(e.target.value);
+                setCursor(0);
+              }}
               onKeyDown={onKeyDown}
               placeholder="Buscar acciones, vistas, temas…"
               className="flex-1 bg-transparent text-[15px] placeholder-muted focus:outline-none text-text"
@@ -296,11 +380,18 @@ export function CommandPalette({ send }: Props) {
                           selected ? "bg-pri/10 text-text" : "text-text-dim hover:bg-white/[0.03]",
                         ].join(" ")}
                       >
-                        <span className={`grid place-items-center h-7 w-7 rounded-md ${selected ? "bg-pri/20" : "bg-white/[0.04]"}`}>
-                          {isEmoji
-                            ? <span className="text-sm leading-none">{a.icon}</span>
-                            : <Icon name={a.icon as IconName} size={14} className={selected ? "text-pri" : ""} />
-                          }
+                        <span
+                          className={`grid place-items-center h-7 w-7 rounded-md ${selected ? "bg-pri/20" : "bg-white/[0.04]"}`}
+                        >
+                          {isEmoji ? (
+                            <span className="text-sm leading-none">{a.icon}</span>
+                          ) : (
+                            <Icon
+                              name={a.icon as IconName}
+                              size={14}
+                              className={selected ? "text-pri" : ""}
+                            />
+                          )}
                         </span>
                         <span className="flex-1 min-w-0">
                           <span className="block text-sm truncate">{a.label}</span>
@@ -309,7 +400,9 @@ export function CommandPalette({ send }: Props) {
                           )}
                         </span>
                         {selected && (
-                          <span className="text-[10px] uppercase tracking-[0.22em] text-pri">↵</span>
+                          <span className="text-[10px] uppercase tracking-[0.22em] text-pri">
+                            ↵
+                          </span>
                         )}
                       </button>
                     );
@@ -323,8 +416,12 @@ export function CommandPalette({ send }: Props) {
           <div className="flex items-center justify-between px-4 py-2 border-t border-white/[0.06] bg-white/[0.02] text-[10px] uppercase tracking-[0.22em] text-muted">
             <span>↑↓ navegar · ↵ ejecutar</span>
             <span className="flex items-center gap-1">
-              <kbd className="px-1.5 py-0.5 rounded bg-white/[0.06] border border-white/[0.08]">⌘</kbd>
-              <kbd className="px-1.5 py-0.5 rounded bg-white/[0.06] border border-white/[0.08]">K</kbd>
+              <kbd className="px-1.5 py-0.5 rounded bg-white/[0.06] border border-white/[0.08]">
+                ⌘
+              </kbd>
+              <kbd className="px-1.5 py-0.5 rounded bg-white/[0.06] border border-white/[0.08]">
+                K
+              </kbd>
               <span className="ml-1">para abrir</span>
             </span>
           </div>

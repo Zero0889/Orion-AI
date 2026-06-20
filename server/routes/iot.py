@@ -29,7 +29,7 @@ Cada cambio admin:
 
 from __future__ import annotations
 
-from typing import Any, Optional
+from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import Response
@@ -37,11 +37,14 @@ from pydantic import BaseModel, Field
 
 from actions.iot import get_system, iot_control, sensor_log, sheets_sync
 from actions.iot.config import (
-    IoTConfig, save_config, validate_device, validate_transport,
+    IoTConfig,
+    save_config,
+    validate_device,
+    validate_transport,
 )
 from actions.iot.devices import Device
-from actions.iot.sensors import get_cache
 from actions.iot.scenes import list_scenes
+from actions.iot.sensors import get_cache
 from core.logger import get_logger
 from server import safe_error_detail
 
@@ -52,42 +55,44 @@ router = APIRouter()
 
 # ── Schemas ─────────────────────────────────────────────────────────────
 class DeviceAction(BaseModel):
-    action:   str = Field(..., description="on | off | dim | rgb | timed")
-    value:    Optional[int] = Field(default=None, description="0-100 para dim")
-    color:    Optional[str] = Field(default=None, description="Color para rgb")
-    duration: Optional[int] = Field(default=None, description="Segundos para timed")
+    action: str = Field(..., description="on | off | dim | rgb | timed")
+    value: int | None = Field(default=None, description="0-100 para dim")
+    color: str | None = Field(default=None, description="Color para rgb")
+    duration: int | None = Field(default=None, description="Segundos para timed")
 
 
 class CapabilitiesBody(BaseModel):
-    on_off:   bool = False
+    on_off: bool = False
     dimmable: bool = False
-    rgb:      bool = False
-    sensor:   Optional[str] = None
+    rgb: bool = False
+    sensor: str | None = None
 
 
 class DeviceBody(BaseModel):
     """Payload para crear/actualizar un dispositivo en iot_config.json."""
-    id:           Optional[str] = Field(default=None, description="solo en POST")
-    name:         str
-    transport:    str
+
+    id: str | None = Field(default=None, description="solo en POST")
+    name: str
+    transport: str
     capabilities: CapabilitiesBody
-    serial:       Optional[dict[str, Any]] = None
-    mqtt:         Optional[dict[str, Any]] = None
+    serial: dict[str, Any] | None = None
+    mqtt: dict[str, Any] | None = None
 
 
 class TransportBody(BaseModel):
     """Payload para crear/actualizar un transport."""
-    type:      str = Field(..., description="'serial' o 'mqtt'")
+
+    type: str = Field(..., description="'serial' o 'mqtt'")
     # Serial
-    port:      Optional[str] = None
-    baud:      Optional[int] = None
+    port: str | None = None
+    baud: int | None = None
     # MQTT
-    host:      Optional[str] = None
-    port_mqtt: Optional[int] = Field(default=None, alias="mqtt_port")
-    username:  Optional[str] = None
-    password:  Optional[str] = None
-    client_id: Optional[str] = None
-    tls:       Optional[bool] = None
+    host: str | None = None
+    port_mqtt: int | None = Field(default=None, alias="mqtt_port")
+    username: str | None = None
+    password: str | None = None
+    client_id: str | None = None
+    tls: bool | None = None
 
     model_config = {"populate_by_name": True}
 
@@ -98,16 +103,18 @@ def get_devices() -> list[dict]:
     sys = get_system()
     devices = []
     for dev in sys.cfg.devices.values():
-        devices.append({
-            "id":           dev.id,
-            "name":         dev.name,
-            "transport":    dev.transport,
-            "capabilities": dev.capabilities.to_dict(),
-            # Devolvemos la config específica para que el modal de edición
-            # pueda mostrar topics/comandos sin tener que pegar JSON
-            "serial":       dev.serial or None,
-            "mqtt":         dev.mqtt or None,
-        })
+        devices.append(
+            {
+                "id": dev.id,
+                "name": dev.name,
+                "transport": dev.transport,
+                "capabilities": dev.capabilities.to_dict(),
+                # Devolvemos la config específica para que el modal de edición
+                # pueda mostrar topics/comandos sin tener que pegar JSON
+                "serial": dev.serial or None,
+                "mqtt": dev.mqtt or None,
+            }
+        )
     return devices
 
 
@@ -122,9 +129,9 @@ def get_sensors() -> dict:
     out = {}
     for dev_id, reading in cache.all().items():
         out[dev_id] = {
-            "value":   reading.value,
+            "value": reading.value,
             "numeric": reading.numeric(),
-            "age_s":   reading.age_seconds(),
+            "age_s": reading.age_seconds(),
         }
     return out
 
@@ -150,15 +157,20 @@ def get_full_config() -> dict:
 # ── Write endpoints (acciones, no config) ───────────────────────────────
 @router.post("/devices/{device_id}/action")
 def device_action(
-    device_id: str, body: DeviceAction, request: Request,
+    device_id: str,
+    body: DeviceAction,
+    request: Request,
 ) -> dict:
     if device_id not in get_system().cfg.devices:
         raise HTTPException(status_code=404, detail=f"Dispositivo '{device_id}' no existe")
 
     params: dict[str, Any] = {"action": body.action, "device": device_id}
-    if body.value    is not None: params["value"]    = body.value
-    if body.color    is not None: params["color"]    = body.color
-    if body.duration is not None: params["duration"] = body.duration
+    if body.value is not None:
+        params["value"] = body.value
+    if body.color is not None:
+        params["color"] = body.color
+    if body.duration is not None:
+        params["duration"] = body.duration
 
     result = iot_control(params)
     _publish(request, "iot.action", {"device": device_id, **params, "result": result})
@@ -201,7 +213,9 @@ def _persist_and_reload(request: Request, cfg: IoTConfig, event: dict) -> None:
     sin cambiar nada) dispararía un reload completo de transports →
     desconecta MQTT, libera y reabre el COM, etc. — caro y ruidoso.
     """
-    import hashlib, json as _json
+    import hashlib
+    import json as _json
+
     from config import IOT_CONFIG_PATH
 
     new_serialized = _json.dumps(cfg.to_dict(), indent=2, ensure_ascii=False, sort_keys=True)
@@ -212,7 +226,9 @@ def _persist_and_reload(request: Request, cfg: IoTConfig, event: dict) -> None:
         if IOT_CONFIG_PATH.exists():
             old_serialized = _json.dumps(
                 _json.loads(IOT_CONFIG_PATH.read_text(encoding="utf-8")),
-                indent=2, ensure_ascii=False, sort_keys=True,
+                indent=2,
+                ensure_ascii=False,
+                sort_keys=True,
             )
             old_hash = hashlib.sha256(old_serialized.encode("utf-8")).hexdigest()
     except (OSError, ValueError) as e:
@@ -243,11 +259,11 @@ def create_device(body: DeviceBody, request: Request) -> dict:
         raise HTTPException(status_code=409, detail=f"Ya existe '{body.id}'")
 
     dev_data = {
-        "name":         body.name,
-        "transport":    body.transport,
+        "name": body.name,
+        "transport": body.transport,
         "capabilities": body.capabilities.model_dump(),
-        "serial":       body.serial or {},
-        "mqtt":         body.mqtt or {},
+        "serial": body.serial or {},
+        "mqtt": body.mqtt or {},
     }
     errs = validate_device(dev_data, sys.cfg.transports)
     if errs:
@@ -265,11 +281,11 @@ def update_device(device_id: str, body: DeviceBody, request: Request) -> dict:
         raise HTTPException(status_code=404, detail=f"'{device_id}' no existe")
 
     dev_data = {
-        "name":         body.name,
-        "transport":    body.transport,
+        "name": body.name,
+        "transport": body.transport,
         "capabilities": body.capabilities.model_dump(),
-        "serial":       body.serial or {},
-        "mqtt":         body.mqtt or {},
+        "serial": body.serial or {},
+        "mqtt": body.mqtt or {},
     }
     errs = validate_device(dev_data, sys.cfg.transports)
     if errs:
@@ -315,7 +331,7 @@ def delete_transport(transport_id: str, request: Request) -> dict:
         raise HTTPException(
             status_code=409,
             detail=f"Transport en uso por: {', '.join(using)}. "
-                   f"Reasigna o borra esos dispositivos primero.",
+            f"Reasigna o borra esos dispositivos primero.",
         )
 
     del sys.cfg.transports[transport_id]
@@ -334,7 +350,7 @@ def reload_system(request: Request) -> dict:
         raise HTTPException(
             status_code=500,
             detail=f"Reload falló: {safe_error_detail(e)}",
-        )
+        ) from e
     _publish(request, "iot.config", {"action": "reload"})
     return {"ok": True}
 
@@ -352,6 +368,7 @@ def disconnect_all(request: Request) -> dict:
     close_all()
     # Reset del singleton para que un futuro get_system() respete el flag.
     import actions.iot.control as _ctrl
+
     with _ctrl._system_lock:
         _ctrl._system = None
 
@@ -369,6 +386,7 @@ def disconnect_all(request: Request) -> dict:
 def connect_all(request: Request) -> dict:
     """Reanuda los transports. Borra el flag de pausa y reabre."""
     from config import IOT_CONFIG_PATH
+
     flag = IOT_CONFIG_PATH.parent / "iot_paused.flag"
     try:
         if flag.exists():
@@ -382,7 +400,7 @@ def connect_all(request: Request) -> dict:
         raise HTTPException(
             status_code=500,
             detail=f"Reconectar falló: {safe_error_detail(e)}",
-        )
+        ) from e
     _publish(request, "iot.config", {"action": "connect", "paused": False})
     return {"ok": True, "paused": False}
 
@@ -391,6 +409,7 @@ def connect_all(request: Request) -> dict:
 def get_paused() -> dict:
     """Estado actual del flag (true = transports cerrados)."""
     from config import IOT_CONFIG_PATH
+
     flag = IOT_CONFIG_PATH.parent / "iot_paused.flag"
     return {"paused": flag.exists()}
 
@@ -410,7 +429,7 @@ def download_sensor_log_csv() -> Response:
 
 class SheetsConnectBody(BaseModel):
     account: str = Field(..., description="Email Google asociado a gog")
-    title:   Optional[str] = Field(default=None, description="Nombre del Sheet (opcional)")
+    title: str | None = Field(default=None, description="Nombre del Sheet (opcional)")
 
 
 @router.get("/sheets/status")
@@ -426,7 +445,7 @@ def sheets_connect(body: SheetsConnectBody, request: Request) -> dict:
         state = sheets_sync.connect(body.account.strip(), body.title)
     except Exception as e:
         log.exception("Sheets connect falló")
-        raise HTTPException(status_code=400, detail=safe_error_detail(e))
+        raise HTTPException(status_code=400, detail=safe_error_detail(e)) from e
     _publish(request, "iot.sheets", {"action": "connect", "state": state})
     return state
 
@@ -446,6 +465,39 @@ def sheets_sync_now(request: Request) -> dict:
     return {"ok": True}
 
 
+class SheetsIntervalBody(BaseModel):
+    sync_interval_s: int = Field(
+        ..., ge=10, le=3600, description="Segundos entre cada sync (10..3600)"
+    )
+
+
+@router.put("/sheets/interval")
+def sheets_set_interval(body: SheetsIntervalBody, request: Request) -> dict:
+    """Actualiza la cadencia de sync a Sheets. Persiste y despierta el loop."""
+    result = sheets_sync.update_sync_interval(body.sync_interval_s)
+    if not result.get("ok"):
+        raise HTTPException(
+            status_code=400,
+            detail=result.get("reason") or "invalid",
+        )
+    _publish(request, "iot.sheets", {"action": "interval", "value": body.sync_interval_s})
+    return sheets_sync.status()
+
+
+@router.post("/sheets/reformat")
+def sheets_reformat(request: Request) -> dict:
+    """Re-aplica el formato bonito (cabecera, freeze, fechas, bandas) al
+    Sheet conectado. No mueve datos."""
+    result = sheets_sync.reformat()
+    if not result.get("ok"):
+        raise HTTPException(
+            status_code=400,
+            detail=result.get("error") or result.get("reason") or "reformat falló",
+        )
+    _publish(request, "iot.sheets", {"action": "reformat"})
+    return result
+
+
 @router.get("/sensor_log/xlsx")
 def download_sensor_log_xlsx() -> Response:
     """Descarga el log como Excel formateado: hoja `all` con todo +
@@ -454,7 +506,7 @@ def download_sensor_log_xlsx() -> Response:
         data = sensor_log.read_xlsx_bytes()
     except Exception as e:
         log.exception("Generar XLSX falló")
-        raise HTTPException(status_code=500, detail=f"XLSX: {safe_error_detail(e)}")
+        raise HTTPException(status_code=500, detail=f"XLSX: {safe_error_detail(e)}") from e
     return Response(
         content=data,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",

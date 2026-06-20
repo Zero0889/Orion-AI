@@ -3,22 +3,25 @@ import os
 import tempfile
 from datetime import datetime
 from threading import Lock
-from pathlib import Path
 
 from config import MEMORY_PATH
-_lock            = Lock()
+import contextlib
+
+_lock = Lock()
 MAX_VALUE_LENGTH = 380
 MEMORY_MAX_CHARS = 2200
 
+
 def _empty_memory() -> dict:
     return {
-        "identity":      {},
-        "preferences":   {},
-        "projects":      {},
+        "identity": {},
+        "preferences": {},
+        "projects": {},
         "relationships": {},
-        "wishes":        {},
-        "notes":         {},
+        "wishes": {},
+        "notes": {},
     }
+
 
 def load_memory() -> dict:
     if not MEMORY_PATH.exists():
@@ -36,6 +39,7 @@ def load_memory() -> dict:
         except (json.JSONDecodeError, OSError) as e:
             print(f"[Memory] ⚠️ Load error: {e}")
             return _empty_memory()
+
 
 def _all_entries(memory: dict) -> list[tuple]:
     entries = []
@@ -60,6 +64,7 @@ def _trim_to_limit(memory: dict) -> dict:
         print(f"[Memory] 🗑️  Trimmed {cat}/{key}")
     return memory
 
+
 def save_memory(memory: dict) -> None:
     """Atomic write: writes to a temp file then renames it.
     This prevents corruption if the process crashes mid-write.
@@ -78,10 +83,8 @@ def save_memory(memory: dict) -> None:
             with os.fdopen(tmp_fd, "w", encoding="utf-8") as f:
                 f.write(payload)
                 f.flush()
-                try:
+                with contextlib.suppress(OSError):
                     os.fsync(f.fileno())
-                except OSError:
-                    pass
             os.replace(tmp_path, MEMORY_PATH)
         except OSError as e:
             print(f"[Memory] ⚠️  Save error: {e}")
@@ -112,8 +115,8 @@ def _recursive_update(target: dict, updates: dict) -> bool:
             if _recursive_update(target[key], value):
                 changed = True
         else:
-            new_val  = _truncate_value(str(value["value"] if isinstance(value, dict) else value))
-            entry    = {"value": new_val, "updated": datetime.now().strftime("%Y-%m-%d")}
+            new_val = _truncate_value(str(value["value"] if isinstance(value, dict) else value))
+            entry = {"value": new_val, "updated": datetime.now().strftime("%Y-%m-%d")}
             existing = target.get(key, {})
             if not isinstance(existing, dict) or existing.get("value") != new_val:
                 target[key] = entry
@@ -130,13 +133,14 @@ def update_memory(memory_update: dict) -> dict:
         print(f"[Memory] 💾 Saved: {list(memory_update.keys())}")
     return memory
 
+
 def format_memory_for_prompt(memory: dict | None) -> str:
     if not memory:
         return ""
 
     lines = []
 
-    identity  = memory.get("identity", {})
+    identity = memory.get("identity", {})
     id_fields = ["name", "age", "birthday", "city", "job", "language", "school", "nationality"]
     for field in id_fields:
         entry = identity.get(field)
@@ -206,6 +210,7 @@ def format_memory_for_prompt(memory: dict | None) -> str:
 
     return result + "\n"
 
+
 def remember(key: str, value: str, category: str = "notes") -> str:
     valid = {"identity", "preferences", "projects", "relationships", "wishes", "notes"}
     if category not in valid:
@@ -216,7 +221,7 @@ def remember(key: str, value: str, category: str = "notes") -> str:
 
 def forget(key: str, category: str = "notes") -> str:
     memory = load_memory()
-    cat    = memory.get(category, {})
+    cat = memory.get(category, {})
     if key in cat:
         del cat[key]
         memory[category] = cat

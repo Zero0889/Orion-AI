@@ -1,8 +1,13 @@
-# Dependencias solo para desarrollo / empaquetado (Fase 6).
+# Dependencias solo para desarrollo / empaquetado.
 # No las necesita el usuario final.
 
-# Tests
+# ── Tests ────────────────────────────────────────────────────────────
 pytest
 
-# Empaquetado nativo (Tauri sidecar + ejecutable standalone)
+# ── Lint / format / types ────────────────────────────────────────────
+ruff
+mypy
+pre-commit
+
+# ── Empaquetado nativo (Tauri sidecar + ejecutable standalone) ───────
 pyinstaller

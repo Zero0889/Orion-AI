@@ -18,7 +18,7 @@ import json
 import sys
 import urllib.error
 from pathlib import Path
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -26,11 +26,10 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from fastapi.testclient import TestClient   # noqa: E402
+from fastapi.testclient import TestClient
 
-import server.routes.mcp as mcp_route       # noqa: E402
-from server.routes.mcp import _normalize_package, _normalize_server  # noqa: E402
-
+import server.routes.mcp as mcp_route
+from server.routes.mcp import _normalize_package, _normalize_server
 
 # ── Unit tests de _normalize_package ────────────────────────────────────
 
@@ -38,10 +37,10 @@ from server.routes.mcp import _normalize_package, _normalize_server  # noqa: E40
 def test_normalize_npm_package_basic():
     pkg = {
         "registryType": "npm",
-        "identifier":   "remote-filesystem-mcp-server",
-        "version":      "0.1.2",
-        "runtimeHint":  "npx",
-        "transport":    {"type": "stdio"},
+        "identifier": "remote-filesystem-mcp-server",
+        "version": "0.1.2",
+        "runtimeHint": "npx",
+        "transport": {"type": "stdio"},
         "runtimeArguments": [{"value": "-y", "type": "positional"}],
         "environmentVariables": [],
     }
@@ -56,8 +55,8 @@ def test_normalize_npm_package_basic():
 def test_normalize_falls_back_to_npx_when_no_runtime_hint():
     pkg = {
         "registryType": "npm",
-        "identifier":   "@anthropic/mcp-server-github",
-        "transport":    {"type": "stdio"},
+        "identifier": "@anthropic/mcp-server-github",
+        "transport": {"type": "stdio"},
     }
     out = _normalize_package(pkg)
     assert out is not None
@@ -68,8 +67,8 @@ def test_normalize_falls_back_to_npx_when_no_runtime_hint():
 def test_normalize_pypi_uses_uvx():
     pkg = {
         "registryType": "pypi",
-        "identifier":   "mcp-server-git",
-        "transport":    {"type": "stdio"},
+        "identifier": "mcp-server-git",
+        "transport": {"type": "stdio"},
     }
     out = _normalize_package(pkg)
     assert out is not None
@@ -79,8 +78,8 @@ def test_normalize_pypi_uses_uvx():
 def test_normalize_unknown_registry_returns_none():
     pkg = {
         "registryType": "weird-format",
-        "identifier":   "x",
-        "transport":    {"type": "stdio"},
+        "identifier": "x",
+        "transport": {"type": "stdio"},
     }
     assert _normalize_package(pkg) is None
 
@@ -88,8 +87,8 @@ def test_normalize_unknown_registry_returns_none():
 def test_normalize_skips_non_stdio_transport():
     pkg = {
         "registryType": "npm",
-        "identifier":   "x",
-        "transport":    {"type": "sse"},  # ORION solo soporta stdio
+        "identifier": "x",
+        "transport": {"type": "sse"},  # ORION solo soporta stdio
     }
     assert _normalize_package(pkg) is None
 
@@ -97,8 +96,8 @@ def test_normalize_skips_non_stdio_transport():
 def test_normalize_includes_package_arguments_after_identifier():
     pkg = {
         "registryType": "npm",
-        "identifier":   "@mcp/server-filesystem",
-        "transport":    {"type": "stdio"},
+        "identifier": "@mcp/server-filesystem",
+        "transport": {"type": "stdio"},
         "runtimeArguments": [{"value": "-y"}],
         "packageArguments": [{"value": "/data"}, {"value": "/work"}],
     }
@@ -109,15 +108,15 @@ def test_normalize_includes_package_arguments_after_identifier():
 def test_normalize_env_vars_carry_required_flag():
     pkg = {
         "registryType": "npm",
-        "identifier":   "@mcp/server-github",
-        "transport":    {"type": "stdio"},
+        "identifier": "@mcp/server-github",
+        "transport": {"type": "stdio"},
         "environmentVariables": [
-            {"name": "GITHUB_PERSONAL_ACCESS_TOKEN",
-             "description": "Token con scope repo",
-             "isRequired": True},
-            {"name": "GITHUB_API_URL",
-             "description": "GHE base URL",
-             "isRequired": False},
+            {
+                "name": "GITHUB_PERSONAL_ACCESS_TOKEN",
+                "description": "Token con scope repo",
+                "isRequired": True,
+            },
+            {"name": "GITHUB_API_URL", "description": "GHE base URL", "isRequired": False},
         ],
     }
     out = _normalize_package(pkg)
@@ -135,18 +134,20 @@ def test_normalize_server_unwraps_official_envelope():
     ``{"server": {...}, "_meta": {...}}``. Debemos leer del subdoc."""
     entry = {
         "server": {
-            "name":        "@mcp/server-fs",
-            "title":       "Filesystem",
+            "name": "@mcp/server-fs",
+            "title": "Filesystem",
             "description": "FS ops",
-            "version":     "0.1.0",
-            "repository":  {"url": "https://github.com/x/y"},
-            "packages": [{
-                "registryType": "npm",
-                "identifier":   "@mcp/server-fs",
-                "transport":    {"type": "stdio"},
-                "runtimeHint":  "npx",
-                "runtimeArguments": [{"value": "-y"}],
-            }],
+            "version": "0.1.0",
+            "repository": {"url": "https://github.com/x/y"},
+            "packages": [
+                {
+                    "registryType": "npm",
+                    "identifier": "@mcp/server-fs",
+                    "transport": {"type": "stdio"},
+                    "runtimeHint": "npx",
+                    "runtimeArguments": [{"value": "-y"}],
+                }
+            ],
         },
         "_meta": {"io.modelcontextprotocol.registry/official": {"isLatest": True}},
     }
@@ -164,15 +165,17 @@ def test_normalize_server_legacy_flat_shape_still_works():
     """Tolerancia hacia atrás: si el upstream vuelve al shape plano,
     seguimos sirviendo."""
     server = {
-        "name":        "@mcp/server-fs",
-        "title":       "Filesystem",
+        "name": "@mcp/server-fs",
+        "title": "Filesystem",
         "description": "FS ops",
-        "packages": [{
-            "registryType": "npm",
-            "identifier":   "@mcp/server-fs",
-            "transport":    {"type": "stdio"},
-            "runtimeHint":  "npx",
-        }],
+        "packages": [
+            {
+                "registryType": "npm",
+                "identifier": "@mcp/server-fs",
+                "transport": {"type": "stdio"},
+                "runtimeHint": "npx",
+            }
+        ],
     }
     out = _normalize_server(server)
     assert out["installable"] is True
@@ -189,8 +192,7 @@ def test_normalize_server_remote_only_streamable_http():
             "title": "Smithery GitHub",
             "description": "Remote MCP server",
             "remotes": [
-                {"type": "streamable-http",
-                 "url": "https://server.smithery.ai/example/mcp"},
+                {"type": "streamable-http", "url": "https://server.smithery.ai/example/mcp"},
             ],
         },
         "_meta": {},
@@ -206,8 +208,7 @@ def test_normalize_server_remote_only_streamable_http():
 def test_normalize_server_not_installable_when_only_unsupported_packages():
     server = {
         "name": "weird",
-        "packages": [{"registryType": "oci", "identifier": "img",
-                      "transport": {"type": "sse"}}],
+        "packages": [{"registryType": "oci", "identifier": "img", "transport": {"type": "sse"}}],
     }
     out = _normalize_server(server)
     assert out["installable"] is False
@@ -237,8 +238,9 @@ def client(monkeypatch, tmp_path, clear_cache):
     mgr.servers.return_value = {}
     monkeypatch.setattr(mcp_route, "get_mcp_manager", lambda: mgr)
 
-    from server.event_bus import OrionEventBus
     from server.app import build_app
+    from server.event_bus import OrionEventBus
+
     bus = OrionEventBus()
     app = build_app(bus)
     with TestClient(app) as tc:
@@ -250,7 +252,7 @@ def _mock_urlopen(payload: dict):
     response = MagicMock()
     response.read.return_value = json.dumps(payload).encode("utf-8")
     response.__enter__ = MagicMock(return_value=response)
-    response.__exit__  = MagicMock(return_value=False)
+    response.__exit__ = MagicMock(return_value=False)
     return response
 
 
@@ -263,21 +265,22 @@ def test_registry_search_returns_normalized_servers(client):
                     "title": "Filesystem",
                     "description": "FS ops",
                     "version": "1.0",
-                    "packages": [{
-                        "registryType": "npm",
-                        "identifier": "@mcp/fs",
-                        "transport": {"type": "stdio"},
-                        "runtimeHint": "npx",
-                        "runtimeArguments": [{"value": "-y"}],
-                    }],
+                    "packages": [
+                        {
+                            "registryType": "npm",
+                            "identifier": "@mcp/fs",
+                            "transport": {"type": "stdio"},
+                            "runtimeHint": "npx",
+                            "runtimeArguments": [{"value": "-y"}],
+                        }
+                    ],
                 },
                 "_meta": {},
             }
         ],
         "metadata": {"nextCursor": "abc", "count": 1},
     }
-    with patch("server.routes.mcp.urllib.request.urlopen",
-               return_value=_mock_urlopen(payload)):
+    with patch("server.routes.mcp.urllib.request.urlopen", return_value=_mock_urlopen(payload)):
         r = client.get("/api/mcp/registry/search?q=fs&limit=10")
     assert r.status_code == 200
     data = r.json()
@@ -304,8 +307,9 @@ def test_registry_search_passes_query_to_upstream(client):
 
 def test_registry_search_uses_cache(client):
     payload = {"servers": [], "metadata": {"count": 0}}
-    with patch("server.routes.mcp.urllib.request.urlopen",
-               return_value=_mock_urlopen(payload)) as m:
+    with patch(
+        "server.routes.mcp.urllib.request.urlopen", return_value=_mock_urlopen(payload)
+    ) as m:
         client.get("/api/mcp/registry/search?q=cached")
         client.get("/api/mcp/registry/search?q=cached")
         client.get("/api/mcp/registry/search?q=cached")
@@ -316,6 +320,7 @@ def test_registry_search_uses_cache(client):
 def test_registry_search_graceful_when_upstream_down(client):
     def fail(*a, **kw):
         raise urllib.error.URLError("connection refused")
+
     with patch("server.routes.mcp.urllib.request.urlopen", side_effect=fail):
         r = client.get("/api/mcp/registry/search?q=anything")
     assert r.status_code == 502
@@ -326,7 +331,7 @@ def test_registry_search_graceful_on_invalid_json(client):
     response = MagicMock()
     response.read.return_value = b"<html>not json</html>"
     response.__enter__ = MagicMock(return_value=response)
-    response.__exit__  = MagicMock(return_value=False)
+    response.__exit__ = MagicMock(return_value=False)
     with patch("server.routes.mcp.urllib.request.urlopen", return_value=response):
         r = client.get("/api/mcp/registry/search?q=x")
     assert r.status_code == 502

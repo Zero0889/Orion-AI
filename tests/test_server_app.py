@@ -35,40 +35,72 @@ if str(PROJECT_ROOT) not in sys.path:
 @pytest.fixture
 def isolated_data(tmp_path, monkeypatch):
     """Apunta los paths de memoria/notas/convs a tmp_path con datos seed."""
+    import memory.conversations as cv
     import memory.memory_manager as mm
     import memory.quick_notes as qn
-    import memory.conversations as cv
 
     mem_file = tmp_path / "long_term.json"
-    mem_file.write_text(json.dumps({
-        "identity":    {"nombre": {"value": "Zahir"}},
-        "preferences": {"comida_favorita": {"value": "pizza"}},
-        "projects":      {},
-        "relationships": {},
-        "wishes":        {},
-        "notes":         {},
-    }, ensure_ascii=False), encoding="utf-8")
+    mem_file.write_text(
+        json.dumps(
+            {
+                "identity": {"nombre": {"value": "Zahir"}},
+                "preferences": {"comida_favorita": {"value": "pizza"}},
+                "projects": {},
+                "relationships": {},
+                "wishes": {},
+                "notes": {},
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
     monkeypatch.setattr(mm, "MEMORY_PATH", mem_file)
 
     notes_file = tmp_path / "quick_notes.json"
-    notes_file.write_text(json.dumps([
-        {"id": "n1", "text": "comprar pan",  "pinned": False, "color": None, "created": "2026-05-31T10:00:00", "updated": "2026-05-31T10:00:00"},
-        {"id": "n2", "text": "regar plantas", "pinned": True,  "color": None, "created": "2026-05-31T11:00:00", "updated": "2026-05-31T11:00:00"},
-    ], ensure_ascii=False), encoding="utf-8")
+    notes_file.write_text(
+        json.dumps(
+            [
+                {
+                    "id": "n1",
+                    "text": "comprar pan",
+                    "pinned": False,
+                    "color": None,
+                    "created": "2026-05-31T10:00:00",
+                    "updated": "2026-05-31T10:00:00",
+                },
+                {
+                    "id": "n2",
+                    "text": "regar plantas",
+                    "pinned": True,
+                    "color": None,
+                    "created": "2026-05-31T11:00:00",
+                    "updated": "2026-05-31T11:00:00",
+                },
+            ],
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
     monkeypatch.setattr(qn, "_NOTES_PATH", notes_file)
 
     convs_file = tmp_path / "conversations.json"
-    convs_file.write_text(json.dumps([
-        {
-            "id":       "abc123",
-            "started":  "2026-05-30T10:00:00",
-            "title":    "Charla de prueba",
-            "messages": [
-                {"role": "user", "text": "hola",  "ts": "2026-05-30T10:00:00"},
-                {"role": "ai",   "text": "hola!", "ts": "2026-05-30T10:00:01"},
+    convs_file.write_text(
+        json.dumps(
+            [
+                {
+                    "id": "abc123",
+                    "started": "2026-05-30T10:00:00",
+                    "title": "Charla de prueba",
+                    "messages": [
+                        {"role": "user", "text": "hola", "ts": "2026-05-30T10:00:00"},
+                        {"role": "ai", "text": "hola!", "ts": "2026-05-30T10:00:01"},
+                    ],
+                }
             ],
-        }
-    ], ensure_ascii=False), encoding="utf-8")
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
     monkeypatch.setattr(cv, "_CONVERSATIONS_PATH", convs_file)
 
     return tmp_path
@@ -77,8 +109,9 @@ def isolated_data(tmp_path, monkeypatch):
 @pytest.fixture
 def client(isolated_data):
     """TestClient con app + bus reales, datos en tmp_path."""
-    from server.event_bus import OrionEventBus
     from server.app import build_app
+    from server.event_bus import OrionEventBus
+
     bus = OrionEventBus()
     app = build_app(bus)
     with TestClient(app) as tc:
@@ -211,6 +244,7 @@ def test_ws_text_command_calls_callback(client):
         ws.send_json({"type": "text", "payload": {"text": "abre Spotify"}})
         # submit_user_text usa un thread daemon, esperamos un poco
         import time
+
         for _ in range(40):
             if received:
                 break

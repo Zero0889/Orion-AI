@@ -39,10 +39,20 @@ export function CircuitPanel() {
   // refetch lista
   useEffect(() => {
     let alive = true;
-    api.circuitList()
-      .then((r) => { if (alive) { setItems(r.items); setError(null); } })
-      .catch((e) => { if (alive) setError(String(e)); });
-    return () => { alive = false; };
+    api
+      .circuitList()
+      .then((r) => {
+        if (alive) {
+          setItems(r.items);
+          setError(null);
+        }
+      })
+      .catch((e) => {
+        if (alive) setError(String(e));
+      });
+    return () => {
+      alive = false;
+    };
   }, [refreshTick]);
 
   // Procesar una imagen ya seleccionada
@@ -61,7 +71,8 @@ export function CircuitPanel() {
       toast.success(
         "Circuito generado",
         [result.spice_path && ".cir SPICE listo", result.kicad_path && ".kicad_sch listo"]
-          .filter(Boolean).join(" — ") || "Sin archivos",
+          .filter(Boolean)
+          .join(" — ") || "Sin archivos",
       );
       setRefreshTick((n) => n + 1);
     } catch (e) {
@@ -90,7 +101,10 @@ export function CircuitPanel() {
 
   // Agrupar items por basename (cir + kicad_sch del mismo circuito)
   const grouped = useMemo(() => {
-    const map = new Map<string, { base: string; spice?: CircuitItem; kicad?: CircuitItem; mtime: number }>();
+    const map = new Map<
+      string,
+      { base: string; spice?: CircuitItem; kicad?: CircuitItem; mtime: number }
+    >();
     for (const it of items) {
       const base = it.name.replace(/\.(cir|kicad_sch)$/i, "");
       const entry = map.get(base) ?? { base, mtime: 0 };
@@ -131,7 +145,7 @@ export function CircuitPanel() {
     try {
       const r = await api.circuitProteusAutodraw(cirPath, { placeInCanvas });
       if (r.ok) toast.success("Componentes añadidos a Proteus", r.summary.slice(0, 200));
-      else      toast.warn("Automatización terminó con avisos", r.summary.slice(0, 200));
+      else toast.warn("Automatización terminó con avisos", r.summary.slice(0, 200));
     } catch (e) {
       toast.error("Autodibujo falló", String(e).slice(0, 200));
     }
@@ -145,7 +159,9 @@ export function CircuitPanel() {
         hint="Sube una imagen de un circuito electrónico y obtén la netlist SPICE (Proteus) y el esquemático KiCad."
         action={
           <div className="flex items-center gap-2">
-            <Badge tone="info" dot>{items.length} archivos</Badge>
+            <Badge tone="info" dot>
+              {items.length} archivos
+            </Badge>
             <Button
               variant="primary"
               size="sm"
@@ -177,7 +193,10 @@ export function CircuitPanel() {
         {/* Drop zone */}
         <section className="p-6">
           <div
-            onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+            onDragOver={(e) => {
+              e.preventDefault();
+              setDragOver(true);
+            }}
             onDragLeave={() => setDragOver(false)}
             onDrop={onDrop}
             onClick={() => !processing && inputRef.current?.click()}
@@ -209,12 +228,22 @@ export function CircuitPanel() {
               <div className="text-sm text-text mb-3">{lastResult.summary}</div>
               <div className="flex flex-wrap gap-2">
                 {lastResult.spice && (
-                  <Button size="sm" variant="ghost" icon="paperclip" onClick={() => copyPath(lastResult.spice!)}>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    icon="paperclip"
+                    onClick={() => copyPath(lastResult.spice!)}
+                  >
                     Copiar ruta .cir
                   </Button>
                 )}
                 {lastResult.kicad && (
-                  <Button size="sm" variant="ghost" icon="paperclip" onClick={() => copyPath(lastResult.kicad!)}>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    icon="paperclip"
+                    onClick={() => copyPath(lastResult.kicad!)}
+                  >
                     Copiar ruta .kicad_sch
                   </Button>
                 )}
@@ -259,21 +288,24 @@ function Subhead({ title, count }: { title: string; count?: number }) {
   return (
     <div className="flex items-baseline gap-2 mb-3">
       <h3 className="text-sm font-medium tracking-tight text-text">{title}</h3>
-      {typeof count === "number" && (
-        <span className="text-xs text-text-dim">· {count}</span>
-      )}
+      {typeof count === "number" && <span className="text-xs text-text-dim">· {count}</span>}
     </div>
   );
 }
 
 function CircuitCard({
-  base, spice, kicad, onCopy, onDelete, onAutodraw,
+  base,
+  spice,
+  kicad,
+  onCopy,
+  onDelete,
+  onAutodraw,
 }: {
-  base:       string;
-  spice?:     CircuitItem;
-  kicad?:     CircuitItem;
-  onCopy:     (path: string) => void;
-  onDelete:   (path: string) => void;
+  base: string;
+  spice?: CircuitItem;
+  kicad?: CircuitItem;
+  onCopy: (path: string) => void;
+  onDelete: (path: string) => void;
   onAutodraw: (cirPath: string, placeInCanvas: boolean) => void;
 }) {
   const date = new Date(Math.max(spice?.modified ?? 0, kicad?.modified ?? 0) * 1000);
@@ -282,7 +314,9 @@ function CircuitCard({
     <Surface className="p-4">
       <div className="flex items-start justify-between gap-3 mb-3">
         <div className="min-w-0">
-          <div className="text-sm font-medium text-text truncate" title={base}>{base}</div>
+          <div className="text-sm font-medium text-text truncate" title={base}>
+            {base}
+          </div>
           <div className="text-xs text-text-dim">{date.toLocaleString()}</div>
         </div>
         <Icon name="cpu" size={18} className="text-text-dim shrink-0" />
@@ -290,7 +324,12 @@ function CircuitCard({
 
       <div className="flex flex-col gap-2">
         {spice && (
-          <FileRow item={spice} label=".cir (Proteus / SPICE)" onCopy={onCopy} onDelete={onDelete} />
+          <FileRow
+            item={spice}
+            label=".cir (Proteus / SPICE)"
+            onCopy={onCopy}
+            onDelete={onDelete}
+          />
         )}
         {kicad && (
           <FileRow item={kicad} label=".kicad_sch (KiCad)" onCopy={onCopy} onDelete={onDelete} />
@@ -324,7 +363,10 @@ function CircuitCard({
 }
 
 function FileRow({
-  item, label, onCopy, onDelete,
+  item,
+  label,
+  onCopy,
+  onDelete,
 }: {
   item: CircuitItem;
   label: string;
@@ -335,11 +377,25 @@ function FileRow({
     <div className="flex items-center justify-between gap-2 p-2 rounded-md bg-white/[0.02] border border-white/[0.05]">
       <div className="min-w-0">
         <div className="text-xs text-text">{label}</div>
-        <div className="text-[10px] text-text-dim truncate" title={item.path}>{item.path}</div>
+        <div className="text-[10px] text-text-dim truncate" title={item.path}>
+          {item.path}
+        </div>
       </div>
       <div className="flex items-center gap-1 shrink-0">
-        <Button size="icon" variant="ghost" icon="paperclip" title="Copiar ruta" onClick={() => onCopy(item.path)} />
-        <Button size="icon" variant="ghost" icon="trash" title="Eliminar" onClick={() => onDelete(item.path)} />
+        <Button
+          size="icon"
+          variant="ghost"
+          icon="paperclip"
+          title="Copiar ruta"
+          onClick={() => onCopy(item.path)}
+        />
+        <Button
+          size="icon"
+          variant="ghost"
+          icon="trash"
+          title="Eliminar"
+          onClick={() => onDelete(item.path)}
+        />
       </div>
     </div>
   );

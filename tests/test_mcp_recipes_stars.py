@@ -15,7 +15,7 @@ import json
 import sys
 import urllib.error
 from pathlib import Path
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -23,12 +23,11 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from fastapi.testclient import TestClient   # noqa: E402
+from fastapi.testclient import TestClient
 
-import server.routes.mcp as mcp_route       # noqa: E402
-from server.routes.mcp import _parse_github_repo, _fetch_github_stars  # noqa: E402
-from core.mcp_recipes import RECIPES, get_recipe, list_recipes         # noqa: E402
-
+import server.routes.mcp as mcp_route
+from core.mcp_recipes import RECIPES, get_recipe, list_recipes
+from server.routes.mcp import _fetch_github_stars, _parse_github_repo
 
 # ── Catálogo ────────────────────────────────────────────────────────────
 
@@ -94,8 +93,9 @@ def client(monkeypatch, tmp_path):
     mcp_route._GH_STAR_CACHE.clear()
     mcp_route._REGISTRY_CACHE.clear()
 
-    from server.event_bus import OrionEventBus
     from server.app import build_app
+    from server.event_bus import OrionEventBus
+
     bus = OrionEventBus()
     app = build_app(bus)
     with TestClient(app) as tc:
@@ -150,30 +150,35 @@ def _mock_urlopen_json(payload: dict):
     response = MagicMock()
     response.read.return_value = json.dumps(payload).encode("utf-8")
     response.__enter__ = MagicMock(return_value=response)
-    response.__exit__  = MagicMock(return_value=False)
+    response.__exit__ = MagicMock(return_value=False)
     return response
 
 
 def test_fetch_stars_returns_count():
     mcp_route._GH_STAR_CACHE.clear()
-    with patch("server.routes.mcp.urllib.request.urlopen",
-               return_value=_mock_urlopen_json({"stargazers_count": 1234})):
+    with patch(
+        "server.routes.mcp.urllib.request.urlopen",
+        return_value=_mock_urlopen_json({"stargazers_count": 1234}),
+    ):
         stars = _fetch_github_stars("https://github.com/foo/bar")
     assert stars == 1234
 
 
 def test_fetch_stars_returns_none_on_network_error():
     mcp_route._GH_STAR_CACHE.clear()
-    with patch("server.routes.mcp.urllib.request.urlopen",
-               side_effect=urllib.error.URLError("rate limited")):
+    with patch(
+        "server.routes.mcp.urllib.request.urlopen",
+        side_effect=urllib.error.URLError("rate limited"),
+    ):
         stars = _fetch_github_stars("https://github.com/foo/bar")
     assert stars is None
 
 
 def test_fetch_stars_caches_positive_and_negative(client):
     mcp_route._GH_STAR_CACHE.clear()
-    with patch("server.routes.mcp.urllib.request.urlopen",
-               side_effect=urllib.error.URLError("err")) as m:
+    with patch(
+        "server.routes.mcp.urllib.request.urlopen", side_effect=urllib.error.URLError("err")
+    ) as m:
         _fetch_github_stars("https://github.com/foo/bar")
         _fetch_github_stars("https://github.com/foo/bar")
         _fetch_github_stars("https://github.com/foo/bar")
@@ -194,16 +199,19 @@ def test_fetch_stars_returns_none_for_non_github_url():
 
 
 def test_endpoint_stars_returns_count(client):
-    with patch("server.routes.mcp.urllib.request.urlopen",
-               return_value=_mock_urlopen_json({"stargazers_count": 999})):
+    with patch(
+        "server.routes.mcp.urllib.request.urlopen",
+        return_value=_mock_urlopen_json({"stargazers_count": 999}),
+    ):
         r = client.get("/api/mcp/registry/stars?repo_url=https://github.com/foo/bar")
     assert r.status_code == 200
     assert r.json() == {"repo_url": "https://github.com/foo/bar", "stars": 999}
 
 
 def test_endpoint_stars_returns_null_when_unreachable(client):
-    with patch("server.routes.mcp.urllib.request.urlopen",
-               side_effect=urllib.error.URLError("offline")):
+    with patch(
+        "server.routes.mcp.urllib.request.urlopen", side_effect=urllib.error.URLError("offline")
+    ):
         r = client.get("/api/mcp/registry/stars?repo_url=https://github.com/foo/bar")
     assert r.status_code == 200
     assert r.json()["stars"] is None

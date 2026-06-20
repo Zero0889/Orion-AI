@@ -21,7 +21,9 @@ import hashlib
 import json
 import threading
 import time
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
+import contextlib
 
 
 def _make_key(args: tuple, kwargs: dict) -> str:
@@ -32,7 +34,9 @@ def _make_key(args: tuple, kwargs: dict) -> str:
     try:
         payload = json.dumps(
             {"a": args, "k": kwargs},
-            sort_keys=True, ensure_ascii=False, default=str,
+            sort_keys=True,
+            ensure_ascii=False,
+            default=str,
         )
     except (TypeError, ValueError):
         payload = repr((args, kwargs))
@@ -40,7 +44,7 @@ def _make_key(args: tuple, kwargs: dict) -> str:
 
 
 class _TTLEntry:
-    __slots__ = ("value", "expires_at")
+    __slots__ = ("expires_at", "value")
 
     def __init__(self, value: Any, expires_at: float):
         self.value = value
@@ -60,9 +64,10 @@ def ttl_cache(
         skip_if     : función opcional aplicada al resultado; si retorna True
                        el resultado NO se guarda (ej. errores transitorios).
     """
+
     def decorator(func: Callable) -> Callable:
         store: dict[str, _TTLEntry] = {}
-        order: list[str] = []           # FIFO de claves
+        order: list[str] = []  # FIFO de claves
         lock = threading.Lock()
         stats = {"hits": 0, "misses": 0}
 
@@ -79,10 +84,8 @@ def ttl_cache(
                 # expirada o ausente
                 if entry is not None:
                     store.pop(key, None)
-                    try:
+                    with contextlib.suppress(ValueError):
                         order.remove(key)
-                    except ValueError:
-                        pass
 
             # Llamada real (fuera del lock para no bloquear)
             result = func(*args, **kwargs)
@@ -113,15 +116,15 @@ def ttl_cache(
         def cache_info() -> dict:
             with lock:
                 return {
-                    "size":    len(store),
-                    "hits":    stats["hits"],
-                    "misses":  stats["misses"],
-                    "ttl_s":   ttl_seconds,
-                    "max":     max_entries,
+                    "size": len(store),
+                    "hits": stats["hits"],
+                    "misses": stats["misses"],
+                    "ttl_s": ttl_seconds,
+                    "max": max_entries,
                 }
 
-        wrapper.cache_clear = cache_clear   # type: ignore[attr-defined]
-        wrapper.cache_info  = cache_info    # type: ignore[attr-defined]
+        wrapper.cache_clear = cache_clear  # type: ignore[attr-defined]
+        wrapper.cache_info = cache_info  # type: ignore[attr-defined]
         return wrapper
 
     return decorator

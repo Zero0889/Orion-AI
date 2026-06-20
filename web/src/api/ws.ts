@@ -46,7 +46,11 @@ export class OrionSocket {
       this.reconnectTimer = null;
     }
     if (this.ws) {
-      try { this.ws.close(); } catch { /* ignore */ }
+      try {
+        this.ws.close();
+      } catch {
+        /* ignore */
+      }
       this.ws = null;
     }
   }
@@ -130,6 +134,6 @@ export function inferBackendUrl(): { http: string; ws: string } {
   const wsProto = loc.protocol === "https:" ? "wss:" : "ws:";
   return {
     http: `${loc.protocol}//${loc.host}`,
-    ws:   `${wsProto}//${loc.host}/ws`,
+    ws: `${wsProto}//${loc.host}/ws`,
   };
 }

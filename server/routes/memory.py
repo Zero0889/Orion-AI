@@ -26,8 +26,12 @@ log = get_logger("server.routes.memory")
 router = APIRouter()
 
 VALID_CATEGORIES = {
-    "identity", "preferences", "projects",
-    "relationships", "wishes", "notes",
+    "identity",
+    "preferences",
+    "projects",
+    "relationships",
+    "wishes",
+    "notes",
 }
 
 
@@ -50,7 +54,10 @@ def get_memory_category(category: str) -> dict:
 
 @router.put("/{category}/{key}")
 def put_memory_entry(
-    category: str, key: str, body: MemoryEntry, request: Request,
+    category: str,
+    key: str,
+    body: MemoryEntry,
+    request: Request,
 ) -> dict:
     if category not in VALID_CATEGORIES:
         raise HTTPException(
@@ -75,14 +82,25 @@ def delete_memory_entry(category: str, key: str, request: Request) -> None:
 
 # ── helpers ─────────────────────────────────────────────────────────────
 def _publish_change(
-    request: Request, op: str, *, category: str, key: str, value: str | None,
+    request: Request,
+    op: str,
+    *,
+    category: str,
+    key: str,
+    value: str | None,
 ) -> None:
     bus = getattr(request.app.state, "bus", None)
     if bus is None:
         return
     try:
-        bus.publish("memory.updated", {
-            "op": op, "category": category, "key": key, "value": value,
-        })
+        bus.publish(
+            "memory.updated",
+            {
+                "op": op,
+                "category": category,
+                "key": key,
+                "value": value,
+            },
+        )
     except Exception as e:
         log.debug("publish memory.updated falló: %s", e)

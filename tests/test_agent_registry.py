@@ -27,11 +27,18 @@ def _fresh_cache():
 
 # ── Estructura del catálogo ────────────────────────────────────────────────
 
+
 def test_los_8_roles_nucleo_existen():
     ids = {a.id for a in registry.list_agents()}
     expected = {
-        "director", "researcher", "coder", "mathematician",
-        "writer", "analyst", "fileops", "iot",
+        "director",
+        "researcher",
+        "coder",
+        "mathematician",
+        "writer",
+        "analyst",
+        "fileops",
+        "iot",
     }
     assert expected.issubset(ids), f"Faltan agentes: {expected - ids}"
 
@@ -64,6 +71,7 @@ def test_agente_inexistente_lanza_keyerror():
 
 
 # ── ask_agent: routing al provider ─────────────────────────────────────────
+
 
 class _FakeProvider:
     def __init__(self, name: str, text: str = "fake-response", available: bool = True):
@@ -99,7 +107,7 @@ def test_ask_agent_cae_a_fallback_si_primario_no_disponible():
     coder = registry.get_agent("coder")
     assert coder.fallback_provider and coder.fallback_model
 
-    primary  = _FakeProvider(coder.provider, available=False)
+    primary = _FakeProvider(coder.provider, available=False)
     fallback = _FakeProvider(coder.fallback_provider, text="fallback-said-hi")
 
     def fake_get(name):

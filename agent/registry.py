@@ -17,7 +17,7 @@ vacía) y el agente declara ``fallback_provider`` + ``fallback_model``,
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from functools import lru_cache
 
 from config import BASE_DIR
@@ -81,6 +81,7 @@ def reset_cache() -> None:
 
 
 # ── API pública ────────────────────────────────────────────────────────────
+
 
 def list_agents(*, only_enabled: bool = True) -> list[AgentDef]:
     agents = _agents().values()
@@ -237,6 +238,7 @@ def ask_agent(
 
 # ── Helpers del agentic loop ─────────────────────────────────────────────
 
+
 def _resolve_agent_tools(agent: AgentDef) -> list[ToolSpec]:
     """Resuelve la whitelist del agente contra el ToolRegistry.
 
@@ -252,10 +254,7 @@ def _resolve_agent_tools(agent: AgentDef) -> list[ToolSpec]:
     declared = set(agent.tools)
 
     if "*" in declared:
-        decls = [
-            d for d in reg.all()
-            if not d.silent and d.include_in_planner
-        ]
+        decls = [d for d in reg.all() if not d.silent and d.include_in_planner]
     else:
         decls = []
         for name in declared:
@@ -269,8 +268,7 @@ def _resolve_agent_tools(agent: AgentDef) -> list[ToolSpec]:
             decls.append(entry[0])
 
     return [
-        ToolSpec(name=d.name, description=d.description, parameters=d.parameters)
-        for d in decls
+        ToolSpec(name=d.name, description=d.description, parameters=d.parameters) for d in decls
     ]
 
 
@@ -292,7 +290,10 @@ def _run_tool_loop(
 
     for iteration in range(max_iterations):
         resp: LLMResponse = provider.complete_with_tools(
-            working_turns, tools, model=model, temperature=temperature,
+            working_turns,
+            tools,
+            model=model,
+            temperature=temperature,
         )
 
         # Sin tool_calls: respuesta final.
@@ -300,11 +301,13 @@ def _run_tool_loop(
             return resp.text or ""
 
         # Append del turno assistant con los tool_calls solicitados.
-        working_turns.append({
-            "role": "assistant",
-            "content": resp.text or None,
-            "tool_calls": resp.tool_calls,
-        })
+        working_turns.append(
+            {
+                "role": "assistant",
+                "content": resp.text or None,
+                "tool_calls": resp.tool_calls,
+            }
+        )
 
         # Ejecuta cada tool_call y mete el resultado como turn role=tool.
         for tc in resp.tool_calls:
@@ -318,12 +321,14 @@ def _run_tool_loop(
             except Exception as e:
                 result = f"Error ejecutando '{name}': {type(e).__name__}: {e}"
 
-            working_turns.append({
-                "role":         "tool",
-                "tool_call_id": call_id,
-                "name":         name,
-                "content":      str(result),
-            })
+            working_turns.append(
+                {
+                    "role": "tool",
+                    "tool_call_id": call_id,
+                    "name": name,
+                    "content": str(result),
+                }
+            )
 
     print(
         f"[AgentRegistry] ⚠️ {agent_id} alcanzó max_tool_iterations="

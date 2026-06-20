@@ -47,17 +47,16 @@ from __future__ import annotations
 
 import json
 import threading
-import time
-from typing import Optional
 
 try:
     import paho.mqtt.client as mqtt  # type: ignore
+
     _PAHO_OK = True
 except ImportError:
     _PAHO_OK = False
 
-from .base import Transport
 from ..devices import Device
+from .base import Transport
 
 
 class MQTTTransport(Transport):
@@ -67,9 +66,7 @@ class MQTTTransport(Transport):
         super().__init__(transport_id, cfg)
 
         if not _PAHO_OK:
-            raise RuntimeError(
-                "paho-mqtt no está instalado. Ejecuta: pip install paho-mqtt"
-            )
+            raise RuntimeError("paho-mqtt no está instalado. Ejecuta: pip install paho-mqtt")
 
         self._connected = threading.Event()
         # device_id → topic_state que se ha suscrito (para sensores)
@@ -83,13 +80,14 @@ class MQTTTransport(Transport):
         # paho 2.x cambió el constructor; nos quedamos en el compatible.
         try:
             self._client = mqtt.Client(
-                mqtt.CallbackAPIVersion.VERSION2, client_id=client_id,
+                mqtt.CallbackAPIVersion.VERSION2,
+                client_id=client_id,
             )  # paho >= 2
         except AttributeError:
             self._client = mqtt.Client(client_id=client_id)  # paho < 2
 
         user = cfg.get("username") or ""
-        pwd  = cfg.get("password") or ""
+        pwd = cfg.get("password") or ""
         if user:
             self._client.username_pw_set(user, pwd)
 
@@ -99,9 +97,9 @@ class MQTTTransport(Transport):
             except Exception as e:
                 print(f"[IoT-MQTT:{self.id}] TLS no se pudo configurar: {e}")
 
-        self._client.on_connect    = self._on_connect
+        self._client.on_connect = self._on_connect
         self._client.on_disconnect = self._on_disconnect
-        self._client.on_message    = self._on_message
+        self._client.on_message = self._on_message
 
         host = cfg.get("host", "localhost")
         port = int(cfg.get("port", 1883))
@@ -188,7 +186,7 @@ class MQTTTransport(Transport):
     def send(self, device: Device, kind: str, value=None) -> bool:
         cfg = device.mqtt or {}
         topic_cmd = cfg.get("topic_command")
-        is_json   = (cfg.get("payload_format") or "string").lower() == "json"
+        is_json = (cfg.get("payload_format") or "string").lower() == "json"
 
         if kind == "on":
             payload = cfg.get("payload_on", "ON")
@@ -233,7 +231,8 @@ class MQTTTransport(Transport):
             if is_json:
                 return self._publish(
                     topic_cmd,
-                    self._publish_json(topic_cmd,
+                    self._publish_json(
+                        topic_cmd,
                         {"state": "ON", "color": {"r": r, "g": g, "b": b}},
                     ),
                 )

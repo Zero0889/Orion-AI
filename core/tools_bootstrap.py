@@ -30,12 +30,11 @@ invocarlos fuera de modo Live.
 from __future__ import annotations
 
 import threading
-from typing import Any
 
 from core.tool_registry import ToolDeclaration, ToolRegistry
 
-
 # ── Helpers de wrapping ─────────────────────────────────────────────────
+
 
 def _stub_live_only(name: str):
     """Handler de relleno para tools que requieren contexto Live.
@@ -43,12 +42,15 @@ def _stub_live_only(name: str):
     Si el executor o un test los invoca sin que main.py los haya
     sobreescrito, devuelve un mensaje explicativo en vez de explotar.
     """
+
     def _h(parameters: dict, **_kwargs) -> str:
         return f"La herramienta '{name}' solo está disponible en modo voz (Gemini Live)."
+
     return _h
 
 
 # ── Schemas y handlers ──────────────────────────────────────────────────
+
 
 def register_builtin_tools() -> None:
     """Registra las 23 tools builtin + los 4 stubs Live-only.
@@ -74,6 +76,7 @@ def register_builtin_tools() -> None:
     # ── open_app ────────────────────────────────────────────────────
     def h_open_app(parameters: dict, *, player=None, **_):
         from actions.open_app import open_app
+
         r = open_app(parameters=parameters, response=None, player=player)
         return r or f"Aplicación abierta: {parameters.get('app_name')}."
 
@@ -90,10 +93,10 @@ def register_builtin_tools() -> None:
                 "properties": {
                     "app_name": {
                         "type": "STRING",
-                        "description": "Exact name of the application (e.g. 'WhatsApp', 'Chrome', 'Spotify')"
+                        "description": "Exact name of the application (e.g. 'WhatsApp', 'Chrome', 'Spotify')",
                     }
                 },
-                "required": ["app_name"]
+                "required": ["app_name"],
             },
         ),
         h_open_app,
@@ -102,6 +105,7 @@ def register_builtin_tools() -> None:
     # ── web_search ──────────────────────────────────────────────────
     def h_web_search(parameters: dict, *, player=None, **_):
         from actions.web_search import web_search
+
         return web_search(parameters=parameters, player=player) or "Listo."
 
     reg.register(
@@ -111,12 +115,16 @@ def register_builtin_tools() -> None:
             parameters={
                 "type": "OBJECT",
                 "properties": {
-                    "query":  {"type": "STRING", "description": "Search query"},
-                    "mode":   {"type": "STRING", "description": "search (default) or compare"},
-                    "items":  {"type": "ARRAY", "items": {"type": "STRING"}, "description": "Items to compare"},
-                    "aspect": {"type": "STRING", "description": "price | specs | reviews"}
+                    "query": {"type": "STRING", "description": "Search query"},
+                    "mode": {"type": "STRING", "description": "search (default) or compare"},
+                    "items": {
+                        "type": "ARRAY",
+                        "items": {"type": "STRING"},
+                        "description": "Items to compare",
+                    },
+                    "aspect": {"type": "STRING", "description": "price | specs | reviews"},
                 },
-                "required": ["query"]
+                "required": ["query"],
             },
         ),
         h_web_search,
@@ -125,7 +133,10 @@ def register_builtin_tools() -> None:
     # ── weather_report ──────────────────────────────────────────────
     def h_weather(parameters: dict, *, player=None, **_):
         from actions.weather_report import weather_action
-        return weather_action(parameters=parameters, player=player) or "Reporte del clima entregado."
+
+        return (
+            weather_action(parameters=parameters, player=player) or "Reporte del clima entregado."
+        )
 
     reg.register(
         ToolDeclaration(
@@ -133,10 +144,8 @@ def register_builtin_tools() -> None:
             description="Gives the weather report to user",
             parameters={
                 "type": "OBJECT",
-                "properties": {
-                    "city": {"type": "STRING", "description": "City name"}
-                },
-                "required": ["city"]
+                "properties": {"city": {"type": "STRING", "description": "City name"}},
+                "required": ["city"],
             },
         ),
         h_weather,
@@ -145,6 +154,7 @@ def register_builtin_tools() -> None:
     # ── send_message ────────────────────────────────────────────────
     def h_send_msg(parameters: dict, *, player=None, **_):
         from actions.send_message import send_message
+
         r = send_message(parameters=parameters, response=None, player=player, session_memory=None)
         return r or f"Mensaje enviado a {parameters.get('receiver')}."
 
@@ -155,11 +165,14 @@ def register_builtin_tools() -> None:
             parameters={
                 "type": "OBJECT",
                 "properties": {
-                    "receiver":     {"type": "STRING", "description": "Recipient contact name"},
+                    "receiver": {"type": "STRING", "description": "Recipient contact name"},
                     "message_text": {"type": "STRING", "description": "The message to send"},
-                    "platform":     {"type": "STRING", "description": "Platform: WhatsApp, Telegram, etc."}
+                    "platform": {
+                        "type": "STRING",
+                        "description": "Platform: WhatsApp, Telegram, etc.",
+                    },
                 },
-                "required": ["receiver", "message_text", "platform"]
+                "required": ["receiver", "message_text", "platform"],
             },
         ),
         h_send_msg,
@@ -168,7 +181,10 @@ def register_builtin_tools() -> None:
     # ── reminder ────────────────────────────────────────────────────
     def h_reminder(parameters: dict, *, player=None, **_):
         from actions.reminder import reminder
-        return reminder(parameters=parameters, response=None, player=player) or "Recordatorio creado."
+
+        return (
+            reminder(parameters=parameters, response=None, player=player) or "Recordatorio creado."
+        )
 
     reg.register(
         ToolDeclaration(
@@ -177,11 +193,11 @@ def register_builtin_tools() -> None:
             parameters={
                 "type": "OBJECT",
                 "properties": {
-                    "date":    {"type": "STRING", "description": "Date in YYYY-MM-DD format"},
-                    "time":    {"type": "STRING", "description": "Time in HH:MM format (24h)"},
-                    "message": {"type": "STRING", "description": "Reminder message text"}
+                    "date": {"type": "STRING", "description": "Date in YYYY-MM-DD format"},
+                    "time": {"type": "STRING", "description": "Time in HH:MM format (24h)"},
+                    "message": {"type": "STRING", "description": "Reminder message text"},
                 },
-                "required": ["date", "time", "message"]
+                "required": ["date", "time", "message"],
             },
         ),
         h_reminder,
@@ -190,6 +206,7 @@ def register_builtin_tools() -> None:
     # ── youtube_video ───────────────────────────────────────────────
     def h_youtube(parameters: dict, *, player=None, **_):
         from actions.youtube_video import youtube_video
+
         return youtube_video(parameters=parameters, response=None, player=player) or "Listo."
 
     reg.register(
@@ -202,13 +219,22 @@ def register_builtin_tools() -> None:
             parameters={
                 "type": "OBJECT",
                 "properties": {
-                    "action": {"type": "STRING", "description": "play | summarize | get_info | trending (default: play)"},
-                    "query":  {"type": "STRING", "description": "Search query for play action"},
-                    "save":   {"type": "BOOLEAN", "description": "Save summary to Notepad (summarize only)"},
-                    "region": {"type": "STRING", "description": "Country code for trending e.g. ES, MX, AR"},
-                    "url":    {"type": "STRING", "description": "Video URL for get_info action"},
+                    "action": {
+                        "type": "STRING",
+                        "description": "play | summarize | get_info | trending (default: play)",
+                    },
+                    "query": {"type": "STRING", "description": "Search query for play action"},
+                    "save": {
+                        "type": "BOOLEAN",
+                        "description": "Save summary to Notepad (summarize only)",
+                    },
+                    "region": {
+                        "type": "STRING",
+                        "description": "Country code for trending e.g. ES, MX, AR",
+                    },
+                    "url": {"type": "STRING", "description": "Video URL for get_info action"},
                 },
-                "required": []
+                "required": [],
             },
         ),
         h_youtube,
@@ -219,11 +245,14 @@ def register_builtin_tools() -> None:
     # El handler devuelve un mensaje de aviso al modelo para que se calle.
     def h_screen(parameters: dict, *, player=None, **_):
         from actions.screen_processor import screen_process
+
         threading.Thread(
             target=screen_process,
             kwargs={
-                "parameters": parameters, "response": None,
-                "player": player, "session_memory": None,
+                "parameters": parameters,
+                "response": None,
+                "player": player,
+                "session_memory": None,
             },
             daemon=True,
         ).start()
@@ -245,10 +274,16 @@ def register_builtin_tools() -> None:
             parameters={
                 "type": "OBJECT",
                 "properties": {
-                    "angle": {"type": "STRING", "description": "'screen' to capture display, 'camera' for webcam. Default: 'screen'"},
-                    "text":  {"type": "STRING", "description": "The question or instruction about the captured image"}
+                    "angle": {
+                        "type": "STRING",
+                        "description": "'screen' to capture display, 'camera' for webcam. Default: 'screen'",
+                    },
+                    "text": {
+                        "type": "STRING",
+                        "description": "The question or instruction about the captured image",
+                    },
                 },
-                "required": ["text"]
+                "required": ["text"],
             },
             runs_in_thread=True,
         ),
@@ -258,6 +293,7 @@ def register_builtin_tools() -> None:
     # ── computer_settings ───────────────────────────────────────────
     def h_settings(parameters: dict, *, player=None, **_):
         from actions.computer_settings import computer_settings
+
         return computer_settings(parameters=parameters, response=None, player=player) or "Listo."
 
     reg.register(
@@ -272,11 +308,17 @@ def register_builtin_tools() -> None:
             parameters={
                 "type": "OBJECT",
                 "properties": {
-                    "action":      {"type": "STRING", "description": "The action to perform"},
-                    "description": {"type": "STRING", "description": "Natural language description of what to do"},
-                    "value":       {"type": "STRING", "description": "Optional value: volume level, text to type, etc."}
+                    "action": {"type": "STRING", "description": "The action to perform"},
+                    "description": {
+                        "type": "STRING",
+                        "description": "Natural language description of what to do",
+                    },
+                    "value": {
+                        "type": "STRING",
+                        "description": "Optional value: volume level, text to type, etc.",
+                    },
                 },
-                "required": []
+                "required": [],
             },
         ),
         h_settings,
@@ -285,6 +327,7 @@ def register_builtin_tools() -> None:
     # ── browser_control ─────────────────────────────────────────────
     def h_browser(parameters: dict, *, player=None, **_):
         from actions.browser_control import browser_control
+
         return browser_control(parameters=parameters, player=player) or "Listo."
 
     reg.register(
@@ -299,22 +342,46 @@ def register_builtin_tools() -> None:
             parameters={
                 "type": "OBJECT",
                 "properties": {
-                    "action":      {"type": "STRING", "description": "go_to | search | click | type | scroll | fill_form | smart_click | smart_type | get_text | get_url | press | new_tab | close_tab | screenshot | back | forward | reload | switch | list_browsers | close | close_all"},
-                    "browser":     {"type": "STRING", "description": "Target browser: chrome | edge | firefox | opera | operagx | brave | vivaldi | safari. Omit to use the currently active browser."},
-                    "url":         {"type": "STRING", "description": "URL for go_to / new_tab action"},
-                    "query":       {"type": "STRING", "description": "Search query for search action"},
-                    "engine":      {"type": "STRING", "description": "Search engine: google | bing | duckduckgo | yandex (default: google)"},
-                    "selector":    {"type": "STRING", "description": "CSS selector for click/type"},
-                    "text":        {"type": "STRING", "description": "Text to click or type"},
-                    "description": {"type": "STRING", "description": "Element description for smart_click/smart_type"},
-                    "direction":   {"type": "STRING", "description": "up | down for scroll"},
-                    "amount":      {"type": "INTEGER", "description": "Scroll amount in pixels (default: 500)"},
-                    "key":         {"type": "STRING", "description": "Key name for press action (e.g. Enter, Escape, F5)"},
-                    "path":        {"type": "STRING", "description": "Save path for screenshot"},
-                    "incognito":   {"type": "BOOLEAN", "description": "Open in private/incognito mode"},
-                    "clear_first": {"type": "BOOLEAN", "description": "Clear field before typing (default: true)"},
+                    "action": {
+                        "type": "STRING",
+                        "description": "go_to | search | click | type | scroll | fill_form | smart_click | smart_type | get_text | get_url | press | new_tab | close_tab | screenshot | back | forward | reload | switch | list_browsers | close | close_all",
+                    },
+                    "browser": {
+                        "type": "STRING",
+                        "description": "Target browser: chrome | edge | firefox | opera | operagx | brave | vivaldi | safari. Omit to use the currently active browser.",
+                    },
+                    "url": {"type": "STRING", "description": "URL for go_to / new_tab action"},
+                    "query": {"type": "STRING", "description": "Search query for search action"},
+                    "engine": {
+                        "type": "STRING",
+                        "description": "Search engine: google | bing | duckduckgo | yandex (default: google)",
+                    },
+                    "selector": {"type": "STRING", "description": "CSS selector for click/type"},
+                    "text": {"type": "STRING", "description": "Text to click or type"},
+                    "description": {
+                        "type": "STRING",
+                        "description": "Element description for smart_click/smart_type",
+                    },
+                    "direction": {"type": "STRING", "description": "up | down for scroll"},
+                    "amount": {
+                        "type": "INTEGER",
+                        "description": "Scroll amount in pixels (default: 500)",
+                    },
+                    "key": {
+                        "type": "STRING",
+                        "description": "Key name for press action (e.g. Enter, Escape, F5)",
+                    },
+                    "path": {"type": "STRING", "description": "Save path for screenshot"},
+                    "incognito": {
+                        "type": "BOOLEAN",
+                        "description": "Open in private/incognito mode",
+                    },
+                    "clear_first": {
+                        "type": "BOOLEAN",
+                        "description": "Clear field before typing (default: true)",
+                    },
                 },
-                "required": ["action"]
+                "required": ["action"],
             },
         ),
         h_browser,
@@ -323,6 +390,7 @@ def register_builtin_tools() -> None:
     # ── file_controller ─────────────────────────────────────────────
     def h_file_ctrl(parameters: dict, *, player=None, **_):
         from actions.file_controller import file_controller
+
         return file_controller(parameters=parameters, player=player) or "Listo."
 
     reg.register(
@@ -350,29 +418,86 @@ def register_builtin_tools() -> None:
             parameters={
                 "type": "OBJECT",
                 "properties": {
-                    "action":      {"type": "STRING", "description": "list | create_file | create_folder | delete | delete_all | delete_bulk | delete_duplicates | delete_empty_folders | move | copy | rename | read | write | find | largest | duplicates | tree_size | disk_usage | organize_desktop | info"},
-                    "path":        {"type": "STRING", "description": "File/folder path or shortcut: desktop, downloads, documents, home"},
-                    "destination": {"type": "STRING", "description": "Destination path for move/copy"},
-                    "new_name":    {"type": "STRING", "description": "New name for rename"},
-                    "content":     {"type": "STRING", "description": "Content for create_file/write"},
-                    "name":        {"type": "STRING", "description": "File name (partial OK — the tool resolves stems, normalizes accents and matches both files and folders)"},
-                    "extension":   {"type": "STRING", "description": "Filter by extension for find/largest/duplicates/delete_bulk/delete_duplicates (e.g. .pdf or just pdf)"},
-                    "pattern":     {"type": "STRING", "description": "Glob pattern for delete_bulk (e.g. '*.tmp', 'Thumbs.db', '*~')"},
-                    "older_than_days": {"type": "INTEGER", "description": "delete_bulk: only files older than N days (by mtime)"},
-                    "larger_than_mb":  {"type": "NUMBER",  "description": "delete_bulk: only files > N MB"},
-                    "smaller_than_mb": {"type": "NUMBER",  "description": "delete_bulk: only files < N MB"},
-                    "keep":        {"type": "STRING", "description": "delete_duplicates: which copy to keep — shortest_path (default) | oldest | newest | first"},
-                    "dry_run":     {"type": "BOOLEAN", "description": "Bulk-delete actions: when true (default) returns only a PREVIEW. Set false ONLY after the user explicitly confirmed."},
-                    "confirm":     {"type": "BOOLEAN", "description": "Bulk-delete actions: required true when dry_run=false. Extra safety to avoid accidental deletion."},
-                    "count":       {"type": "INTEGER", "description": "Number of results for largest (default 10, max 50)"},
-                    "min_size_mb": {"type": "NUMBER",  "description": "Minimum file size in MB for largest (default 0 = no minimum)"},
-                    "min_size_kb": {"type": "NUMBER",  "description": "Minimum file size in KB for duplicates/delete_duplicates (default 1 = ignore tiny files)"},
-                    "max_groups":  {"type": "INTEGER", "description": "Max duplicate groups to return (default 20, max 100)"},
-                    "depth":       {"type": "INTEGER", "description": "Recursion depth for tree_size (1-4, default 1)"},
-                    "top":         {"type": "INTEGER", "description": "How many subfolders to list in tree_size (default 20, max 50)"},
-                    "confirm_all": {"type": "BOOLEAN", "description": "When true on a delete with multiple matches, delete ALL of them. Use only after the user confirmed 'todos/all'."},
+                    "action": {
+                        "type": "STRING",
+                        "description": "list | create_file | create_folder | delete | delete_all | delete_bulk | delete_duplicates | delete_empty_folders | move | copy | rename | read | write | find | largest | duplicates | tree_size | disk_usage | organize_desktop | info",
+                    },
+                    "path": {
+                        "type": "STRING",
+                        "description": "File/folder path or shortcut: desktop, downloads, documents, home",
+                    },
+                    "destination": {
+                        "type": "STRING",
+                        "description": "Destination path for move/copy",
+                    },
+                    "new_name": {"type": "STRING", "description": "New name for rename"},
+                    "content": {"type": "STRING", "description": "Content for create_file/write"},
+                    "name": {
+                        "type": "STRING",
+                        "description": "File name (partial OK — the tool resolves stems, normalizes accents and matches both files and folders)",
+                    },
+                    "extension": {
+                        "type": "STRING",
+                        "description": "Filter by extension for find/largest/duplicates/delete_bulk/delete_duplicates (e.g. .pdf or just pdf)",
+                    },
+                    "pattern": {
+                        "type": "STRING",
+                        "description": "Glob pattern for delete_bulk (e.g. '*.tmp', 'Thumbs.db', '*~')",
+                    },
+                    "older_than_days": {
+                        "type": "INTEGER",
+                        "description": "delete_bulk: only files older than N days (by mtime)",
+                    },
+                    "larger_than_mb": {
+                        "type": "NUMBER",
+                        "description": "delete_bulk: only files > N MB",
+                    },
+                    "smaller_than_mb": {
+                        "type": "NUMBER",
+                        "description": "delete_bulk: only files < N MB",
+                    },
+                    "keep": {
+                        "type": "STRING",
+                        "description": "delete_duplicates: which copy to keep — shortest_path (default) | oldest | newest | first",
+                    },
+                    "dry_run": {
+                        "type": "BOOLEAN",
+                        "description": "Bulk-delete actions: when true (default) returns only a PREVIEW. Set false ONLY after the user explicitly confirmed.",
+                    },
+                    "confirm": {
+                        "type": "BOOLEAN",
+                        "description": "Bulk-delete actions: required true when dry_run=false. Extra safety to avoid accidental deletion.",
+                    },
+                    "count": {
+                        "type": "INTEGER",
+                        "description": "Number of results for largest (default 10, max 50)",
+                    },
+                    "min_size_mb": {
+                        "type": "NUMBER",
+                        "description": "Minimum file size in MB for largest (default 0 = no minimum)",
+                    },
+                    "min_size_kb": {
+                        "type": "NUMBER",
+                        "description": "Minimum file size in KB for duplicates/delete_duplicates (default 1 = ignore tiny files)",
+                    },
+                    "max_groups": {
+                        "type": "INTEGER",
+                        "description": "Max duplicate groups to return (default 20, max 100)",
+                    },
+                    "depth": {
+                        "type": "INTEGER",
+                        "description": "Recursion depth for tree_size (1-4, default 1)",
+                    },
+                    "top": {
+                        "type": "INTEGER",
+                        "description": "How many subfolders to list in tree_size (default 20, max 50)",
+                    },
+                    "confirm_all": {
+                        "type": "BOOLEAN",
+                        "description": "When true on a delete with multiple matches, delete ALL of them. Use only after the user confirmed 'todos/all'.",
+                    },
                 },
-                "required": ["action"]
+                "required": ["action"],
             },
         ),
         h_file_ctrl,
@@ -381,22 +506,29 @@ def register_builtin_tools() -> None:
     # ── desktop_control ─────────────────────────────────────────────
     def h_desktop(parameters: dict, *, player=None, **_):
         from actions.desktop import desktop_control
+
         return desktop_control(parameters=parameters, player=player) or "Listo."
 
     reg.register(
         ToolDeclaration(
             name="desktop_control",
-            description="Controls the desktop: wallpaper, organize, clean, list, stats.",
+            description=(
+                "Controls the desktop with EXPLICIT actions only. "
+                "For file operations use file_controller; for opening apps "
+                "use open_app; for general system control use computer_control."
+            ),
             parameters={
                 "type": "OBJECT",
                 "properties": {
-                    "action": {"type": "STRING", "description": "wallpaper | wallpaper_url | organize | clean | list | stats | task"},
-                    "path":   {"type": "STRING", "description": "Image path for wallpaper"},
-                    "url":    {"type": "STRING", "description": "Image URL for wallpaper_url"},
-                    "mode":   {"type": "STRING", "description": "by_type or by_date for organize"},
-                    "task":   {"type": "STRING", "description": "Natural language desktop task"},
+                    "action": {
+                        "type": "STRING",
+                        "description": "wallpaper | wallpaper_url | current_wallpaper | organize | clean | list | stats",
+                    },
+                    "path": {"type": "STRING", "description": "Image path for wallpaper"},
+                    "url": {"type": "STRING", "description": "Image URL for wallpaper_url"},
+                    "mode": {"type": "STRING", "description": "by_type or by_date for organize"},
                 },
-                "required": ["action"]
+                "required": ["action"],
             },
         ),
         h_desktop,
@@ -405,6 +537,7 @@ def register_builtin_tools() -> None:
     # ── code_helper ─────────────────────────────────────────────────
     def h_code(parameters: dict, *, player=None, speak=None, **_):
         from actions.code_helper import code_helper
+
         return code_helper(parameters=parameters, player=player, speak=speak) or "Listo."
 
     reg.register(
@@ -419,16 +552,31 @@ def register_builtin_tools() -> None:
             parameters={
                 "type": "OBJECT",
                 "properties": {
-                    "action":      {"type": "STRING", "description": "write | edit | explain | run | build | auto (default: auto)"},
-                    "description": {"type": "STRING", "description": "What the code should do or what change to make"},
-                    "language":    {"type": "STRING", "description": "Programming language (default: python)"},
+                    "action": {
+                        "type": "STRING",
+                        "description": "write | edit | explain | run | build | auto (default: auto)",
+                    },
+                    "description": {
+                        "type": "STRING",
+                        "description": "What the code should do or what change to make",
+                    },
+                    "language": {
+                        "type": "STRING",
+                        "description": "Programming language (default: python)",
+                    },
                     "output_path": {"type": "STRING", "description": "Where to save the file"},
-                    "file_path":   {"type": "STRING", "description": "Path to existing file for edit/explain/run/build"},
-                    "code":        {"type": "STRING", "description": "Raw code string for explain"},
-                    "args":        {"type": "STRING", "description": "CLI arguments for run/build"},
-                    "timeout":     {"type": "INTEGER", "description": "Execution timeout in seconds (default: 30)"},
+                    "file_path": {
+                        "type": "STRING",
+                        "description": "Path to existing file for edit/explain/run/build",
+                    },
+                    "code": {"type": "STRING", "description": "Raw code string for explain"},
+                    "args": {"type": "STRING", "description": "CLI arguments for run/build"},
+                    "timeout": {
+                        "type": "INTEGER",
+                        "description": "Execution timeout in seconds (default: 30)",
+                    },
                 },
-                "required": ["action"]
+                "required": ["action"],
             },
             timeout=180,
             needs_speak=True,
@@ -439,6 +587,7 @@ def register_builtin_tools() -> None:
     # ── dev_agent ───────────────────────────────────────────────────
     def h_dev(parameters: dict, *, player=None, speak=None, **_):
         from actions.dev_agent import dev_agent
+
         return dev_agent(parameters=parameters, player=player, speak=speak) or "Listo."
 
     reg.register(
@@ -448,12 +597,21 @@ def register_builtin_tools() -> None:
             parameters={
                 "type": "OBJECT",
                 "properties": {
-                    "description":  {"type": "STRING", "description": "What the project should do"},
-                    "language":     {"type": "STRING", "description": "Programming language (default: python)"},
-                    "project_name": {"type": "STRING", "description": "Optional project folder name"},
-                    "timeout":      {"type": "INTEGER", "description": "Run timeout in seconds (default: 30)"},
+                    "description": {"type": "STRING", "description": "What the project should do"},
+                    "language": {
+                        "type": "STRING",
+                        "description": "Programming language (default: python)",
+                    },
+                    "project_name": {
+                        "type": "STRING",
+                        "description": "Optional project folder name",
+                    },
+                    "timeout": {
+                        "type": "INTEGER",
+                        "description": "Run timeout in seconds (default: 30)",
+                    },
                 },
-                "required": ["description"]
+                "required": ["description"],
             },
             timeout=300,
             needs_speak=True,
@@ -475,10 +633,16 @@ def register_builtin_tools() -> None:
             parameters={
                 "type": "OBJECT",
                 "properties": {
-                    "goal":     {"type": "STRING", "description": "Complete description of what to accomplish"},
-                    "priority": {"type": "STRING", "description": "low | normal | high (default: normal)"}
+                    "goal": {
+                        "type": "STRING",
+                        "description": "Complete description of what to accomplish",
+                    },
+                    "priority": {
+                        "type": "STRING",
+                        "description": "low | normal | high (default: normal)",
+                    },
                 },
-                "required": ["goal"]
+                "required": ["goal"],
             },
             # Semi-síncrono: el handler en main.py espera hasta 110s por el
             # resultado para devolverlo como tool_response. Damos margen de
@@ -492,6 +656,7 @@ def register_builtin_tools() -> None:
     # ── computer_control ────────────────────────────────────────────
     def h_comp_ctrl(parameters: dict, *, player=None, **_):
         from actions.computer_control import computer_control
+
         return computer_control(parameters=parameters, player=player) or "Listo."
 
     reg.register(
@@ -501,23 +666,35 @@ def register_builtin_tools() -> None:
             parameters={
                 "type": "OBJECT",
                 "properties": {
-                    "action":      {"type": "STRING", "description": "type | smart_type | click | double_click | right_click | hotkey | press | scroll | move | copy | paste | screenshot | wait | clear_field | focus_window | screen_find | screen_click | random_data | user_data"},
-                    "text":        {"type": "STRING", "description": "Text to type or paste"},
-                    "x":           {"type": "INTEGER", "description": "X coordinate"},
-                    "y":           {"type": "INTEGER", "description": "Y coordinate"},
-                    "keys":        {"type": "STRING", "description": "Key combination e.g. 'ctrl+c'"},
-                    "key":         {"type": "STRING", "description": "Single key e.g. 'enter'"},
-                    "direction":   {"type": "STRING", "description": "up | down | left | right"},
-                    "amount":      {"type": "INTEGER", "description": "Scroll amount (default: 3)"},
-                    "seconds":     {"type": "NUMBER",  "description": "Seconds to wait"},
-                    "title":       {"type": "STRING",  "description": "Window title for focus_window"},
-                    "description": {"type": "STRING",  "description": "Element description for screen_find/screen_click"},
-                    "type":        {"type": "STRING",  "description": "Data type for random_data"},
-                    "field":       {"type": "STRING",  "description": "Field for user_data: name|email|city"},
-                    "clear_first": {"type": "BOOLEAN", "description": "Clear field before typing (default: true)"},
-                    "path":        {"type": "STRING",  "description": "Save path for screenshot"},
+                    "action": {
+                        "type": "STRING",
+                        "description": "type | smart_type | click | double_click | right_click | hotkey | press | scroll | move | copy | paste | screenshot | wait | clear_field | focus_window | screen_find | screen_click | random_data | user_data",
+                    },
+                    "text": {"type": "STRING", "description": "Text to type or paste"},
+                    "x": {"type": "INTEGER", "description": "X coordinate"},
+                    "y": {"type": "INTEGER", "description": "Y coordinate"},
+                    "keys": {"type": "STRING", "description": "Key combination e.g. 'ctrl+c'"},
+                    "key": {"type": "STRING", "description": "Single key e.g. 'enter'"},
+                    "direction": {"type": "STRING", "description": "up | down | left | right"},
+                    "amount": {"type": "INTEGER", "description": "Scroll amount (default: 3)"},
+                    "seconds": {"type": "NUMBER", "description": "Seconds to wait"},
+                    "title": {"type": "STRING", "description": "Window title for focus_window"},
+                    "description": {
+                        "type": "STRING",
+                        "description": "Element description for screen_find/screen_click",
+                    },
+                    "type": {"type": "STRING", "description": "Data type for random_data"},
+                    "field": {
+                        "type": "STRING",
+                        "description": "Field for user_data: name|email|city",
+                    },
+                    "clear_first": {
+                        "type": "BOOLEAN",
+                        "description": "Clear field before typing (default: true)",
+                    },
+                    "path": {"type": "STRING", "description": "Save path for screenshot"},
                 },
-                "required": ["action"]
+                "required": ["action"],
             },
         ),
         h_comp_ctrl,
@@ -526,6 +703,7 @@ def register_builtin_tools() -> None:
     # ── game_updater ────────────────────────────────────────────────
     def h_game(parameters: dict, *, player=None, speak=None, **_):
         from actions.game_updater import game_updater
+
         return game_updater(parameters=parameters, player=player, speak=speak) or "Listo."
 
     reg.register(
@@ -541,15 +719,36 @@ def register_builtin_tools() -> None:
             parameters={
                 "type": "OBJECT",
                 "properties": {
-                    "action":    {"type": "STRING",  "description": "update | install | list | download_status | schedule | cancel_schedule | schedule_status (default: update)"},
-                    "platform":  {"type": "STRING",  "description": "steam | epic | both (default: both)"},
-                    "game_name": {"type": "STRING",  "description": "Game name (partial match supported)"},
-                    "app_id":    {"type": "STRING",  "description": "Steam AppID for install (optional)"},
-                    "hour":      {"type": "INTEGER", "description": "Hour for scheduled update 0-23 (default: 3)"},
-                    "minute":    {"type": "INTEGER", "description": "Minute for scheduled update 0-59 (default: 0)"},
-                    "shutdown_when_done": {"type": "BOOLEAN", "description": "Shut down PC when download finishes"},
+                    "action": {
+                        "type": "STRING",
+                        "description": "update | install | list | download_status | schedule | cancel_schedule | schedule_status (default: update)",
+                    },
+                    "platform": {
+                        "type": "STRING",
+                        "description": "steam | epic | both (default: both)",
+                    },
+                    "game_name": {
+                        "type": "STRING",
+                        "description": "Game name (partial match supported)",
+                    },
+                    "app_id": {
+                        "type": "STRING",
+                        "description": "Steam AppID for install (optional)",
+                    },
+                    "hour": {
+                        "type": "INTEGER",
+                        "description": "Hour for scheduled update 0-23 (default: 3)",
+                    },
+                    "minute": {
+                        "type": "INTEGER",
+                        "description": "Minute for scheduled update 0-59 (default: 0)",
+                    },
+                    "shutdown_when_done": {
+                        "type": "BOOLEAN",
+                        "description": "Shut down PC when download finishes",
+                    },
                 },
-                "required": []
+                "required": [],
             },
             timeout=300,
             needs_speak=True,
@@ -560,6 +759,7 @@ def register_builtin_tools() -> None:
     # ── flight_finder ───────────────────────────────────────────────
     def h_flight(parameters: dict, *, player=None, **_):
         from actions.flight_finder import flight_finder
+
         return flight_finder(parameters=parameters, player=player) or "Listo."
 
     reg.register(
@@ -569,15 +769,24 @@ def register_builtin_tools() -> None:
             parameters={
                 "type": "OBJECT",
                 "properties": {
-                    "origin":      {"type": "STRING",  "description": "Departure city or airport code"},
-                    "destination": {"type": "STRING",  "description": "Arrival city or airport code"},
-                    "date":        {"type": "STRING",  "description": "Departure date (any format)"},
-                    "return_date": {"type": "STRING",  "description": "Return date for round trips"},
-                    "passengers":  {"type": "INTEGER", "description": "Number of passengers (default: 1)"},
-                    "cabin":       {"type": "STRING",  "description": "economy | premium | business | first"},
-                    "save":        {"type": "BOOLEAN", "description": "Save results to Notepad"},
+                    "origin": {"type": "STRING", "description": "Departure city or airport code"},
+                    "destination": {
+                        "type": "STRING",
+                        "description": "Arrival city or airport code",
+                    },
+                    "date": {"type": "STRING", "description": "Departure date (any format)"},
+                    "return_date": {"type": "STRING", "description": "Return date for round trips"},
+                    "passengers": {
+                        "type": "INTEGER",
+                        "description": "Number of passengers (default: 1)",
+                    },
+                    "cabin": {
+                        "type": "STRING",
+                        "description": "economy | premium | business | first",
+                    },
+                    "save": {"type": "BOOLEAN", "description": "Save results to Notepad"},
                 },
-                "required": ["origin", "destination", "date"]
+                "required": ["origin", "destination", "date"],
             },
             timeout=90,
         ),
@@ -606,6 +815,7 @@ def register_builtin_tools() -> None:
     # ── file_processor ──────────────────────────────────────────────
     def h_file_proc(parameters: dict, *, player=None, speak=None, **_):
         from actions.file_processor import file_processor
+
         return file_processor(parameters=parameters, player=player, speak=speak) or "Listo."
 
     reg.register(
@@ -632,7 +842,7 @@ def register_builtin_tools() -> None:
                 "properties": {
                     "file_path": {
                         "type": "STRING",
-                        "description": "Full path to the uploaded file. Leave empty to use the currently uploaded file."
+                        "description": "Full path to the uploaded file. Leave empty to use the currently uploaded file.",
                     },
                     "action": {
                         "type": "STRING",
@@ -648,31 +858,58 @@ def register_builtin_tools() -> None:
                             "video: trim | extract_audio | extract_frame | compress | transcribe | info | convert\n"
                             "archive: list | extract\n"
                             "pptx: summarize | extract_text | analyze"
-                        )
+                        ),
                     },
                     "instruction": {
                         "type": "STRING",
-                        "description": "Free-form instruction if action doesn't cover it. E.g. 'translate this to Spanish', 'find all email addresses'"
+                        "description": "Free-form instruction if action doesn't cover it. E.g. 'translate this to Spanish', 'find all email addresses'",
                     },
                     "format": {
                         "type": "STRING",
-                        "description": "Target format for conversion. E.g. 'mp3', 'pdf', 'csv', 'png'"
+                        "description": "Target format for conversion. E.g. 'mp3', 'pdf', 'csv', 'png'",
                     },
-                    "width":       {"type": "INTEGER", "description": "Target width for image resize"},
-                    "height":      {"type": "INTEGER", "description": "Target height for image resize"},
-                    "scale":       {"type": "NUMBER",  "description": "Scale factor for image resize (e.g. 0.5)"},
-                    "quality":     {"type": "INTEGER", "description": "Quality 1-100 for image/video compress"},
-                    "start":       {"type": "STRING",  "description": "Start time for trim: seconds or HH:MM:SS"},
-                    "end":         {"type": "STRING",  "description": "End time for trim: seconds or HH:MM:SS"},
-                    "timestamp":   {"type": "STRING",  "description": "Timestamp for video frame extraction HH:MM:SS"},
-                    "column":      {"type": "STRING",  "description": "Column name for CSV filter/sort"},
-                    "value":       {"type": "STRING",  "description": "Filter value for CSV filter"},
-                    "condition":   {"type": "STRING",  "description": "Filter condition: equals|contains|gt|lt"},
-                    "ascending":   {"type": "BOOLEAN", "description": "Sort order for CSV sort (default: true)"},
-                    "save":        {"type": "BOOLEAN", "description": "Save result to file (default: true)"},
-                    "destination": {"type": "STRING",  "description": "Output folder for archive extract"},
+                    "width": {"type": "INTEGER", "description": "Target width for image resize"},
+                    "height": {"type": "INTEGER", "description": "Target height for image resize"},
+                    "scale": {
+                        "type": "NUMBER",
+                        "description": "Scale factor for image resize (e.g. 0.5)",
+                    },
+                    "quality": {
+                        "type": "INTEGER",
+                        "description": "Quality 1-100 for image/video compress",
+                    },
+                    "start": {
+                        "type": "STRING",
+                        "description": "Start time for trim: seconds or HH:MM:SS",
+                    },
+                    "end": {
+                        "type": "STRING",
+                        "description": "End time for trim: seconds or HH:MM:SS",
+                    },
+                    "timestamp": {
+                        "type": "STRING",
+                        "description": "Timestamp for video frame extraction HH:MM:SS",
+                    },
+                    "column": {"type": "STRING", "description": "Column name for CSV filter/sort"},
+                    "value": {"type": "STRING", "description": "Filter value for CSV filter"},
+                    "condition": {
+                        "type": "STRING",
+                        "description": "Filter condition: equals|contains|gt|lt",
+                    },
+                    "ascending": {
+                        "type": "BOOLEAN",
+                        "description": "Sort order for CSV sort (default: true)",
+                    },
+                    "save": {
+                        "type": "BOOLEAN",
+                        "description": "Save result to file (default: true)",
+                    },
+                    "destination": {
+                        "type": "STRING",
+                        "description": "Output folder for archive extract",
+                    },
                 },
-                "required": []
+                "required": [],
             },
             timeout=180,
             needs_speak=True,
@@ -684,6 +921,7 @@ def register_builtin_tools() -> None:
     # ── circuit_from_image ──────────────────────────────────────────
     def h_circuit_from_image(parameters: dict, *, player=None, **_):
         from actions.circuit_from_image import circuit_from_image
+
         return circuit_from_image(parameters, player=player) or "Listo."
 
     reg.register(
@@ -703,19 +941,19 @@ def register_builtin_tools() -> None:
                 "properties": {
                     "image_path": {
                         "type": "STRING",
-                        "description": "Absolute path to the circuit image. If empty, uses the currently uploaded file."
+                        "description": "Absolute path to the circuit image. If empty, uses the currently uploaded file.",
                     },
                     "outputs": {
                         "type": "ARRAY",
                         "items": {"type": "STRING"},
-                        "description": "Targets to generate: 'spice', 'kicad'. Default: both."
+                        "description": "Targets to generate: 'spice', 'kicad'. Default: both.",
                     },
                     "output_dir": {
                         "type": "STRING",
-                        "description": "Folder where the .cir and .kicad_sch are written. Default: the image's folder."
+                        "description": "Folder where the .cir and .kicad_sch are written. Default: the image's folder.",
                     },
                 },
-                "required": ["image_path"]
+                "required": ["image_path"],
             },
             timeout=120,
             needs_current_file=True,
@@ -726,6 +964,7 @@ def register_builtin_tools() -> None:
     # ── proteus_autodraw ────────────────────────────────────────────
     def h_proteus_autodraw(parameters: dict, *, player=None, **_):
         from actions.proteus_autodraw import proteus_autodraw
+
         return proteus_autodraw(parameters, player=player) or "Listo."
 
     reg.register(
@@ -744,14 +983,14 @@ def register_builtin_tools() -> None:
                 "properties": {
                     "cir_path": {
                         "type": "STRING",
-                        "description": "Absolute path to the .cir file."
+                        "description": "Absolute path to the .cir file.",
                     },
                     "countdown": {
                         "type": "INTEGER",
-                        "description": "Seconds before automation starts (default 3) — gives the user time to focus Proteus."
+                        "description": "Seconds before automation starts (default 3) — gives the user time to focus Proteus.",
                     },
                 },
-                "required": ["cir_path"]
+                "required": ["cir_path"],
             },
             timeout=180,
         ),
@@ -775,14 +1014,14 @@ def register_builtin_tools() -> None:
                 "properties": {
                     "text": {
                         "type": "STRING",
-                        "description": "Full text of the note to save in Spanish. Required."
+                        "description": "Full text of the note to save in Spanish. Required.",
                     },
                     "pinned": {
                         "type": "BOOLEAN",
-                        "description": "Pin the note at the top of the list (default: false)"
+                        "description": "Pin the note at the top of the list (default: false)",
                     },
                 },
-                "required": ["text"]
+                "required": ["text"],
             },
             include_in_planner=False,
         ),
@@ -813,12 +1052,18 @@ def register_builtin_tools() -> None:
                             "relationships — friends, family, partner, colleagues | "
                             "wishes — future plans, things to buy, travel dreams | "
                             "notes — habits, schedule, anything else worth remembering"
-                        )
+                        ),
                     },
-                    "key":   {"type": "STRING", "description": "Short snake_case key (e.g. nombre, comida_favorita, hermana_nombre)"},
-                    "value": {"type": "STRING", "description": "Concise value in Spanish (e.g. Fatih, pizza, hermana mayor)"},
+                    "key": {
+                        "type": "STRING",
+                        "description": "Short snake_case key (e.g. nombre, comida_favorita, hermana_nombre)",
+                    },
+                    "value": {
+                        "type": "STRING",
+                        "description": "Concise value in Spanish (e.g. Fatih, pizza, hermana mayor)",
+                    },
                 },
-                "required": ["category", "key", "value"]
+                "required": ["category", "key", "value"],
             },
             silent=True,
         ),
@@ -828,6 +1073,7 @@ def register_builtin_tools() -> None:
     # ── iot_control ─────────────────────────────────────────────────
     def h_iot(parameters: dict, *, player=None, speak=None, **_):
         from actions.iot import iot_control
+
         return iot_control(parameters=parameters, player=player, speak=speak) or "Listo."
 
     reg.register(
@@ -863,16 +1109,31 @@ def register_builtin_tools() -> None:
                             "read_sensor — get the latest cached sensor reading for a device | "
                             "list_devices — return all devices with their capabilities | "
                             "status — connection status of every configured transport"
-                        )
+                        ),
                     },
-                    "device":      {"type": "STRING",  "description": "Device id (use list_devices to discover). 'all' is a shortcut for all_on/all_off."},
-                    "duration":    {"type": "INTEGER", "description": "Seconds for 'timed' (or for 'on' to auto-off later)."},
-                    "value":       {"type": "INTEGER", "description": "Brightness 0-100 for 'dim'."},
-                    "color":       {"type": "STRING",  "description": "Color for 'rgb' — accepts a name (rojo/azul/...), hex (#ff00aa) or 'r,g,b'."},
-                    "scene":       {"type": "STRING",  "description": "Scene id or name for action=scene."},
-                    "description": {"type": "STRING",  "description": "Natural-language command for action=auto."},
+                    "device": {
+                        "type": "STRING",
+                        "description": "Device id (use list_devices to discover). 'all' is a shortcut for all_on/all_off.",
+                    },
+                    "duration": {
+                        "type": "INTEGER",
+                        "description": "Seconds for 'timed' (or for 'on' to auto-off later).",
+                    },
+                    "value": {"type": "INTEGER", "description": "Brightness 0-100 for 'dim'."},
+                    "color": {
+                        "type": "STRING",
+                        "description": "Color for 'rgb' — accepts a name (rojo/azul/...), hex (#ff00aa) or 'r,g,b'.",
+                    },
+                    "scene": {
+                        "type": "STRING",
+                        "description": "Scene id or name for action=scene.",
+                    },
+                    "description": {
+                        "type": "STRING",
+                        "description": "Natural-language command for action=auto.",
+                    },
                 },
-                "required": []
+                "required": [],
             },
             needs_speak=True,
         ),
@@ -882,6 +1143,7 @@ def register_builtin_tools() -> None:
     # ── google_drive ────────────────────────────────────────────────
     def h_drive(parameters: dict, *, player=None, **_):
         from actions.google_drive import google_drive
+
         return google_drive(parameters=parameters, player=player) or "Listo."
 
     reg.register(
@@ -915,54 +1177,51 @@ def register_builtin_tools() -> None:
                             "delete — send a file to trash | "
                             "download — download a file to local storage | "
                             "info — get detailed file information"
-                        )
+                        ),
                     },
                     "file_path": {
                         "type": "STRING",
-                        "description": "Local file path for upload or edit actions. Leave empty to use the currently uploaded file in the UI."
+                        "description": "Local file path for upload or edit actions. Leave empty to use the currently uploaded file in the UI.",
                     },
                     "file_id": {
                         "type": "STRING",
-                        "description": "Google Drive file ID for move/rename/delete/download/info/edit actions."
+                        "description": "Google Drive file ID for move/rename/delete/download/info/edit actions.",
                     },
                     "name": {
                         "type": "STRING",
-                        "description": "Name for new documents, folders, or search query."
+                        "description": "Name for new documents, folders, or search query.",
                     },
                     "doc_type": {
                         "type": "STRING",
-                        "description": "Type of document to create: document | spreadsheet | presentation (default: document)"
+                        "description": "Type of document to create: document | spreadsheet | presentation (default: document)",
                     },
                     "folder_id": {
                         "type": "STRING",
-                        "description": "Target folder ID for upload/create/create_folder/list actions."
+                        "description": "Target folder ID for upload/create/create_folder/list actions.",
                     },
                     "destination_folder_id": {
                         "type": "STRING",
-                        "description": "Destination folder ID for move action."
+                        "description": "Destination folder ID for move action.",
                     },
-                    "new_name": {
-                        "type": "STRING",
-                        "description": "New name for rename action."
-                    },
+                    "new_name": {"type": "STRING", "description": "New name for rename action."},
                     "content": {
                         "type": "STRING",
-                        "description": "Text content for creating or editing documents."
+                        "description": "Text content for creating or editing documents.",
                     },
                     "query": {
                         "type": "STRING",
-                        "description": "Search query for search/list actions."
+                        "description": "Search query for search/list actions.",
                     },
                     "destination": {
                         "type": "STRING",
-                        "description": "Local destination path for download action."
+                        "description": "Local destination path for download action.",
                     },
                     "max_results": {
                         "type": "INTEGER",
-                        "description": "Maximum number of results for list/search (default: 20)."
+                        "description": "Maximum number of results for list/search (default: 20).",
                     },
                 },
-                "required": ["action"]
+                "required": ["action"],
             },
             timeout=120,
             needs_current_file=True,
@@ -973,6 +1232,7 @@ def register_builtin_tools() -> None:
     # ── classroom ───────────────────────────────────────────────────
     def h_classroom(parameters: dict, *, player=None, **_):
         from actions.classroom import classroom
+
         return classroom(parameters=parameters, player=player) or "Listo."
 
     reg.register(
@@ -993,14 +1253,14 @@ def register_builtin_tools() -> None:
                 "properties": {
                     "account": {
                         "type": "STRING",
-                        "description": "Which account: personal (default, main account /u/0/) | institucional (university account /u/1/)"
+                        "description": "Which account: personal (default, main account /u/0/) | institucional (university account /u/1/)",
                     },
                     "url": {
                         "type": "STRING",
-                        "description": "Custom Classroom URL. Leave empty to auto-resolve from account type."
+                        "description": "Custom Classroom URL. Leave empty to auto-resolve from account type.",
                     },
                 },
-                "required": []
+                "required": [],
             },
         ),
         h_classroom,
@@ -1009,6 +1269,7 @@ def register_builtin_tools() -> None:
     # ── notebooklm_research ─────────────────────────────────────────
     def h_nblm(parameters: dict, *, player=None, **_):
         from actions.notebooklm_research import notebooklm_research
+
         return notebooklm_research(parameters=parameters, player=player) or "Listo."
 
     reg.register(
@@ -1033,50 +1294,47 @@ def register_builtin_tools() -> None:
                 "properties": {
                     "action": {
                         "type": "STRING",
-                        "description": "research (default) | list | ask | delete"
+                        "description": "research (default) | list | ask | delete",
                     },
                     "topic": {
                         "type": "STRING",
-                        "description": "Tema a investigar (para action=research). Sé específico: incluye fechas, ámbito, idioma si aplica."
+                        "description": "Tema a investigar (para action=research). Sé específico: incluye fechas, ámbito, idioma si aplica.",
                     },
                     "n_sources": {
                         "type": "INTEGER",
-                        "description": "Número objetivo de fuentes a importar (default 20)."
+                        "description": "Número objetivo de fuentes a importar (default 20).",
                     },
                     "mode": {
                         "type": "STRING",
-                        "description": "fast (default, ~minutos) | deep (búsqueda exhaustiva, ~10-30 min)."
+                        "description": "fast (default, ~minutos) | deep (búsqueda exhaustiva, ~10-30 min).",
                     },
                     "source": {
                         "type": "STRING",
-                        "description": "web (default, busca en internet) | drive (busca en Google Drive del usuario)."
+                        "description": "web (default, busca en internet) | drive (busca en Google Drive del usuario).",
                     },
                     "auto_import": {
                         "type": "BOOLEAN",
-                        "description": "Importa automáticamente las fuentes encontradas al notebook (default true)."
+                        "description": "Importa automáticamente las fuentes encontradas al notebook (default true).",
                     },
                     "notebook_name": {
                         "type": "STRING",
-                        "description": "Título personalizado del notebook. Si se omite, se usa el topic."
+                        "description": "Título personalizado del notebook. Si se omite, se usa el topic.",
                     },
                     "notebook_id": {
                         "type": "STRING",
-                        "description": "ID del notebook (para action=ask o action=delete)."
+                        "description": "ID del notebook (para action=ask o action=delete).",
                     },
-                    "question": {
-                        "type": "STRING",
-                        "description": "Pregunta para action=ask."
-                    },
+                    "question": {"type": "STRING", "description": "Pregunta para action=ask."},
                     "limit": {
                         "type": "INTEGER",
-                        "description": "Máximo de notebooks a devolver en action=list (default 30)."
+                        "description": "Máximo de notebooks a devolver en action=list (default 30).",
                     },
                     "timeout": {
                         "type": "NUMBER",
-                        "description": "Timeout en segundos para esperar el research (default 1800 = 30 min)."
+                        "description": "Timeout en segundos para esperar el research (default 1800 = 30 min).",
                     },
                 },
-                "required": []
+                "required": [],
             },
             timeout=1900,
         ),
@@ -1091,12 +1349,14 @@ def register_builtin_tools() -> None:
     # skills/<id>/SKILL.md y aplica max_inject_chars).
     def h_use_skill(parameters: dict, *, player=None, **_):
         from core.skills import get_skill, max_inject_chars
+
         sid = (parameters.get("skill_id") or "").strip()
         if not sid:
             return "use_skill: falta 'skill_id'."
         skill = get_skill(sid)
         if skill is None:
             from core.skills import list_skills
+
             available = ", ".join(s.id for s in list_skills()) or "(ninguna instalada)"
             return f"use_skill: '{sid}' no instalada. Disponibles: {available}"
         body = skill.truncated_body(max_inject_chars())
@@ -1114,8 +1374,9 @@ def register_builtin_tools() -> None:
     # conversación continúa. Mismo patrón que AskUserQuestion de Claude.
     def h_ask_user(parameters: dict, **_kwargs) -> str:
         from core.ask_user import get_ask_user
-        question    = (parameters.get("question") or "").strip()
-        options     = parameters.get("options") or []
+
+        question = (parameters.get("question") or "").strip()
+        options = parameters.get("options") or []
         allow_other = bool(parameters.get("allow_other", True))
         if not question:
             return "ask_user: falta el campo 'question'."
@@ -1125,10 +1386,12 @@ def register_builtin_tools() -> None:
         clean: list[dict] = []
         for o in options:
             if isinstance(o, dict) and o.get("label"):
-                clean.append({
-                    "label":       str(o["label"]),
-                    "description": str(o.get("description", "")),
-                })
+                clean.append(
+                    {
+                        "label": str(o["label"]),
+                        "description": str(o.get("description", "")),
+                    }
+                )
             elif isinstance(o, str):
                 clean.append({"label": o, "description": ""})
         if len(clean) < 2:
@@ -1163,8 +1426,14 @@ def register_builtin_tools() -> None:
                         "items": {
                             "type": "OBJECT",
                             "properties": {
-                                "label":       {"type": "STRING", "description": "Short button text (max 40 chars)"},
-                                "description": {"type": "STRING", "description": "Optional one-line subtitle for clarity"},
+                                "label": {
+                                    "type": "STRING",
+                                    "description": "Short button text (max 40 chars)",
+                                },
+                                "description": {
+                                    "type": "STRING",
+                                    "description": "Optional one-line subtitle for clarity",
+                                },
                             },
                             "required": ["label"],
                         },

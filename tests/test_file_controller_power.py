@@ -25,8 +25,7 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-import actions.file_controller as fc   # noqa: E402
-
+import actions.file_controller as fc
 
 # ── Helper: tree builder ───────────────────────────────────────────────
 
@@ -42,7 +41,11 @@ def sandbox(tmp_path, monkeypatch):
     """Permite que ``_is_safe_path`` y ``_resolve_path`` traten ``tmp_path``
     como una raíz válida durante el test."""
     monkeypatch.setattr(fc, "_safe_roots", lambda: [tmp_path])
-    monkeypatch.setattr(fc, "_resolve_path", lambda raw: tmp_path / raw if raw and raw != str(tmp_path) else tmp_path)
+    monkeypatch.setattr(
+        fc,
+        "_resolve_path",
+        lambda raw: tmp_path / raw if raw and raw != str(tmp_path) else tmp_path,
+    )
     return tmp_path
 
 
@@ -53,9 +56,9 @@ def test_duplicates_finds_identical_pairs(sandbox):
     content_a = b"A" * 5000
     content_b = b"B" * 5000
     _write(sandbox / "dir1" / "copy1.bin", content_a)
-    _write(sandbox / "dir2" / "copy2.bin", content_a)   # duplicado
-    _write(sandbox / "dir2" / "copy3.bin", content_a)   # triplicado
-    _write(sandbox / "unique.bin", content_b)           # único
+    _write(sandbox / "dir2" / "copy2.bin", content_a)  # duplicado
+    _write(sandbox / "dir2" / "copy3.bin", content_a)  # triplicado
+    _write(sandbox / "unique.bin", content_b)  # único
 
     out = fc.find_duplicates(path=str(sandbox), min_size_kb=0.1)
     assert "Duplicados" in out
@@ -96,7 +99,7 @@ def test_duplicates_filters_by_extension(sandbox):
 def test_duplicates_handles_large_files(sandbox):
     """Archivos > _HASH_CHUNK_SIZE bajan a la etapa 3 (hash completo).
     Probamos con tamaño justo arriba del threshold."""
-    big = (b"Z" * (fc._HASH_CHUNK_SIZE + 100))
+    big = b"Z" * (fc._HASH_CHUNK_SIZE + 100)
     _write(sandbox / "big1.bin", big)
     _write(sandbox / "big2.bin", big)
     out = fc.find_duplicates(path=str(sandbox), min_size_kb=0.1)
@@ -119,9 +122,9 @@ def test_duplicates_skips_blocked_dirs(sandbox):
 
 
 def test_tree_size_lists_subfolders_sorted_by_size(sandbox):
-    _write(sandbox / "fat" / "a.bin", b"X" * (10 * 1024))     # 10 KB
-    _write(sandbox / "fat" / "b.bin", b"X" * (20 * 1024))     # 20 KB
-    _write(sandbox / "thin" / "c.bin", b"X" * 1024)           # 1 KB
+    _write(sandbox / "fat" / "a.bin", b"X" * (10 * 1024))  # 10 KB
+    _write(sandbox / "fat" / "b.bin", b"X" * (20 * 1024))  # 20 KB
+    _write(sandbox / "thin" / "c.bin", b"X" * 1024)  # 1 KB
     _write(sandbox / "empty" / ".keep", b"")
 
     out = fc.tree_size(path=str(sandbox), depth=1, top=10)
@@ -149,7 +152,7 @@ def test_tree_size_returns_friendly_msg_on_empty(sandbox):
 def test_largest_with_extension_filter(sandbox):
     _write(sandbox / "a.pdf", b"X" * 5000)
     _write(sandbox / "b.pdf", b"X" * 4000)
-    _write(sandbox / "c.txt", b"X" * 10000)   # más grande, pero otra ext
+    _write(sandbox / "c.txt", b"X" * 10000)  # más grande, pero otra ext
     out = fc.get_largest_files(path=str(sandbox), count=5, extension="pdf")
     assert "a.pdf" in out
     assert "b.pdf" in out
@@ -157,8 +160,8 @@ def test_largest_with_extension_filter(sandbox):
 
 
 def test_largest_with_min_size_filter(sandbox):
-    _write(sandbox / "small.bin", b"X" * 1024)              # 1 KB
-    _write(sandbox / "big.bin",   b"X" * (3 * 1024 * 1024)) # 3 MB
+    _write(sandbox / "small.bin", b"X" * 1024)  # 1 KB
+    _write(sandbox / "big.bin", b"X" * (3 * 1024 * 1024))  # 3 MB
     out = fc.get_largest_files(path=str(sandbox), count=5, min_size_mb=1.0)
     assert "big.bin" in out
     assert "small.bin" not in out
@@ -177,20 +180,24 @@ def test_dispatcher_routes_duplicates_action(sandbox):
     same = b"R" * 2048
     _write(sandbox / "a.bin", same)
     _write(sandbox / "b.bin", same)
-    out = fc.file_controller(parameters={
-        "action": "duplicates",
-        "path":   str(sandbox),
-        "min_size_kb": 0.1,
-    })
+    out = fc.file_controller(
+        parameters={
+            "action": "duplicates",
+            "path": str(sandbox),
+            "min_size_kb": 0.1,
+        }
+    )
     assert "Duplicados" in out
 
 
 def test_dispatcher_routes_tree_size_action(sandbox):
     _write(sandbox / "x" / "f.bin", b"X" * 2048)
-    out = fc.file_controller(parameters={
-        "action": "tree_size",
-        "path":   str(sandbox),
-    })
+    out = fc.file_controller(
+        parameters={
+            "action": "tree_size",
+            "path": str(sandbox),
+        }
+    )
     assert "Tamaño" in out
     assert "x" in out
 
@@ -198,11 +205,13 @@ def test_dispatcher_routes_tree_size_action(sandbox):
 def test_dispatcher_passes_largest_filters(sandbox):
     _write(sandbox / "a.pdf", b"X" * 5000)
     _write(sandbox / "b.txt", b"X" * 5000)
-    out = fc.file_controller(parameters={
-        "action":    "largest",
-        "path":      str(sandbox),
-        "extension": "pdf",
-    })
+    out = fc.file_controller(
+        parameters={
+            "action": "largest",
+            "path": str(sandbox),
+            "extension": "pdf",
+        }
+    )
     assert "a.pdf" in out
     assert "b.txt" not in out
 
@@ -215,6 +224,7 @@ def test_registry_advertises_new_actions():
     Gemini y el planner."""
     from core.tool_registry import ToolRegistry
     from core.tools_bootstrap import register_builtin_tools
+
     ToolRegistry._reset()
     register_builtin_tools()
     decl, _ = ToolRegistry().get("file_controller")

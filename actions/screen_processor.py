@@ -5,17 +5,15 @@ import base64
 import io
 import json
 import re
-import sys
 import threading
 import time
-from pathlib import Path
-from typing import Optional
 
 import numpy as np
 import sounddevice as sd
 
 try:
     import cv2
+
     _CV2 = True
 except ImportError:
     _CV2 = False
@@ -23,12 +21,14 @@ except ImportError:
 try:
     import mss
     import mss.tools
+
     _MSS = True
 except ImportError:
     _MSS = False
 
 try:
     import PIL.Image
+
     _PIL = True
 except ImportError:
     _PIL = False
@@ -36,7 +36,9 @@ except ImportError:
 from google import genai
 from google.genai import types as gtypes
 
-from config import get_api_key, API_CONFIG_PATH as _CONFIG_PATH, BASE_DIR as _BASE
+from config import API_CONFIG_PATH as _CONFIG_PATH
+from config import get_api_key
+import contextlib
 
 
 def _load_config() -> dict:
@@ -55,19 +57,18 @@ def _save_config_key(key: str, value) -> None:
         print(f"[Vision] ⚠️  No se pudo guardar la clave de configuración '{key}': {e}")
 
 
-
-
 def _get_os() -> str:
     return _load_config().get("os_system", "windows").lower()
 
-_LIVE_MODEL         = "models/gemini-2.5-flash"
-_CHANNELS           = 1
+
+_LIVE_MODEL = "models/gemini-2.5-flash"
+_CHANNELS = 1
 _RECEIVE_SAMPLE_RATE = 24_000
-_CHUNK_SIZE         = 1_024
+_CHUNK_SIZE = 1_024
 
 _IMG_MAX_W = 640
 _IMG_MAX_H = 360
-_JPEG_Q    = 60
+_JPEG_Q = 60
 
 _SYSTEM_PROMPT = (
     "You are O.R.I.O.N, an advanced AI assistant. "
@@ -94,16 +95,17 @@ def _compress(img_bytes: bytes, source_format: str = "PNG") -> tuple[bytes, str]
         print(f"[Vision] ⚠️  La compresión de imagen falló: {e}")
         return img_bytes, f"image/{source_format.lower()}"
 
+
 def _capture_screen() -> tuple[bytes, str]:
 
     if not _MSS:
         raise RuntimeError("mss no está instalado. Ejecuta: pip install mss")
 
     with mss.mss() as sct:
-        monitors = sct.monitors          # [0] = all combined, [1..n] = real screens
-        target   = monitors[1] if len(monitors) > 1 else monitors[0]
-        shot     = sct.grab(target)
-        png      = mss.tools.to_png(shot.rgb, shot.size)
+        monitors = sct.monitors  # [0] = all combined, [1..n] = real screens
+        target = monitors[1] if len(monitors) > 1 else monitors[0]
+        shot = sct.grab(target)
+        png = mss.tools.to_png(shot.rgb, shot.size)
 
     return _compress(png, "PNG")
 
@@ -164,9 +166,9 @@ def _capture_camera() -> tuple[bytes, str]:
     if not _CV2:
         raise RuntimeError("OpenCV (cv2) no está instalado. Ejecuta: pip install opencv-python")
 
-    index   = _get_camera_index()
+    index = _get_camera_index()
     backend = _cv2_backend()
-    cap     = cv2.VideoCapture(index, backend)
+    cap = cv2.VideoCapture(index, backend)
 
     if not cap.isOpened():
         raise RuntimeError(f"No se pudo abrir la cámara con el índice {index}.")
@@ -191,16 +193,17 @@ def _capture_camera() -> tuple[bytes, str]:
     _, buf = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, _JPEG_Q])
     return buf.tobytes(), "image/jpeg"
 
+
 class _VisionSession:
     def __init__(self):
-        self._loop:       Optional[asyncio.AbstractEventLoop] = None
-        self._thread:     Optional[threading.Thread]          = None
-        self._session                                          = None
-        self._out_queue:  Optional[asyncio.Queue]             = None
-        self._audio_in:   Optional[asyncio.Queue]             = None
-        self._ready_evt:  threading.Event                     = threading.Event()
-        self._player                                           = None
-        self._lock:       threading.Lock                       = threading.Lock()
+        self._loop: asyncio.AbstractEventLoop | None = None
+        self._thread: threading.Thread | None = None
+        self._session = None
+        self._out_queue: asyncio.Queue | None = None
+        self._audio_in: asyncio.Queue | None = None
+        self._ready_evt: threading.Event = threading.Event()
+        self._player = None
+        self._lock: threading.Lock = threading.Lock()
 
     def start(self, player=None, timeout: float = 25.0) -> None:
         with self._lock:
@@ -239,7 +242,7 @@ class _VisionSession:
 
     async def _session_loop(self) -> None:
         self._out_queue = asyncio.Queue(maxsize=30)
-        self._audio_in  = asyncio.Queue()
+        self._audio_in = asyncio.Queue()
 
         client = genai.Client(
             api_key=get_api_key(),
@@ -251,9 +254,7 @@ class _VisionSession:
             system_instruction=_SYSTEM_PROMPT,
             speech_config=gtypes.SpeechConfig(
                 voice_config=gtypes.VoiceConfig(
-                    prebuilt_voice_config=gtypes.PrebuiltVoiceConfig(
-                        voice_name="Charon"
-                    )
+                    prebuilt_voice_config=gtypes.PrebuiltVoiceConfig(voice_name="Charon")
                 )
             ),
         )
@@ -262,9 +263,7 @@ class _VisionSession:
         while True:
             try:
                 print("[Vision] 🔌 Conectando...")
-                async with client.aio.live.connect(
-                    model=_LIVE_MODEL, config=config
-                ) as session:
+                async with client.aio.live.connect(model=_LIVE_MODEL, config=config) as session:
                     self._session = session
                     self._ready_evt.set()
                     backoff = 2.0
@@ -309,10 +308,10 @@ class _VisionSession:
                 err_msg = str(e)[:200]
                 print(f"[Vision] ⚠️  Error de envío: {err_msg}")
                 if self._player:
-                    try:
-                        self._player.write_log(f"ERROR: No se pudo enviar la imagen al modelo Vision. {err_msg}")
-                    except Exception:
-                        pass
+                    with contextlib.suppress(Exception):
+                        self._player.write_log(
+                            f"ERROR: No se pudo enviar la imagen al modelo Vision. {err_msg}"
+                        )
                 # Don't crash — continue processing next images
                 await asyncio.sleep(0.5)
 
@@ -352,10 +351,8 @@ class _VisionSession:
             err_msg = str(e)[:200]
             print(f"[Vision] ⚠️  Error de recepción: {err_msg}")
             if self._player:
-                try:
+                with contextlib.suppress(Exception):
                     self._player.write_log(f"ERROR: Visión desconectada — {err_msg}")
-                except Exception:
-                    pass
             raise
 
     async def _play_loop(self) -> None:
@@ -377,9 +374,10 @@ class _VisionSession:
             stream.stop()
             stream.close()
 
-_session      = _VisionSession()
+
+_session = _VisionSession()
 _session_lock = threading.Lock()
-_session_up   = False
+_session_up = False
 
 
 def _ensure_session(player=None) -> None:
@@ -393,15 +391,15 @@ def _ensure_session(player=None) -> None:
 
 
 def screen_process(
-    parameters:     dict,
+    parameters: dict,
     response=None,
     player=None,
     session_memory=None,
 ) -> bool:
 
-    params    = parameters or {}
+    params = parameters or {}
     user_text = (params.get("text") or params.get("user_text") or "").strip()
-    angle     = params.get("angle", "screen").lower().strip()
+    angle = params.get("angle", "screen").lower().strip()
 
     if not user_text:
         print("[Vision] ⚠️  No se proporcionó pregunta — abortando")
@@ -436,18 +434,19 @@ def warmup_session(player=None) -> None:
     except Exception as e:
         print(f"[Vision] ⚠️  El precalentamiento falló: {e}")
 
+
 if __name__ == "__main__":
     print("[TEST] screen_processor.py")
     print("=" * 52)
     mode = input("angle — screen / camera (predeterminado: screen): ").strip().lower() or "screen"
-    q    = input("Pregunta (Enter = por defecto): ").strip() or "¿Qué ves? Sé breve."
+    q = input("Pregunta (Enter = por defecto): ").strip() or "¿Qué ves? Sé breve."
 
     t0 = time.perf_counter()
     warmup_session()
-    print(f"Sesión lista en {time.perf_counter()-t0:.2f}s\n")
+    print(f"Sesión lista en {time.perf_counter() - t0:.2f}s\n")
 
     t1 = time.perf_counter()
     ok = screen_process({"angle": mode, "text": q})
-    print(f"En cola en {time.perf_counter()-t1:.3f}s — esperando audio...")
+    print(f"En cola en {time.perf_counter() - t1:.3f}s — esperando audio...")
     time.sleep(10)
     print("Listo." if ok else "Falló.")

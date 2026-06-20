@@ -45,8 +45,8 @@ log = get_logger("server.routes.files")
 router = APIRouter()
 
 
-MAX_BYTES   = 50 * 1024 * 1024   # 50 MB
-_SAFE_NAME  = re.compile(r"[^A-Za-z0-9._-]+")
+MAX_BYTES = 50 * 1024 * 1024  # 50 MB
+_SAFE_NAME = re.compile(r"[^A-Za-z0-9._-]+")
 
 
 def _ensure_uploads_dir() -> Path:
@@ -66,7 +66,7 @@ async def upload_file(request: Request, file: UploadFile = File(...)) -> dict:
     """Sube un archivo y lo deja como ``current_file`` del bus."""
     uploads = _ensure_uploads_dir()
     safe = _safe_name(file.filename)
-    final = uploads / f"{int(time.time()*1000)}_{safe}"
+    final = uploads / f"{int(time.time() * 1000)}_{safe}"
 
     # Stream a disco con cap de tamaño defensivo.
     written = 0
@@ -82,7 +82,7 @@ async def upload_file(request: Request, file: UploadFile = File(...)) -> dict:
                     final.unlink(missing_ok=True)
                     raise HTTPException(
                         status_code=413,
-                        detail=f"Archivo demasiado grande (> {MAX_BYTES // (1024*1024)} MB)",
+                        detail=f"Archivo demasiado grande (> {MAX_BYTES // (1024 * 1024)} MB)",
                     )
                 fout.write(chunk)
     except HTTPException:
@@ -91,7 +91,7 @@ async def upload_file(request: Request, file: UploadFile = File(...)) -> dict:
         # Limpia si quedó algo a medias.
         final.unlink(missing_ok=True)
         log.error("Upload falló: %s", e)
-        raise HTTPException(status_code=500, detail=f"No se pudo guardar: {e}")
+        raise HTTPException(status_code=500, detail=f"No se pudo guardar: {e}") from e
     finally:
         await file.close()
 
@@ -106,7 +106,7 @@ async def upload_file(request: Request, file: UploadFile = File(...)) -> dict:
 
     log.info("Archivo subido: %s (%d bytes)", final.name, written)
     return {
-        "ok":   True,
+        "ok": True,
         "path": abs_path,
         "name": final.name,
         "original": file.filename or "",
@@ -123,9 +123,9 @@ async def get_current_file(request: Request) -> dict:
     p = Path(path)
     return {
         "current": {
-            "path":   str(p),
-            "name":   p.name,
-            "size":   p.stat().st_size if p.exists() else None,
+            "path": str(p),
+            "name": p.name,
+            "size": p.stat().st_size if p.exists() else None,
             "exists": p.exists(),
         }
     }

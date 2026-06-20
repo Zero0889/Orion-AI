@@ -13,13 +13,17 @@ from pydantic import BaseModel
 
 from core.logger import get_logger
 from memory.conversations import (
-    delete_all_conversations, delete_conversation, delete_conversations_bulk,
-    get_conversation, list_conversations,
+    delete_all_conversations,
+    delete_conversation,
+    delete_conversations_bulk,
+    get_conversation,
+    list_conversations,
 )
 
 
 class BulkDeleteBody(BaseModel):
     ids: list[str]
+
 
 log = get_logger("server.routes.conversations")
 router = APIRouter()
@@ -36,9 +40,9 @@ def get_all_conversations() -> list[dict]:
     convs = list_conversations()
     return [
         {
-            "id":       c.get("id"),
-            "started":  c.get("started"),
-            "title":    c.get("title"),
+            "id": c.get("id"),
+            "started": c.get("started"),
+            "title": c.get("title"),
             "messages": c.get("msg_count", 0),
         }
         for c in convs

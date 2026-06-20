@@ -43,9 +43,8 @@ from config import CONFIG_DIR
 from core.mcp_client import (
     MCPServerError,
     get_mcp_manager,
-    load_servers_config,
 )
-from core.mcp_recipes  import list_recipes
+from core.mcp_recipes import list_recipes
 from core.tool_registry import ToolRegistry
 
 log = logging.getLogger("orion.server.mcp")
@@ -66,7 +65,7 @@ MCP_CONFIG_PATH = CONFIG_DIR / "mcp_servers.json"
 REGISTRY_BASE = "https://registry.modelcontextprotocol.io/v0"
 REGISTRY_TIMEOUT = 8.0
 _REGISTRY_CACHE: dict[str, tuple[float, dict]] = {}
-_REGISTRY_CACHE_TTL = 300.0   # 5 min
+_REGISTRY_CACHE_TTL = 300.0  # 5 min
 
 
 def _fetch_registry(url: str) -> dict:
@@ -126,23 +125,27 @@ def _normalize_package(pkg: dict) -> dict | None:
         if isinstance(v, str):
             package_args.append(v)
 
-    args = [*runtime_args, identifier, *package_args] if identifier else [*runtime_args, *package_args]
+    args = (
+        [*runtime_args, identifier, *package_args] if identifier else [*runtime_args, *package_args]
+    )
 
     env_required: list[dict] = []
     for e in pkg.get("environmentVariables") or []:
-        env_required.append({
-            "name":        e.get("name", ""),
-            "description": (e.get("description") or "")[:200],
-            "required":    bool(e.get("isRequired", False)),
-        })
+        env_required.append(
+            {
+                "name": e.get("name", ""),
+                "description": (e.get("description") or "")[:200],
+                "required": bool(e.get("isRequired", False)),
+            }
+        )
 
     return {
-        "command":      command,
-        "args":         args,
+        "command": command,
+        "args": args,
         "env_required": env_required,
         "registry_type": registry_type,
-        "identifier":   identifier,
-        "version":      pkg.get("version", ""),
+        "identifier": identifier,
+        "version": pkg.get("version", ""),
     }
 
 
@@ -168,17 +171,19 @@ def _normalize_server(entry: dict) -> dict:
             normalized_pkgs.append(n)
 
     raw_remotes = server.get("remotes") or []
-    remote_kinds = sorted({(r.get("type") or "").lower() for r in raw_remotes if isinstance(r, dict)})
+    remote_kinds = sorted(
+        {(r.get("type") or "").lower() for r in raw_remotes if isinstance(r, dict)}
+    )
 
     return {
-        "name":         server.get("name", ""),
-        "title":        server.get("title") or server.get("name", ""),
-        "description":  (server.get("description") or "")[:400],
-        "version":      server.get("version", ""),
-        "repository":   (server.get("repository") or {}).get("url"),
-        "packages":     normalized_pkgs,
-        "installable":  bool(normalized_pkgs),
-        "remote":       bool(raw_remotes) and not normalized_pkgs,
+        "name": server.get("name", ""),
+        "title": server.get("title") or server.get("name", ""),
+        "description": (server.get("description") or "")[:400],
+        "version": server.get("version", ""),
+        "repository": (server.get("repository") or {}).get("url"),
+        "packages": normalized_pkgs,
+        "installable": bool(normalized_pkgs),
+        "remote": bool(raw_remotes) and not normalized_pkgs,
         "remote_kinds": remote_kinds,
     }
 
@@ -243,19 +248,19 @@ def _save_raw_config(raw: dict[str, Any]) -> None:
 def _server_to_dict(server_id: str, cfg_dict: dict, live_status: dict) -> dict:
     """Combina la config persistida con el estado live (running / tools)."""
     return {
-        "id":              server_id,
-        "command":         cfg_dict.get("command", ""),
-        "args":            cfg_dict.get("args", []),
-        "env":             cfg_dict.get("env", {}),
-        "enabled":         bool(cfg_dict.get("enabled", True)),
-        "cwd":             cfg_dict.get("cwd"),
+        "id": server_id,
+        "command": cfg_dict.get("command", ""),
+        "args": cfg_dict.get("args", []),
+        "env": cfg_dict.get("env", {}),
+        "enabled": bool(cfg_dict.get("enabled", True)),
+        "cwd": cfg_dict.get("cwd"),
         "startup_timeout": cfg_dict.get("startup_timeout", 15.0),
-        "call_timeout":    cfg_dict.get("call_timeout", 60.0),
+        "call_timeout": cfg_dict.get("call_timeout", 60.0),
         # Estado live
-        "running":         live_status.get("running", False),
-        "tool_count":      live_status.get("tool_count", 0),
-        "tools":           live_status.get("tools", []),
-        "error":           live_status.get("error"),
+        "running": live_status.get("running", False),
+        "tool_count": live_status.get("tool_count", 0),
+        "tools": live_status.get("tools", []),
+        "error": live_status.get("error"),
     }
 
 
@@ -266,15 +271,15 @@ def _live_status_for(server_id: str) -> dict:
         return {"running": False, "tool_count": 0, "tools": []}
     tools = [
         {
-            "name":        t.get("name", ""),
+            "name": t.get("name", ""),
             "description": (t.get("description") or "")[:200],
         }
         for t in server.tools
     ]
     return {
-        "running":    True,
+        "running": True,
         "tool_count": len(tools),
-        "tools":      tools,
+        "tools": tools,
     }
 
 
@@ -306,12 +311,14 @@ async def list_mcp_tools() -> list[dict]:
             continue
         prefix = decl.name.split("__", 1)[0]
         if prefix in server_ids or _looks_like_mcp_name(prefix, server_ids):
-            out.append({
-                "name":        decl.name,
-                "server_id":   prefix,
-                "description": decl.description,
-                "timeout":     decl.timeout,
-            })
+            out.append(
+                {
+                    "name": decl.name,
+                    "server_id": prefix,
+                    "description": decl.description,
+                    "timeout": decl.timeout,
+                }
+            )
     return out
 
 
@@ -320,8 +327,7 @@ def _looks_like_mcp_name(prefix: str, server_ids: set[str]) -> bool:
     Reconciliamos por similitud simple."""
     sanitized = "".join(c if (c.isalnum() or c == "_") else "_" for c in prefix)
     return sanitized in {
-        "".join(c if (c.isalnum() or c == "_") else "_" for c in s)
-        for s in server_ids
+        "".join(c if (c.isalnum() or c == "_") else "_" for c in s) for s in server_ids
     }
 
 
@@ -451,7 +457,7 @@ async def list_curated_recipes() -> list[dict]:
 GITHUB_API = "https://api.github.com"
 GITHUB_TIMEOUT = 4.0
 _GH_STAR_CACHE: dict[str, tuple[float, int | None]] = {}
-_GH_STAR_TTL = 24 * 3600.0   # 24h
+_GH_STAR_TTL = 24 * 3600.0  # 24h
 
 
 def _parse_github_repo(url: str) -> tuple[str, str] | None:
@@ -493,7 +499,7 @@ def _fetch_github_stars(repo_url: str) -> int | None:
             url,
             headers={
                 "User-Agent": "orion/1.0",
-                "Accept":     "application/vnd.github+json",
+                "Accept": "application/vnd.github+json",
             },
         )
         with urllib.request.urlopen(req, timeout=GITHUB_TIMEOUT) as resp:
@@ -534,9 +540,9 @@ async def registry_search(
     servers = [_normalize_server(s) for s in (payload.get("servers") or [])]
     metadata = payload.get("metadata") or {}
     return {
-        "servers":     servers,
+        "servers": servers,
         "next_cursor": metadata.get("nextCursor"),
-        "count":       metadata.get("count", len(servers)),
+        "count": metadata.get("count", len(servers)),
     }
 
 

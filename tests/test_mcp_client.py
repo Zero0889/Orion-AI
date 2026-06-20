@@ -31,7 +31,7 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from core.mcp_client import (   # noqa: E402
+from core.mcp_client import (
     MCPManager,
     MCPServer,
     MCPServerConfig,
@@ -40,8 +40,7 @@ from core.mcp_client import (   # noqa: E402
     _make_tool_name,
     load_servers_config,
 )
-from core.tool_registry import ToolRegistry  # noqa: E402
-
+from core.tool_registry import ToolRegistry
 
 FAKE_SERVER = PROJECT_ROOT / "tests" / "fixtures" / "fake_mcp_server.py"
 
@@ -94,13 +93,17 @@ def test_load_config_invalid_json(tmp_path):
 
 def test_load_config_filters_disabled(tmp_path):
     p = tmp_path / "ok.json"
-    p.write_text(json.dumps({
-        "servers": {
-            "alpha": {"command": "echo", "enabled": True},
-            "beta":  {"command": "echo", "enabled": False},
-            "gamma": {"command": "echo"},  # enabled=True default
-        }
-    }))
+    p.write_text(
+        json.dumps(
+            {
+                "servers": {
+                    "alpha": {"command": "echo", "enabled": True},
+                    "beta": {"command": "echo", "enabled": False},
+                    "gamma": {"command": "echo"},  # enabled=True default
+                }
+            }
+        )
+    )
     cfgs = load_servers_config(p)
     ids = {c.server_id for c in cfgs}
     assert ids == {"alpha", "gamma"}
@@ -108,12 +111,16 @@ def test_load_config_filters_disabled(tmp_path):
 
 def test_load_config_skips_malformed_entries(tmp_path):
     p = tmp_path / "mixed.json"
-    p.write_text(json.dumps({
-        "servers": {
-            "ok":  {"command": "echo"},
-            "bad": {"no_command_here": True},
-        }
-    }))
+    p.write_text(
+        json.dumps(
+            {
+                "servers": {
+                    "ok": {"command": "echo"},
+                    "bad": {"no_command_here": True},
+                }
+            }
+        )
+    )
     cfgs = load_servers_config(p)
     assert [c.server_id for c in cfgs] == ["ok"]
 
@@ -125,9 +132,9 @@ def test_convert_schema_basic_types():
     src = {
         "type": "object",
         "properties": {
-            "name":  {"type": "string"},
-            "age":   {"type": "integer"},
-            "ok":    {"type": "boolean"},
+            "name": {"type": "string"},
+            "age": {"type": "integer"},
+            "ok": {"type": "boolean"},
             "price": {"type": "number"},
         },
         "required": ["name"],
@@ -162,9 +169,12 @@ def test_convert_schema_defaults_to_object_when_properties_present():
 
 
 def test_convert_schema_preserves_descriptions():
-    src = {"type": "object", "properties": {
-        "msg": {"type": "string", "description": "Hello"},
-    }}
+    src = {
+        "type": "object",
+        "properties": {
+            "msg": {"type": "string", "description": "Hello"},
+        },
+    }
     out = _convert_schema(src)
     assert out["properties"]["msg"]["description"] == "Hello"
 
@@ -278,14 +288,17 @@ def test_manager_start_all_with_empty_config(tmp_path, clean_registry):
 
 
 def test_manager_start_all_registers_namespaced_tools(tmp_path, clean_registry):
-    config_path = _write_config(tmp_path, {
-        "fake": {
-            "command": sys.executable,
-            "args": [str(FAKE_SERVER)],
-            "startup_timeout": 10,
-            "call_timeout": 10,
-        }
-    })
+    config_path = _write_config(
+        tmp_path,
+        {
+            "fake": {
+                "command": sys.executable,
+                "args": [str(FAKE_SERVER)],
+                "startup_timeout": 10,
+                "call_timeout": 10,
+            }
+        },
+    )
     mgr = MCPManager(config_path=config_path)
     try:
         n = mgr.start_all()
@@ -302,18 +315,21 @@ def test_manager_start_all_registers_namespaced_tools(tmp_path, clean_registry):
 
 def test_manager_skips_failed_server_and_continues(tmp_path, clean_registry):
     """Un servidor que no arranca no debe tumbar al resto."""
-    config_path = _write_config(tmp_path, {
-        "broken": {
-            "command": "this_binary_does_not_exist_xyz",
-            "startup_timeout": 2,
+    config_path = _write_config(
+        tmp_path,
+        {
+            "broken": {
+                "command": "this_binary_does_not_exist_xyz",
+                "startup_timeout": 2,
+            },
+            "fake": {
+                "command": sys.executable,
+                "args": [str(FAKE_SERVER)],
+                "startup_timeout": 10,
+                "call_timeout": 10,
+            },
         },
-        "fake": {
-            "command": sys.executable,
-            "args": [str(FAKE_SERVER)],
-            "startup_timeout": 10,
-            "call_timeout": 10,
-        },
-    })
+    )
     mgr = MCPManager(config_path=config_path)
     try:
         n = mgr.start_all()
@@ -329,16 +345,20 @@ def test_manager_tool_appears_in_planner_text(tmp_path, clean_registry):
     """Las tools MCP llevan include_in_planner=True por default,
     así que el planner las ve."""
     from core.tools_bootstrap import register_builtin_tools
+
     register_builtin_tools()
 
-    config_path = _write_config(tmp_path, {
-        "fake": {
-            "command": sys.executable,
-            "args": [str(FAKE_SERVER)],
-            "startup_timeout": 10,
-            "call_timeout": 10,
-        }
-    })
+    config_path = _write_config(
+        tmp_path,
+        {
+            "fake": {
+                "command": sys.executable,
+                "args": [str(FAKE_SERVER)],
+                "startup_timeout": 10,
+                "call_timeout": 10,
+            }
+        },
+    )
     mgr = MCPManager(config_path=config_path)
     try:
         mgr.start_all()

@@ -25,8 +25,8 @@ from __future__ import annotations
 
 # Re-export explícito de la API pública sin Qt.
 from config.theme import (
-    THEMES,
     DEFAULT_THEME,
+    THEMES,
     get_theme,
     list_themes,
     load_theme_name,
@@ -34,8 +34,8 @@ from config.theme import (
 )
 
 __all__ = [
-    "THEMES",
     "DEFAULT_THEME",
+    "THEMES",
     "get_theme",
     "list_themes",
     "load_theme_name",

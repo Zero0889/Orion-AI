@@ -30,10 +30,9 @@ validar capabilities y enrutar al transport adecuado.
 
 from __future__ import annotations
 
-from typing import Callable, Optional
+from collections.abc import Callable
 
 from .config import IoTConfig
-
 
 # Tipo del callback que dispara una acción individual.
 # Recibe (device_id, command, **kwargs) y devuelve un mensaje str.
@@ -44,15 +43,17 @@ def list_scenes(cfg: IoTConfig) -> list[dict]:
     """Devuelve lista resumida ``[{"id": ..., "name": ..., "steps": N}, ...]``."""
     out = []
     for scene_id, scene in cfg.scenes.items():
-        out.append({
-            "id":    scene_id,
-            "name":  scene.get("name", scene_id),
-            "steps": len(scene.get("actions") or []),
-        })
+        out.append(
+            {
+                "id": scene_id,
+                "name": scene.get("name", scene_id),
+                "steps": len(scene.get("actions") or []),
+            }
+        )
     return out
 
 
-def find_scene(cfg: IoTConfig, query: str) -> Optional[tuple[str, dict]]:
+def find_scene(cfg: IoTConfig, query: str) -> tuple[str, dict] | None:
     """Busca una escena por id exacto o por nombre (case-insensitive,
     aceptando coincidencia parcial).
     """
@@ -86,7 +87,7 @@ def execute_scene(scene: dict, runner: ActionRunner) -> str:
     best-effort por diseño: "modo dormir" no debe abortar si una bombilla
     está desenchufada).
     """
-    name    = scene.get("name", "escena")
+    name = scene.get("name", "escena")
     actions = scene.get("actions") or []
 
     if not actions:
@@ -95,7 +96,7 @@ def execute_scene(scene: dict, runner: ActionRunner) -> str:
     results: list[str] = []
     ok, fail = 0, 0
     for step in actions:
-        device  = step.get("device")
+        device = step.get("device")
         command = step.get("command")
         if not device or not command:
             continue

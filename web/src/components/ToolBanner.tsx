@@ -19,7 +19,7 @@ import { prettyToolName } from "@/lib/toolLabels";
 import { useInteractionStore } from "@/stores/interaction";
 
 export function ToolBanner() {
-  const tool  = useInteractionStore((s) => s.tool);
+  const tool = useInteractionStore((s) => s.tool);
   const agent = useInteractionStore((s) => s.agent);
 
   // Reloj para mostrar segundos transcurridos sin re-renderizar todo
@@ -54,12 +54,14 @@ export function ToolBanner() {
               {Object.keys(tool.args).length > 0 && (
                 <>
                   {" · "}
-                  {Object.entries(tool.args).slice(0, 2).map(([k, v]) => (
-                    <span key={k} className="mr-2">
-                      <span className="opacity-60">{k}=</span>
-                      <span>{String(v).slice(0, 28)}</span>
-                    </span>
-                  ))}
+                  {Object.entries(tool.args)
+                    .slice(0, 2)
+                    .map(([k, v]) => (
+                      <span key={k} className="mr-2">
+                        <span className="opacity-60">{k}=</span>
+                        <span>{String(v).slice(0, 28)}</span>
+                      </span>
+                    ))}
                 </>
               )}
             </div>
@@ -106,9 +108,18 @@ export function ToolBanner() {
 function ProgressDots() {
   return (
     <span className="flex items-center gap-1">
-      <span className="h-1.5 w-1.5 rounded-full bg-current opacity-30 animate-pulse-soft" style={{ animationDelay: "0s" }} />
-      <span className="h-1.5 w-1.5 rounded-full bg-current opacity-60 animate-pulse-soft" style={{ animationDelay: "0.2s" }} />
-      <span className="h-1.5 w-1.5 rounded-full bg-current opacity-90 animate-pulse-soft" style={{ animationDelay: "0.4s" }} />
+      <span
+        className="h-1.5 w-1.5 rounded-full bg-current opacity-30 animate-pulse-soft"
+        style={{ animationDelay: "0s" }}
+      />
+      <span
+        className="h-1.5 w-1.5 rounded-full bg-current opacity-60 animate-pulse-soft"
+        style={{ animationDelay: "0.2s" }}
+      />
+      <span
+        className="h-1.5 w-1.5 rounded-full bg-current opacity-90 animate-pulse-soft"
+        style={{ animationDelay: "0.4s" }}
+      />
     </span>
   );
 }

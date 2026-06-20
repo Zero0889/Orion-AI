@@ -1,71 +1,75 @@
+import json
 import os
 import re
-import sys
-import json
-import time
 import subprocess
+import sys
 import threading
-from pathlib import Path
+import time
 from datetime import datetime
+from pathlib import Path
 
-from config import get_os, is_windows, is_mac, is_linux
+from config import is_linux, is_mac, is_windows
 
 _KNOWN_APPIDS: dict[str, tuple[str, str]] = {
-    "pubg":                ("578080",  "PUBG: Battlegrounds"),
-    "pubg battlegrounds":  ("578080",  "PUBG: Battlegrounds"),
-    "pubg: battlegrounds": ("578080",  "PUBG: Battlegrounds"),
-    "battlegrounds":       ("578080",  "PUBG: Battlegrounds"),
-    "gta5":                ("271590",  "Grand Theft Auto V"),
-    "gta v":               ("271590",  "Grand Theft Auto V"),
-    "grand theft auto v":  ("271590",  "Grand Theft Auto V"),
-    "cs2":                 ("730",     "Counter-Strike 2"),
-    "csgo":                ("730",     "Counter-Strike 2"),
-    "counter-strike 2":    ("730",     "Counter-Strike 2"),
-    "counter strike 2":    ("730",     "Counter-Strike 2"),
-    "dota2":               ("570",     "Dota 2"),
-    "dota 2":              ("570",     "Dota 2"),
-    "rust":                ("252490",  "Rust"),
-    "valheim":             ("892970",  "Valheim"),
-    "cyberpunk":           ("1091500", "Cyberpunk 2077"),
-    "cyberpunk 2077":      ("1091500", "Cyberpunk 2077"),
-    "elden ring":          ("1245620", "ELDEN RING"),
-    "minecraft":           ("1672970", "Minecraft Launcher"),
-    "apex legends":        ("1172470", "Apex Legends"),
-    "apex":                ("1172470", "Apex Legends"),
-    "fortnite":            ("1517990", "Fortnite"),
-    "goose goose duck":    ("1568590", "Goose Goose Duck"),
-    "among us":            ("945360",  "Among Us"),
-    "fall guys":           ("1097150", "Fall Guys"),
-    "rocket league":       ("252950",  "Rocket League"),
-    "warframe":            ("230410",  "Warframe"),
-    "destiny 2":           ("1085660", "Destiny 2"),
-    "team fortress 2":     ("440",     "Team Fortress 2"),
-    "tf2":                 ("440",     "Team Fortress 2"),
-    "left 4 dead 2":       ("550",     "Left 4 Dead 2"),
-    "l4d2":                ("550",     "Left 4 Dead 2"),
-    "paladins":            ("444090",  "Paladins"),
-    "smite":               ("386360",  "SMITE"),
-    "war thunder":         ("236390",  "War Thunder"),
-    "world of warships":   ("552990",  "World of Warships"),
-    "path of exile":       ("238960",  "Path of Exile"),
-    "poe":                 ("238960",  "Path of Exile"),
-    "lost ark":            ("1599340", "Lost Ark"),
-    "new world":           ("1063730", "New World: Aeternum"),
+    "pubg": ("578080", "PUBG: Battlegrounds"),
+    "pubg battlegrounds": ("578080", "PUBG: Battlegrounds"),
+    "pubg: battlegrounds": ("578080", "PUBG: Battlegrounds"),
+    "battlegrounds": ("578080", "PUBG: Battlegrounds"),
+    "gta5": ("271590", "Grand Theft Auto V"),
+    "gta v": ("271590", "Grand Theft Auto V"),
+    "grand theft auto v": ("271590", "Grand Theft Auto V"),
+    "cs2": ("730", "Counter-Strike 2"),
+    "csgo": ("730", "Counter-Strike 2"),
+    "counter-strike 2": ("730", "Counter-Strike 2"),
+    "counter strike 2": ("730", "Counter-Strike 2"),
+    "dota2": ("570", "Dota 2"),
+    "dota 2": ("570", "Dota 2"),
+    "rust": ("252490", "Rust"),
+    "valheim": ("892970", "Valheim"),
+    "cyberpunk": ("1091500", "Cyberpunk 2077"),
+    "cyberpunk 2077": ("1091500", "Cyberpunk 2077"),
+    "elden ring": ("1245620", "ELDEN RING"),
+    "minecraft": ("1672970", "Minecraft Launcher"),
+    "apex legends": ("1172470", "Apex Legends"),
+    "apex": ("1172470", "Apex Legends"),
+    "fortnite": ("1517990", "Fortnite"),
+    "goose goose duck": ("1568590", "Goose Goose Duck"),
+    "among us": ("945360", "Among Us"),
+    "fall guys": ("1097150", "Fall Guys"),
+    "rocket league": ("252950", "Rocket League"),
+    "warframe": ("230410", "Warframe"),
+    "destiny 2": ("1085660", "Destiny 2"),
+    "team fortress 2": ("440", "Team Fortress 2"),
+    "tf2": ("440", "Team Fortress 2"),
+    "left 4 dead 2": ("550", "Left 4 Dead 2"),
+    "l4d2": ("550", "Left 4 Dead 2"),
+    "paladins": ("444090", "Paladins"),
+    "smite": ("386360", "SMITE"),
+    "war thunder": ("236390", "War Thunder"),
+    "world of warships": ("552990", "World of Warships"),
+    "path of exile": ("238960", "Path of Exile"),
+    "poe": ("238960", "Path of Exile"),
+    "lost ark": ("1599340", "Lost Ark"),
+    "new world": ("1063730", "New World: Aeternum"),
 }
 
+
 def _find_steam_path() -> Path | None:
-    if is_windows(): return _find_steam_windows()
-    if is_mac():     return _find_steam_mac()
+    if is_windows():
+        return _find_steam_windows()
+    if is_mac():
+        return _find_steam_mac()
     return _find_steam_linux()
 
 
 def _find_steam_windows() -> Path | None:
     try:
         import winreg
+
         for hive, key_path in [
             (winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\WOW6432Node\Valve\Steam"),
             (winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\Valve\Steam"),
-            (winreg.HKEY_CURRENT_USER,  r"SOFTWARE\Valve\Steam"),
+            (winreg.HKEY_CURRENT_USER, r"SOFTWARE\Valve\Steam"),
         ]:
             try:
                 key = winreg.OpenKey(hive, key_path)
@@ -80,8 +84,11 @@ def _find_steam_windows() -> Path | None:
         pass
     for p in [
         Path(os.environ.get("ProgramFiles(x86)", "")) / "Steam",
-        Path(os.environ.get("ProgramFiles", ""))       / "Steam",
-        Path("C:/Steam"), Path("D:/Steam"), Path("E:/Steam"), Path("F:/Steam"),
+        Path(os.environ.get("ProgramFiles", "")) / "Steam",
+        Path("C:/Steam"),
+        Path("D:/Steam"),
+        Path("E:/Steam"),
+        Path("F:/Steam"),
     ]:
         if p.exists() and (p / "steam.exe").exists():
             return p
@@ -102,7 +109,7 @@ def _find_steam_linux() -> Path | None:
     for p in [
         Path.home() / ".steam" / "steam",
         Path.home() / ".steam" / "root",
-        Path.home() / ".local"  / "share" / "Steam",
+        Path.home() / ".local" / "share" / "Steam",
         Path("/usr/share/steam"),
         Path("/opt/steam"),
     ]:
@@ -112,8 +119,10 @@ def _find_steam_linux() -> Path | None:
 
 
 def _steam_exe(steam_path: Path) -> Path:
-    if is_windows(): return steam_path / "steam.exe"
-    if is_mac():     return Path("/Applications/Steam.app/Contents/MacOS/steam_osx")
+    if is_windows():
+        return steam_path / "steam.exe"
+    if is_mac():
+        return Path("/Applications/Steam.app/Contents/MacOS/steam_osx")
     return steam_path / "steam.sh"
 
 
@@ -125,9 +134,10 @@ def _launch_steam_url(exe: Path, url: str) -> None:
     else:
         subprocess.Popen([str(exe), url])
 
+
 def _get_steam_libraries(steam_path: Path) -> list[Path]:
     libraries = [steam_path / "steamapps"]
-    vdf_path  = steam_path / "steamapps" / "libraryfolders.vdf"
+    vdf_path = steam_path / "steamapps" / "libraryfolders.vdf"
     if not vdf_path.exists():
         return libraries
     try:
@@ -146,39 +156,46 @@ def _get_steam_games(steam_path: Path) -> list[dict]:
     for lib in _get_steam_libraries(steam_path):
         for acf in lib.glob("appmanifest_*.acf"):
             try:
-                content  = acf.read_text(encoding="utf-8", errors="ignore")
-                app_id   = re.search(r'"appid"\s+"(\d+)"',     content)
-                name     = re.search(r'"name"\s+"([^"]+)"',     content)
-                state    = re.search(r'"StateFlags"\s+"(\d+)"', content)
-                size     = re.search(r'"SizeOnDisk"\s+"(\d+)"', content)
+                content = acf.read_text(encoding="utf-8", errors="ignore")
+                app_id = re.search(r'"appid"\s+"(\d+)"', content)
+                name = re.search(r'"name"\s+"([^"]+)"', content)
+                state = re.search(r'"StateFlags"\s+"(\d+)"', content)
+                size = re.search(r'"SizeOnDisk"\s+"(\d+)"', content)
                 if app_id and name:
-                    games.append({
-                        "id":    app_id.group(1),
-                        "name":  name.group(1),
-                        "state": int(state.group(1)) if state else 0,
-                        "size":  int(size.group(1))  if size  else 0,
-                        "lib":   str(lib),
-                        "acf":   str(acf),
-                    })
+                    games.append(
+                        {
+                            "id": app_id.group(1),
+                            "name": name.group(1),
+                            "state": int(state.group(1)) if state else 0,
+                            "size": int(size.group(1)) if size else 0,
+                            "lib": str(lib),
+                            "acf": str(acf),
+                        }
+                    )
             except Exception:
                 continue
     return games
 
+
 def _is_steam_running() -> bool:
     try:
         if is_windows():
-            out = subprocess.run(["tasklist", "/FI", "IMAGENAME eq steam.exe"],
-                                 capture_output=True, text=True).stdout
+            out = subprocess.run(
+                ["tasklist", "/FI", "IMAGENAME eq steam.exe"], capture_output=True, text=True
+            ).stdout
             return "steam.exe" in out.lower()
         proc = "steam_osx" if is_mac() else "steam"
-        return bool(subprocess.run(["pgrep", "-x", proc],
-                                   capture_output=True, text=True).stdout.strip())
+        return bool(
+            subprocess.run(["pgrep", "-x", proc], capture_output=True, text=True).stdout.strip()
+        )
     except Exception:
         return False
+
 
 def _get_steam_window_rect() -> tuple[int, int, int, int] | None:
     try:
         import pygetwindow as gw
+
         for w in gw.getAllWindows():
             if "steam" in w.title.lower() and w.width > 200 and w.visible:
                 return w.left, w.top, w.width, w.height
@@ -190,8 +207,8 @@ def _get_steam_window_rect() -> tuple[int, int, int, int] | None:
 def _click_first_profile_by_screenshot() -> bool:
 
     try:
-        import pyautogui
         import numpy as np
+        import pyautogui
 
         time.sleep(1.5)
         win = _get_steam_window_rect()
@@ -201,16 +218,20 @@ def _click_first_profile_by_screenshot() -> bool:
 
         wx, wy, ww, wh = win
         screenshot = pyautogui.screenshot(region=(wx, wy, ww, wh))
-        img        = np.array(screenshot)
-        h, w       = img.shape[:2]
+        img = np.array(screenshot)
+        h, w = img.shape[:2]
 
-        search_y1, search_y2 = h // 3,  h * 3 // 4
-        search_x1, search_x2 = w // 5,  w * 4 // 5
+        search_y1, search_y2 = h // 3, h * 3 // 4
+        search_x1, search_x2 = w // 5, w * 4 // 5
         region = img[search_y1:search_y2, search_x1:search_x2]
 
-        r, g, b = region[:,:,0].astype(int), region[:,:,1].astype(int), region[:,:,2].astype(int)
-        max_c   = np.maximum(np.maximum(r, g), b)
-        min_c   = np.minimum(np.minimum(r, g), b)
+        r, g, b = (
+            region[:, :, 0].astype(int),
+            region[:, :, 1].astype(int),
+            region[:, :, 2].astype(int),
+        )
+        max_c = np.maximum(np.maximum(r, g), b)
+        min_c = np.minimum(np.minimum(r, g), b)
         colorful = (max_c > 60) & ((max_c - min_c) > 40)
 
         if not colorful.any():
@@ -223,8 +244,8 @@ def _click_first_profile_by_screenshot() -> bool:
         if not len(cols) or not len(rows):
             return False
 
-        avatar_w   = min(90, region.shape[1] // 4)
-        first_col  = int(cols[0])
+        avatar_w = min(90, region.shape[1] // 4)
+        first_col = int(cols[0])
         block_cols = cols[cols < first_col + avatar_w]
 
         abs_x = wx + search_x1 + int(block_cols.mean())
@@ -249,16 +270,20 @@ def _handle_steam_profile_selection() -> bool:
 
     wx, wy, ww, wh = win
     try:
-        import pyautogui, numpy as np
-        screenshot   = pyautogui.screenshot(region=(wx, wy, ww, wh))
-        img          = np.array(screenshot)
-        is_small     = ww < 900 and wh < 700
-        top_region   = img[:wh // 3, :, :]
-        white_pixels = int(np.sum(
-            (top_region[:,:,0] > 200) &
-            (top_region[:,:,1] > 200) &
-            (top_region[:,:,2] > 200)
-        ))
+        import numpy as np
+        import pyautogui
+
+        screenshot = pyautogui.screenshot(region=(wx, wy, ww, wh))
+        img = np.array(screenshot)
+        is_small = ww < 900 and wh < 700
+        top_region = img[: wh // 3, :, :]
+        white_pixels = int(
+            np.sum(
+                (top_region[:, :, 0] > 200)
+                & (top_region[:, :, 1] > 200)
+                & (top_region[:, :, 2] > 200)
+            )
+        )
         if not is_small and white_pixels <= 100:
             print("[GameUpdater] ℹ️ No hay diálogo de perfil — Steam ya ha iniciado sesión")
             return False
@@ -270,14 +295,17 @@ def _handle_steam_profile_selection() -> bool:
     print("[GameUpdater] 👤 Selección de perfil detectada — haciendo clic en el primer perfil")
     return _click_first_profile_by_screenshot()
 
+
 def _find_best_drive() -> dict | None:
-    import shutil, string
+    import shutil
+    import string
+
     drives = []
     for letter in string.ascii_uppercase:
         drive_path = f"{letter}:\\"
         if os.path.exists(drive_path):
             try:
-                free_gb = shutil.disk_usage(drive_path).free / (1024 ** 3)
+                free_gb = shutil.disk_usage(drive_path).free / (1024**3)
                 if free_gb > 0:
                     drives.append({"letter": letter, "path": drive_path, "free_gb": free_gb})
             except Exception:
@@ -292,7 +320,9 @@ def _select_drive_in_dialog(dialog, drive_letter: str) -> bool:
             for ctrl in dialog.descendants(control_type=control_type):
                 if target in ctrl.window_text().upper():
                     ctrl.click_input()
-                    print(f"[GameUpdater] ✅ Unidad seleccionada ({control_type}): {ctrl.window_text()}")
+                    print(
+                        f"[GameUpdater] ✅ Unidad seleccionada ({control_type}): {ctrl.window_text()}"
+                    )
                     return True
         except Exception:
             continue
@@ -341,8 +371,10 @@ def _handle_install_dialog_pyautogui(game_name: str, best_drive: dict) -> str:
         import pyautogui
         import pygetwindow as gw
     except ImportError:
-        return (f"Se abrió el diálogo de instalación para '{game_name}'. "
-                f"Por favor, seleccione '{best_drive['letter']}:' y haga clic en Instalar manualmente.")
+        return (
+            f"Se abrió el diálogo de instalación para '{game_name}'. "
+            f"Por favor, seleccione '{best_drive['letter']}:' y haga clic en Instalar manualmente."
+        )
 
     pyautogui.FAILSAFE = False
     drive_label = f"{best_drive['letter']}:"
@@ -351,8 +383,11 @@ def _handle_install_dialog_pyautogui(game_name: str, best_drive: dict) -> str:
     for _ in range(30):
         time.sleep(0.5)
         for w in gw.getAllWindows():
-            if ("install" in w.title.lower() or "steam" in w.title.lower()) \
-                    and w.width > 300 and w.visible:
+            if (
+                ("install" in w.title.lower() or "steam" in w.title.lower())
+                and w.width > 300
+                and w.visible
+            ):
                 install_win = w
                 break
         if install_win:
@@ -383,11 +418,14 @@ def _handle_install_dialog(game_name: str) -> str:
         return f"Se abrió el diálogo de instalación para '{game_name}'. No se pudieron detectar las unidades."
 
     drive_letter = best_drive["letter"]
-    drive_label  = f"{drive_letter}:"
-    print(f"[GameUpdater] 🏆 Unidad objetivo: {drive_label} ({best_drive['free_gb']:.1f} GB libres)")
+    drive_label = f"{drive_letter}:"
+    print(
+        f"[GameUpdater] 🏆 Unidad objetivo: {drive_label} ({best_drive['free_gb']:.1f} GB libres)"
+    )
 
     try:
         from pywinauto import Application, findwindows
+
         dialog = None
 
         for _ in range(40):
@@ -397,16 +435,16 @@ def _handle_install_dialog(game_name: str) -> str:
                     title_re=r"(?i)(install|yükle|steam)", visible_only=True
                 ):
                     try:
-                        app  = Application(backend="uia").connect(handle=hwnd)
-                        win  = app.window(handle=hwnd)
+                        app = Application(backend="uia").connect(handle=hwnd)
+                        win = app.window(handle=hwnd)
                         rect = win.rectangle()
                         if win.is_visible() and rect.width() > 300 and rect.height() > 200:
                             all_text = " ".join(
-                                c.window_text() for c in win.descendants()
-                                if c.window_text()
+                                c.window_text() for c in win.descendants() if c.window_text()
                             ).upper()
-                            if any(x in all_text for x in
-                                   ("C:", "D:", "E:", "F:", "INSTALL", "YÜKLE")):
+                            if any(
+                                x in all_text for x in ("C:", "D:", "E:", "F:", "INSTALL", "YÜKLE")
+                            ):
                                 dialog = win
                                 break
                     except Exception:
@@ -421,13 +459,17 @@ def _handle_install_dialog(game_name: str) -> str:
 
         dialog.set_focus()
         time.sleep(0.4)
-        drive_selected  = _select_drive_in_dialog(dialog, drive_letter)
+        drive_selected = _select_drive_in_dialog(dialog, drive_letter)
         install_clicked = _click_button(
             dialog, ["install", "yükle", "next", "ileri", "ok", "tamam"]
         )
 
         if install_clicked:
-            suffix = f"Se seleccionó {drive_label} y" if drive_selected else "Se usó la unidad predeterminada, pero"
+            suffix = (
+                f"Se seleccionó {drive_label} y"
+                if drive_selected
+                else "Se usó la unidad predeterminada, pero"
+            )
             return f"{suffix} se hizo clic en Instalar para '{game_name}'."
         return f"Por favor, haga clic en Instalar manualmente en Steam para '{game_name}'."
 
@@ -436,6 +478,7 @@ def _handle_install_dialog(game_name: str) -> str:
     except Exception as e:
         print(f"[GameUpdater] ⚠️ pywinauto falló: {e}")
         return _handle_install_dialog_pyautogui(game_name, best_drive)
+
 
 def _ensure_steam_running(steam_path: Path) -> bool:
     if _is_steam_running():
@@ -465,9 +508,9 @@ def _ensure_steam_running(steam_path: Path) -> bool:
     print("[GameUpdater] ⚠️ No se pudo iniciar Steam")
     return False
 
+
 def _search_steam_appid(game_name: str) -> tuple[str | None, str | None]:
     name_lower = game_name.lower().strip()
-
 
     steam_path = _find_steam_path()
     if steam_path:
@@ -486,10 +529,12 @@ def _search_steam_appid(game_name: str) -> tuple[str | None, str | None]:
             return app_id, canonical
 
     try:
-        import urllib.request, urllib.parse
+        import urllib.parse
+        import urllib.request
+
         query = urllib.parse.quote(game_name)
-        url   = f"https://store.steampowered.com/api/storesearch/?term={query}&l=english&cc=US"
-        req   = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+        url = f"https://store.steampowered.com/api/storesearch/?term={query}&l=english&cc=US"
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
         with urllib.request.urlopen(req, timeout=6) as resp:
             items = json.loads(resp.read().decode()).get("items", [])
         if items:
@@ -501,18 +546,19 @@ def _search_steam_appid(game_name: str) -> tuple[str | None, str | None]:
 
     return None, None
 
+
 def _update_steam_games(steam_path: Path, game_name: str = None) -> str:
     if not _ensure_steam_running(steam_path):
         return "No se pudo iniciar Steam."
 
-    exe   = _steam_exe(steam_path)
+    exe = _steam_exe(steam_path)
     games = _get_steam_games(steam_path)
     if not games:
         return "No se encontraron juegos de Steam."
 
     if game_name:
         name_lower = game_name.lower()
-        targets    = [g for g in games if name_lower in g["name"].lower()]
+        targets = [g for g in games if name_lower in g["name"].lower()]
         if not targets:
             available = ", ".join(g["name"] for g in games[:5])
             return f"El juego '{game_name}' no se encontró. Instalados: {available}..."
@@ -523,7 +569,7 @@ def _update_steam_games(steam_path: Path, game_name: str = None) -> str:
 
     for game in targets:
         state = game["state"]
-        name  = game["name"]
+        name = game["name"]
         if state == 4:
             already_updated.append(name)
         elif state == 1026:
@@ -538,7 +584,7 @@ def _update_steam_games(steam_path: Path, game_name: str = None) -> str:
 
     parts = []
     if update_started:
-        names  = ", ".join(update_started[:3])
+        names = ", ".join(update_started[:3])
         suffix = f" y {len(update_started) - 3} más" if len(update_started) > 3 else ""
         parts.append(f"Actualización iniciada para: {names}{suffix}.")
     if already_running:
@@ -546,19 +592,19 @@ def _update_steam_games(steam_path: Path, game_name: str = None) -> str:
     if already_updated:
         parts.append(
             f"{already_updated[0]} ya está actualizado."
-            if game_name else
-            f"{len(already_updated)} juego(s) ya actualizado(s)."
+            if game_name
+            else f"{len(already_updated)} juego(s) ya actualizado(s)."
         )
     if errors:
         parts.append(f"Errores: {'; '.join(errors)}.")
     return " ".join(parts) if parts else "No hay juegos para actualizar."
 
-def _install_steam_game(steam_path: Path, game_name: str = None,
-                        app_id: str = None) -> str:
+
+def _install_steam_game(steam_path: Path, game_name: str = None, app_id: str = None) -> str:
     if not _ensure_steam_running(steam_path):
         return "No se pudo iniciar Steam."
 
-    exe             = _steam_exe(steam_path)
+    exe = _steam_exe(steam_path)
     installed_games = _get_steam_games(steam_path)
 
     already = None
@@ -566,14 +612,13 @@ def _install_steam_game(steam_path: Path, game_name: str = None,
         already = next((g for g in installed_games if g["id"] == str(app_id)), None)
     elif game_name:
         name_lower = game_name.lower()
-        already    = next((g for g in installed_games
-                           if name_lower in g["name"].lower()), None)
+        already = next((g for g in installed_games if name_lower in g["name"].lower()), None)
     else:
         return "Por favor, especifique un nombre de juego o AppID."
 
     if already:
         state = already["state"]
-        name  = already["name"]
+        name = already["name"]
         if state == 4:
             return f"'{name}' ya está instalado y actualizado."
         if state == 1026:
@@ -586,9 +631,11 @@ def _install_steam_game(steam_path: Path, game_name: str = None,
     if not app_id and game_name:
         found_id, found_name = _search_steam_appid(game_name)
         if not found_id:
-            return (f"No se encontró '{game_name}' en Steam. "
-                    f"Intente proporcionando el AppID directamente.")
-        app_id    = found_id
+            return (
+                f"No se encontró '{game_name}' en Steam. "
+                f"Intente proporcionando el AppID directamente."
+            )
+        app_id = found_id
         game_name = found_name or game_name
         print(f"[GameUpdater] 🔍 Instalando: {game_name} (AppID: {app_id})")
 
@@ -597,23 +644,22 @@ def _install_steam_game(steam_path: Path, game_name: str = None,
 
         if is_windows():
             threading.Thread(
-                target=_handle_install_dialog,
-                args=(game_name or str(app_id),),
-                daemon=True
+                target=_handle_install_dialog, args=(game_name or str(app_id),), daemon=True
             ).start()
         return f"Instalación iniciada para '{game_name}'. Steam abrirá el diálogo de descarga."
     except Exception as e:
         return f"La instalación falló: {e}"
 
+
 def _get_download_status(steam_path: Path) -> str:
-    games   = _get_steam_games(steam_path)
-    active  = [g for g in games if g["state"] == 1026]
+    games = _get_steam_games(steam_path)
+    active = [g for g in games if g["state"] == 1026]
     pending = [g for g in games if g["state"] in (6, 516)]
-    lines   = []
+    lines = []
     if active:
         lines.append(f"Descargando: {', '.join(g['name'] for g in active)}.")
     if pending:
-        names  = ", ".join(g["name"] for g in pending[:5])
+        names = ", ".join(g["name"] for g in pending[:5])
         suffix = f" y {len(pending) - 5} más" if len(pending) > 5 else ""
         lines.append(f"Actualizaciones pendientes: {names}{suffix}.")
     return " ".join(lines) if lines else "No hay descargas activas ni actualizaciones pendientes."
@@ -628,8 +674,9 @@ def _system_shutdown() -> None:
         subprocess.run(["systemctl", "poweroff"])
 
 
-def _watch_and_shutdown(steam_path: Path, speak=None,
-                        check_interval: int = 30, timeout_hours: int = 12):
+def _watch_and_shutdown(
+    steam_path: Path, speak=None, check_interval: int = 30, timeout_hours: int = 12
+):
     print("[GameUpdater]...")
     deadline = time.time() + timeout_hours * 3600
 
@@ -642,7 +689,7 @@ def _watch_and_shutdown(steam_path: Path, speak=None,
                 speak(f"Descarga iniciada para {names}. Apagaré el equipo cuando termine.")
             break
     else:
-        return  
+        return
 
     while time.time() < deadline:
         time.sleep(check_interval)
@@ -658,18 +705,21 @@ def _watch_and_shutdown(steam_path: Path, speak=None,
 
 
 def _find_epic_exe() -> Path | None:
-    if is_windows(): return _find_epic_exe_windows()
-    if is_mac():     return _find_epic_exe_mac()
+    if is_windows():
+        return _find_epic_exe_windows()
+    if is_mac():
+        return _find_epic_exe_mac()
     return _find_epic_exe_linux()
 
 
 def _find_epic_exe_windows() -> Path | None:
     try:
         import winreg
+
         for hive, key_path in [
             (winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\WOW6432Node\EpicGames\EpicGamesLauncher"),
             (winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\EpicGames\EpicGamesLauncher"),
-            (winreg.HKEY_CURRENT_USER,  r"SOFTWARE\EpicGames\EpicGamesLauncher"),
+            (winreg.HKEY_CURRENT_USER, r"SOFTWARE\EpicGames\EpicGamesLauncher"),
         ]:
             try:
                 key = winreg.OpenKey(hive, key_path)
@@ -683,9 +733,26 @@ def _find_epic_exe_windows() -> Path | None:
     except ImportError:
         pass
     for candidate in [
-        Path(os.environ.get("ProgramFiles(x86)", "")) / "Epic Games" / "Launcher" / "Portal" / "Binaries" / "Win64" / "EpicGamesLauncher.exe",
-        Path(os.environ.get("ProgramFiles", ""))       / "Epic Games" / "Launcher" / "Portal" / "Binaries" / "Win64" / "EpicGamesLauncher.exe",
-        Path(os.environ.get("LOCALAPPDATA", ""))        / "EpicGamesLauncher" / "Portal" / "Binaries" / "Win64" / "EpicGamesLauncher.exe",
+        Path(os.environ.get("ProgramFiles(x86)", ""))
+        / "Epic Games"
+        / "Launcher"
+        / "Portal"
+        / "Binaries"
+        / "Win64"
+        / "EpicGamesLauncher.exe",
+        Path(os.environ.get("ProgramFiles", ""))
+        / "Epic Games"
+        / "Launcher"
+        / "Portal"
+        / "Binaries"
+        / "Win64"
+        / "EpicGamesLauncher.exe",
+        Path(os.environ.get("LOCALAPPDATA", ""))
+        / "EpicGamesLauncher"
+        / "Portal"
+        / "Binaries"
+        / "Win64"
+        / "EpicGamesLauncher.exe",
     ]:
         if candidate.exists():
             return candidate
@@ -706,14 +773,26 @@ def _find_epic_exe_linux() -> Path | None:
 
 def _epic_manifests_path() -> Path | None:
     if is_windows():
-        p = Path(os.environ.get("PROGRAMDATA", "C:/ProgramData")) \
-            / "Epic" / "EpicGamesLauncher" / "Data" / "Manifests"
+        p = (
+            Path(os.environ.get("PROGRAMDATA", "C:/ProgramData"))
+            / "Epic"
+            / "EpicGamesLauncher"
+            / "Data"
+            / "Manifests"
+        )
         return p if p.exists() else None
     if is_mac():
-        p = Path.home() / "Library" / "Application Support" \
-            / "Epic" / "EpicGamesLauncher" / "Data" / "Manifests"
+        p = (
+            Path.home()
+            / "Library"
+            / "Application Support"
+            / "Epic"
+            / "EpicGamesLauncher"
+            / "Data"
+            / "Manifests"
+        )
         return p if p.exists() else None
-    return None  
+    return None
 
 
 def _get_epic_games() -> list[dict]:
@@ -737,12 +816,14 @@ def _is_epic_running() -> bool:
         if is_windows():
             out = subprocess.run(
                 ["tasklist", "/FI", "IMAGENAME eq EpicGamesLauncher.exe"],
-                capture_output=True, text=True
+                capture_output=True,
+                text=True,
             ).stdout
             return "epicgameslauncher.exe" in out.lower()
         proc = "EpicGamesLauncher" if is_mac() else "heroic"
-        return bool(subprocess.run(["pgrep", "-x", proc],
-                                   capture_output=True, text=True).stdout.strip())
+        return bool(
+            subprocess.run(["pgrep", "-x", proc], capture_output=True, text=True).stdout.strip()
+        )
     except Exception:
         return False
 
@@ -752,7 +833,7 @@ def _update_epic_games(epic_exe: Path, game_name: str = None) -> str:
 
     if game_name:
         name_lower = game_name.lower()
-        matched    = [g for g in games if name_lower in g["name"].lower()]
+        matched = [g for g in games if name_lower in g["name"].lower()]
         if not matched:
             return f"'{game_name}' no se encontró en Epic."
         try:
@@ -774,38 +855,60 @@ def _update_epic_games(epic_exe: Path, game_name: str = None) -> str:
                 if epic_exe:
                     subprocess.Popen([str(epic_exe)])
                 else:
-                    return ("Epic Games no tiene soporte nativo en Linux. "
-                            "Considere usar Heroic Launcher.")
+                    return (
+                        "Epic Games no tiene soporte nativo en Linux. "
+                        "Considere usar Heroic Launcher."
+                    )
             else:
-
                 if _is_epic_running():
                     for g in games[:10]:
-                        subprocess.Popen([str(epic_exe),
-                            f"com.epicgames.launcher://apps/{g['id']}?action=launch&silent=true"])
+                        subprocess.Popen(
+                            [
+                                str(epic_exe),
+                                f"com.epicgames.launcher://apps/{g['id']}?action=launch&silent=true",
+                            ]
+                        )
                         time.sleep(0.5)
                     return f"Se verificó la actualización de {len(games)} juego(s) de Epic."
                 else:
                     subprocess.Popen([str(epic_exe)])
             count = len(games)
-            return (f"Epic Games Launcher abierto. Se verificarán {count} juego(s)."
-                    if count else "Epic Games Launcher abierto.")
+            return (
+                f"Epic Games Launcher abierto. Se verificarán {count} juego(s)."
+                if count
+                else "Epic Games Launcher abierto."
+            )
         except Exception as e:
             return f"No se pudo iniciar Epic: {e}"
 
+
 def _schedule_daily_update(hour: int = 3, minute: int = 0) -> str:
-    if is_windows(): return _schedule_windows(hour, minute)
-    if is_mac():     return _schedule_mac(hour, minute)
+    if is_windows():
+        return _schedule_windows(hour, minute)
+    if is_mac():
+        return _schedule_mac(hour, minute)
     return _schedule_linux(hour, minute)
 
 
 def _schedule_windows(hour: int, minute: int) -> str:
-    task_name   = "ORION_GameUpdater"
+    task_name = "ORION_GameUpdater"
     script_path = Path(__file__).resolve()
     subprocess.run(["schtasks", "/Delete", "/TN", task_name, "/F"], capture_output=True)
     for extra in (["/RL", "HIGHEST", "/RU", "SYSTEM"], []):
-        cmd    = ["schtasks", "/Create", "/TN", task_name,
-                  "/TR", f'"{sys.executable}" "{script_path}" --scheduled',
-                  "/SC", "DAILY", "/ST", f"{hour:02d}:{minute:02d}", "/F", *extra]
+        cmd = [
+            "schtasks",
+            "/Create",
+            "/TN",
+            task_name,
+            "/TR",
+            f'"{sys.executable}" "{script_path}" --scheduled',
+            "/SC",
+            "DAILY",
+            "/ST",
+            f"{hour:02d}:{minute:02d}",
+            "/F",
+            *extra,
+        ]
         result = subprocess.run(cmd, capture_output=True, text=True)
         if result.returncode == 0:
             return f"Actualización diaria de juegos programada a las {hour:02d}:{minute:02d}."
@@ -813,9 +916,9 @@ def _schedule_windows(hour: int, minute: int) -> str:
 
 
 def _schedule_mac(hour: int, minute: int) -> str:
-    plist_dir   = Path.home() / "Library" / "LaunchAgents"
+    plist_dir = Path.home() / "Library" / "LaunchAgents"
     plist_dir.mkdir(parents=True, exist_ok=True)
-    plist_path  = plist_dir / "com.orion.gameupdater.plist"
+    plist_path = plist_dir / "com.orion.gameupdater.plist"
     script_path = Path(__file__).resolve()
     plist_content = f"""<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
@@ -838,8 +941,9 @@ def _schedule_mac(hour: int, minute: int) -> str:
     try:
         plist_path.write_text(plist_content, encoding="utf-8")
         subprocess.run(["launchctl", "unload", str(plist_path)], capture_output=True)
-        result = subprocess.run(["launchctl", "load", str(plist_path)],
-                                capture_output=True, text=True)
+        result = subprocess.run(
+            ["launchctl", "load", str(plist_path)], capture_output=True, text=True
+        )
         if result.returncode == 0:
             return f"Actualización diaria de juegos programada a las {hour:02d}:{minute:02d} vía launchd."
         return f"La programación falló: {result.stderr.strip()}"
@@ -849,18 +953,21 @@ def _schedule_mac(hour: int, minute: int) -> str:
 
 def _schedule_linux(hour: int, minute: int) -> str:
     script_path = Path(__file__).resolve()
-    marker      = "# ORION_GameUpdater"
-    cron_entry  = f"{minute} {hour} * * * {sys.executable} {script_path} --scheduled  {marker}"
+    marker = "# ORION_GameUpdater"
+    cron_entry = f"{minute} {hour} * * * {sys.executable} {script_path} --scheduled  {marker}"
     try:
         existing = subprocess.run(["crontab", "-l"], capture_output=True, text=True)
-        lines    = [l for l in existing.stdout.splitlines()
-                    if marker not in l and str(script_path) not in l]
+        lines = [
+            l for l in existing.stdout.splitlines() if marker not in l and str(script_path) not in l
+        ]
         lines.append(cron_entry)
-        proc = subprocess.run(["crontab", "-"],
-                              input="\n".join(lines) + "\n",
-                              text=True, capture_output=True)
+        proc = subprocess.run(
+            ["crontab", "-"], input="\n".join(lines) + "\n", text=True, capture_output=True
+        )
         if proc.returncode == 0:
-            return f"Actualización diaria de juegos programada a las {hour:02d}:{minute:02d} vía cron."
+            return (
+                f"Actualización diaria de juegos programada a las {hour:02d}:{minute:02d} vía cron."
+            )
         return f"La programación falló: {proc.stderr.strip()}"
     except Exception as e:
         return f"La programación falló: {e}"
@@ -870,10 +977,14 @@ def _cancel_scheduled_update() -> str:
     if is_windows():
         result = subprocess.run(
             ["schtasks", "/Delete", "/TN", "ORION_GameUpdater", "/F"],
-            capture_output=True, text=True
+            capture_output=True,
+            text=True,
         )
-        return ("Actualización programada cancelada."
-                if result.returncode == 0 else "No se encontró ninguna actualización programada.")
+        return (
+            "Actualización programada cancelada."
+            if result.returncode == 0
+            else "No se encontró ninguna actualización programada."
+        )
     if is_mac():
         plist_path = Path.home() / "Library" / "LaunchAgents" / "com.orion.gameupdater.plist"
         if plist_path.exists():
@@ -884,10 +995,8 @@ def _cancel_scheduled_update() -> str:
 
     try:
         existing = subprocess.run(["crontab", "-l"], capture_output=True, text=True)
-        lines    = [l for l in existing.stdout.splitlines()
-                    if "ORION_GameUpdater" not in l]
-        subprocess.run(["crontab", "-"],
-                       input="\n".join(lines) + "\n", text=True)
+        lines = [l for l in existing.stdout.splitlines() if "ORION_GameUpdater" not in l]
+        subprocess.run(["crontab", "-"], input="\n".join(lines) + "\n", text=True)
         return "Actualización programada cancelada."
     except Exception as e:
         return f"La cancelación falló: {e}"
@@ -897,47 +1006,54 @@ def _get_schedule_status() -> str:
     if is_windows():
         result = subprocess.run(
             ["schtasks", "/Query", "/TN", "ORION_GameUpdater", "/FO", "LIST"],
-            capture_output=True, text=True
+            capture_output=True,
+            text=True,
         )
         if result.returncode != 0:
             return "No se encontró ninguna actualización de juegos programada."
         for line in result.stdout.strip().splitlines():
-            if any(k in line for k in
-                   ("Next Run", "Sonraki", "Prochaine", "Próxima", "Nächste")):
+            if any(k in line for k in ("Next Run", "Sonraki", "Prochaine", "Próxima", "Nächste")):
                 return f"Actualización de juegos programada. {line.strip()}"
         return "La actualización de juegos está programada."
     if is_mac():
-        plist_path = (Path.home() / "Library" / "LaunchAgents"
-                      / "com.orion.gameupdater.plist")
-        return ("La actualización de juegos está programada vía launchd."
-                if plist_path.exists() else "No se encontró ninguna actualización de juegos programada.")
+        plist_path = Path.home() / "Library" / "LaunchAgents" / "com.orion.gameupdater.plist"
+        return (
+            "La actualización de juegos está programada vía launchd."
+            if plist_path.exists()
+            else "No se encontró ninguna actualización de juegos programada."
+        )
 
     try:
         result = subprocess.run(["crontab", "-l"], capture_output=True, text=True)
         if "ORION_GameUpdater" in result.stdout:
             for line in result.stdout.splitlines():
                 if "ORION_GameUpdater" in line:
-                    return f"La actualización de juegos está programada: {line.split('#')[0].strip()}"
+                    return (
+                        f"La actualización de juegos está programada: {line.split('#')[0].strip()}"
+                    )
         return "No se encontró ninguna actualización de juegos programada."
     except Exception:
         return "No se encontró ninguna actualización de juegos programada."
 
 
 def game_updater(parameters: dict, player=None, speak=None) -> str:
-    p         = parameters or {}
-    action    = p.get("action",    "update").lower().strip()
-    platform  = p.get("platform",  "both").lower().strip()
+    p = parameters or {}
+    action = p.get("action", "update").lower().strip()
+    platform = p.get("platform", "both").lower().strip()
     game_name = (p.get("game_name") or "").strip() or None
-    app_id    = (p.get("app_id")    or "").strip() or None
-    hour      = int(p.get("hour",   3))
-    minute    = int(p.get("minute", 0))
-    shutdown  = str(p.get("shutdown_when_done", "false")).lower() == "true"
+    app_id = (p.get("app_id") or "").strip() or None
+    hour = int(p.get("hour", 3))
+    minute = int(p.get("minute", 0))
+    shutdown = str(p.get("shutdown_when_done", "false")).lower() == "true"
 
     results = []
 
-    if action == "schedule":        return _schedule_daily_update(hour=hour, minute=minute)
-    if action == "cancel_schedule": return _cancel_scheduled_update()
-    if action == "schedule_status": return _get_schedule_status()
+    if action == "schedule":
+        return _schedule_daily_update(hour=hour, minute=minute)
+    if action == "cancel_schedule":
+        return _cancel_scheduled_update()
+    if action == "schedule_status":
+        return _get_schedule_status()
 
     if action == "list":
         if platform in ("steam", "both"):
@@ -945,7 +1061,7 @@ def game_updater(parameters: dict, player=None, speak=None) -> str:
             if steam_path:
                 games = _get_steam_games(steam_path)
                 if games:
-                    names  = ", ".join(g["name"] for g in games[:8])
+                    names = ", ".join(g["name"] for g in games[:8])
                     suffix = f" y {len(games) - 8} más" if len(games) > 8 else ""
                     results.append(f"Steam ({len(games)} juegos): {names}{suffix}.")
                 else:
@@ -958,7 +1074,7 @@ def game_updater(parameters: dict, player=None, speak=None) -> str:
             else:
                 games = _get_epic_games()
                 if games:
-                    names  = ", ".join(g["name"] for g in games[:8])
+                    names = ", ".join(g["name"] for g in games[:8])
                     suffix = f" y {len(games) - 8} más" if len(games) > 8 else ""
                     results.append(f"Epic ({len(games)} juegos): {names}{suffix}.")
                 else:
@@ -982,24 +1098,22 @@ def game_updater(parameters: dict, player=None, speak=None) -> str:
                 results.append("Steam: No instalado.")
             else:
                 if game_name:
-                    installed  = _get_steam_games(steam_path)
+                    installed = _get_steam_games(steam_path)
                     name_lower = game_name.lower()
-                    is_installed = any(
-                        name_lower in g["name"].lower() for g in installed
-                    )
+                    is_installed = any(name_lower in g["name"].lower() for g in installed)
                     if not is_installed:
-                        msg = _install_steam_game(
-                            steam_path, game_name=game_name, app_id=app_id
-                        )
+                        msg = _install_steam_game(steam_path, game_name=game_name, app_id=app_id)
                         if shutdown:
                             threading.Thread(
                                 target=_watch_and_shutdown,
                                 kwargs={"steam_path": steam_path, "speak": speak},
-                                daemon=True
+                                daemon=True,
                             ).start()
                             msg += " Apagado automático activado."
-                        if player: player.write_log(f"[GameUpdater] {msg[:100]}")
-                        if speak:  speak(msg)
+                        if player:
+                            player.write_log(f"[GameUpdater] {msg[:100]}")
+                        if speak:
+                            speak(msg)
                         return msg
                     else:
                         results.append(
@@ -1007,7 +1121,9 @@ def game_updater(parameters: dict, player=None, speak=None) -> str:
                         )
                 else:
                     if action == "install":
-                        results.append("Steam: Por favor, especifique un nombre de juego para instalar.")
+                        results.append(
+                            "Steam: Por favor, especifique un nombre de juego para instalar."
+                        )
                     else:
                         results.append(f"Steam: {_update_steam_games(steam_path)}")
 
@@ -1015,27 +1131,25 @@ def game_updater(parameters: dict, player=None, speak=None) -> str:
                     threading.Thread(
                         target=_watch_and_shutdown,
                         kwargs={"steam_path": steam_path, "speak": speak},
-                        daemon=True
+                        daemon=True,
                     ).start()
                     results.append("Apagado automático activado.")
 
         if platform in ("epic", "both"):
             if is_linux():
-                results.append(
-                    "Epic: No tiene soporte nativo en Linux. Use Heroic Launcher."
-                )
+                results.append("Epic: No tiene soporte nativo en Linux. Use Heroic Launcher.")
             else:
                 epic_exe = _find_epic_exe()
                 if epic_exe:
-                    results.append(
-                        f"Epic: {_update_epic_games(epic_exe, game_name=game_name)}"
-                    )
+                    results.append(f"Epic: {_update_epic_games(epic_exe, game_name=game_name)}")
                 else:
                     results.append("Epic: No instalado.")
 
         output = " | ".join(results) or "Nada que hacer."
-        if player: player.write_log(f"[GameUpdater] {output[:100]}")
-        if speak:  speak(output)
+        if player:
+            player.write_log(f"[GameUpdater] {output[:100]}")
+        if speak:
+            speak(output)
         return output
 
     return f"Acción desconocida: '{action}'."

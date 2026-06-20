@@ -38,11 +38,11 @@ class SystemInfoPlugin(PluginBase):
                 "properties": {
                     "detail": {
                         "type": "STRING",
-                        "description": "What to report: all | cpu | memory | disk | os (default: all)"
+                        "description": "What to report: all | cpu | memory | disk | os (default: all)",
                     }
                 },
-                "required": []
-            }
+                "required": [],
+            },
         }
 
     def execute(self, parameters: dict, player: Any = None, **kwargs) -> str:
@@ -50,9 +50,7 @@ class SystemInfoPlugin(PluginBase):
         parts = []
 
         if detail in ("all", "os"):
-            parts.append(
-                f"OS: {platform.system()} {platform.release()} ({platform.machine()})"
-            )
+            parts.append(f"OS: {platform.system()} {platform.release()} ({platform.machine()})")
             parts.append(f"Python: {sys.version.split()[0]}")
             parts.append(f"Hostname: {platform.node()}")
 
@@ -79,4 +77,6 @@ class SystemInfoPlugin(PluginBase):
                 f"({disk.percent}%)"
             )
 
-        return "\n".join(parts) if parts else "Detalle no reconocido. Usa: all, cpu, memory, disk, os"
+        return (
+            "\n".join(parts) if parts else "Detalle no reconocido. Usa: all, cpu, memory, disk, os"
+        )

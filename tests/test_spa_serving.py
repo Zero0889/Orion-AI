@@ -27,8 +27,9 @@ INDEX = DIST / "index.html"
 def client():
     if not INDEX.is_file():
         pytest.skip("web/dist no construido. Ejecuta `npm run build` en web/.")
-    from server.event_bus import OrionEventBus
     from server.app import build_app
+    from server.event_bus import OrionEventBus
+
     bus = OrionEventBus()
     app = build_app(bus)
     with TestClient(app) as tc:
@@ -39,7 +40,7 @@ def test_root_serves_spa(client):
     r = client.get("/")
     assert r.status_code == 200
     assert "<!doctype html" in r.text.lower()
-    assert "id=\"root\"" in r.text
+    assert 'id="root"' in r.text
 
 
 def test_assets_route_exists_or_skips(client):

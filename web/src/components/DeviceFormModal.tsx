@@ -19,13 +19,14 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import {
   api,
-  type IoTCapabilities, type IoTDevice, type IoTDeviceBody,
-  type IoTFullConfig, type IoTTransportBody,
+  type IoTCapabilities,
+  type IoTDevice,
+  type IoTDeviceBody,
+  type IoTFullConfig,
+  type IoTTransportBody,
 } from "@/api/rest";
 import { Icon, type IconName } from "@/ui/Icon";
-import {
-  Badge, Button, Field, Modal, Surface, Switch, TextInput,
-} from "@/ui/primitives";
+import { Badge, Button, Field, Modal, Surface, Switch, TextInput } from "@/ui/primitives";
 import {
   SENSOR_FREQ_REC,
   type DeviceConfig,
@@ -41,48 +42,56 @@ type TransportType = "mqtt" | "serial" | "custom";
 const LIGHT_HINTS = /\b(foco|luz|lampar|bombill|light|lamp|spot|led)\w*/i;
 
 interface Props {
-  open:    boolean;
+  open: boolean;
   onClose: () => void;
-  device?:  IoTDevice | LocalDevice;
-  config?:  DeviceConfig;
+  device?: IoTDevice | LocalDevice;
+  config?: DeviceConfig;
 
   /** Llamado tras éxito en backend o tras escribir local. */
-  onSaved?:        () => void;
-  onSubmitLocal:   (dev: LocalDevice, cfg: DeviceConfig) => void;
-  onSubmitConfig:  (id: string, cfg: DeviceConfig, displayName?: string) => void;
-  onDeleteLocal?:  (id: string) => void;
+  onSaved?: () => void;
+  onSubmitLocal: (dev: LocalDevice, cfg: DeviceConfig) => void;
+  onSubmitConfig: (id: string, cfg: DeviceConfig, displayName?: string) => void;
+  onDeleteLocal?: (id: string) => void;
 }
 
 /* ── presets ──────────────────────────────────────────────────────── */
 type DeviceKind = "light" | "switch" | "sensor" | "mixed";
 
 const DEVICE_KINDS: { id: DeviceKind; label: string; icon: IconName; hint: string }[] = [
-  { id: "light",  label: "Foco / luz",       icon: "lightbulb", hint: "Encendido, regulable, RGB" },
-  { id: "switch", label: "Interruptor",      icon: "bolt",      hint: "Solo on/off"               },
-  { id: "sensor", label: "Sensor",           icon: "gauge",     hint: "Lecturas numéricas"        },
-  { id: "mixed",  label: "Mixto / avanzado", icon: "cpu",       hint: "Combinación libre"         },
+  { id: "light", label: "Foco / luz", icon: "lightbulb", hint: "Encendido, regulable, RGB" },
+  { id: "switch", label: "Interruptor", icon: "bolt", hint: "Solo on/off" },
+  { id: "sensor", label: "Sensor", icon: "gauge", hint: "Lecturas numéricas" },
+  { id: "mixed", label: "Mixto / avanzado", icon: "cpu", hint: "Combinación libre" },
 ];
 
 const SENSOR_PRESETS: { id: SensorKind; label: string; icon: IconName; backendId: string }[] = [
   { id: "temperature", label: "Temperatura", icon: "thermometer", backendId: "temperature" },
-  { id: "humidity",    label: "Humedad",     icon: "droplet",     backendId: "humidity"    },
-  { id: "pressure",    label: "Presión",     icon: "gauge",       backendId: "pressure"    },
-  { id: "light",       label: "Luminosidad", icon: "sun",         backendId: "light"       },
-  { id: "motion",      label: "Movimiento",  icon: "motion",      backendId: "motion"      },
-  { id: "co2",         label: "Calidad aire",icon: "wind",        backendId: "co2"         },
-  { id: "custom",      label: "Personalizado", icon: "tag",       backendId: ""            },
+  { id: "humidity", label: "Humedad", icon: "droplet", backendId: "humidity" },
+  { id: "pressure", label: "Presión", icon: "gauge", backendId: "pressure" },
+  { id: "light", label: "Luminosidad", icon: "sun", backendId: "light" },
+  { id: "motion", label: "Movimiento", icon: "motion", backendId: "motion" },
+  { id: "co2", label: "Calidad aire", icon: "wind", backendId: "co2" },
+  { id: "custom", label: "Personalizado", icon: "tag", backendId: "" },
 ];
 
 const TRANSPORT_KINDS: { id: TransportType; label: string; icon: IconName; hint: string }[] = [
-  { id: "mqtt",   label: "ESP32 (MQTT)",     icon: "wifi",  hint: "WiFi, broker MQTT" },
-  { id: "serial", label: "Arduino (Serial)", icon: "bolt",  hint: "USB, puerto COM"   },
-  { id: "custom", label: "Otro / existente", icon: "cpu",   hint: "Transport ya definido en el backend" },
+  { id: "mqtt", label: "ESP32 (MQTT)", icon: "wifi", hint: "WiFi, broker MQTT" },
+  { id: "serial", label: "Arduino (Serial)", icon: "bolt", hint: "USB, puerto COM" },
+  {
+    id: "custom",
+    label: "Otro / existente",
+    icon: "cpu",
+    hint: "Transport ya definido en el backend",
+  },
 ];
 
 /* ── helpers ──────────────────────────────────────────────────────── */
 function slugify(s: string): string {
-  return s.trim().toLowerCase()
-    .normalize("NFD").replace(/[̀-ͯ]/g, "")
+  return s
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
     .replace(/[^a-z0-9]+/g, "_")
     .replace(/^_+|_+$/g, "")
     .slice(0, 32);
@@ -93,7 +102,7 @@ function kindFromDevice(d?: IoTDevice, cfg?: DeviceConfig): DeviceKind {
   if (cfg?.kind) return cfg.kind;
   if (!d) return "light";
   const c = d.capabilities;
-  if (c.sensor)            return "sensor";
+  if (c.sensor) return "sensor";
   if (c.rgb || c.dimmable) return "light";
   if (c.on_off && !c.dimmable && !c.rgb) {
     // Heurística por nombre/id: "foco", "luz", "lampara"... → light
@@ -109,50 +118,57 @@ function isObj(v: unknown): v is Record<string, unknown> {
 
 /* ── component ────────────────────────────────────────────────────── */
 export function DeviceFormModal({
-  open, onClose, device, config,
-  onSaved, onSubmitConfig, onDeleteLocal,
+  open,
+  onClose,
+  device,
+  config,
+  onSaved,
+  onSubmitConfig,
+  onDeleteLocal,
 }: Props) {
-  const isLocal   = !!(device as LocalDevice | undefined)?.__local;
+  const isLocal = !!(device as LocalDevice | undefined)?.__local;
   const mode: Mode = !device ? "create" : isLocal ? "edit-local" : "edit-backend";
 
   // form state ──────────────────────────────────────────────────────
-  const [kind,        setKind]        = useState<DeviceKind>(kindFromDevice(device, config));
-  const [name,        setName]        = useState(device?.name ?? "");
-  const [id,          setId]          = useState(device?.id   ?? "");
-  const [idTouched,   setIdTouched]   = useState(!!device);
-  const [caps,        setCaps]        = useState<IoTCapabilities>(
+  const [kind, setKind] = useState<DeviceKind>(kindFromDevice(device, config));
+  const [name, setName] = useState(device?.name ?? "");
+  const [id, setId] = useState(device?.id ?? "");
+  const [idTouched, setIdTouched] = useState(!!device);
+  const [caps, setCaps] = useState<IoTCapabilities>(
     device?.capabilities ?? { on_off: true, dimmable: false, rgb: false, sensor: null },
   );
-  const [sensorKind,  setSensorKind]  = useState<SensorKind>(
-    config?.sensorKind
-    ?? (SENSOR_PRESETS.find((p) => p.backendId === device?.capabilities.sensor)?.id ?? "temperature"),
+  const [sensorKind, setSensorKind] = useState<SensorKind>(
+    config?.sensorKind ??
+      SENSOR_PRESETS.find((p) => p.backendId === device?.capabilities.sensor)?.id ??
+      "temperature",
   );
   const [customSensor, setCustomSensor] = useState<string>(
-    (device?.capabilities.sensor && !SENSOR_PRESETS.some((p) => p.backendId === device.capabilities.sensor))
+    device?.capabilities.sensor &&
+      !SENSOR_PRESETS.some((p) => p.backendId === device.capabilities.sensor)
       ? device.capabilities.sensor
       : "",
   );
   const [displayName, setDisplayName] = useState(config?.displayName ?? "");
-  const [updateFreq,  setUpdateFreq]  = useState<number>(
+  const [updateFreq, setUpdateFreq] = useState<number>(
     config?.updateFreqS ?? SENSOR_FREQ_REC[sensorKind].value,
   );
-  const [showGraph,   setShowGraph]   = useState<boolean>(config?.showGraph ?? false);
+  const [showGraph, setShowGraph] = useState<boolean>(config?.showGraph ?? false);
 
   // transport state ─────────────────────────────────────────────────
   const [transportType, setTransportType] = useState<TransportType>("mqtt");
-  const [transportId,   setTransportId]   = useState(device?.transport ?? "esp32_mqtt");
-  const [serialPort,    setSerialPort]    = useState("COM3");
-  const [serialBaud,    setSerialBaud]    = useState(9600);
-  const [mqttHost,      setMqttHost]      = useState("broker.hivemq.com");
-  const [mqttPort,      setMqttPort]      = useState(1883);
+  const [transportId, setTransportId] = useState(device?.transport ?? "esp32_mqtt");
+  const [serialPort, setSerialPort] = useState("COM3");
+  const [serialBaud, setSerialBaud] = useState(9600);
+  const [mqttHost, setMqttHost] = useState("broker.hivemq.com");
+  const [mqttPort, setMqttPort] = useState(1883);
   // per-device transport-specific config
-  const [topicCommand,  setTopicCommand]  = useState("");
-  const [topicState,    setTopicState]    = useState("");
-  const [sensorField,   setSensorField]   = useState("");
-  const [payloadOn,     setPayloadOn]     = useState("ON");
-  const [payloadOff,    setPayloadOff]    = useState("OFF");
-  const [cmdOn,         setCmdOn]         = useState("");
-  const [cmdOff,        setCmdOff]        = useState("");
+  const [topicCommand, setTopicCommand] = useState("");
+  const [topicState, setTopicState] = useState("");
+  const [sensorField, setSensorField] = useState("");
+  const [payloadOn, setPayloadOn] = useState("ON");
+  const [payloadOff, setPayloadOff] = useState("OFF");
+  const [cmdOn, setCmdOn] = useState("");
+  const [cmdOff, setCmdOff] = useState("");
   const [serialSensorPrefix, setSerialSensorPrefix] = useState("");
 
   // backend full config (para listar transports existentes en custom)
@@ -163,11 +179,18 @@ export function DeviceFormModal({
   // y si "config" estuviera en deps, el reset borraría lo que el usuario
   // acaba de cambiar — bug clásico).
   const configRef = useRef(config);
-  useEffect(() => { configRef.current = config; }, [config]);
+  useEffect(() => {
+    configRef.current = config;
+  }, [config]);
 
   // bookkeeping
   const [submitting, setSubmitting] = useState(false);
-  const [errors, setErrors] = useState<{ name?: string; id?: string; transport?: string; submit?: string }>({});
+  const [errors, setErrors] = useState<{
+    name?: string;
+    id?: string;
+    transport?: string;
+    submit?: string;
+  }>({});
 
   /* ── reset SOLO cuando el modal se abre o cambia el device ───
    *  Importante: NO depende de `config` (lo leemos via configRef) — si
@@ -175,7 +198,7 @@ export function DeviceFormModal({
    *  que el usuario acaba de cambiar (p. ej. el transportType). */
   useEffect(() => {
     if (!open) return;
-    const cfg = configRef.current;   // snapshot fresco al abrir
+    const cfg = configRef.current; // snapshot fresco al abrir
 
     setKind(kindFromDevice(device, cfg));
     setName(device?.name ?? "");
@@ -183,11 +206,13 @@ export function DeviceFormModal({
     setIdTouched(!!device);
     setCaps(device?.capabilities ?? { on_off: true, dimmable: false, rgb: false, sensor: null });
     const sk =
-      cfg?.sensorKind
-      ?? (SENSOR_PRESETS.find((p) => p.backendId === device?.capabilities.sensor)?.id ?? "temperature");
+      cfg?.sensorKind ??
+      SENSOR_PRESETS.find((p) => p.backendId === device?.capabilities.sensor)?.id ??
+      "temperature";
     setSensorKind(sk);
     setCustomSensor(
-      device?.capabilities.sensor && !SENSOR_PRESETS.some((p) => p.backendId === device.capabilities.sensor)
+      device?.capabilities.sensor &&
+        !SENSOR_PRESETS.some((p) => p.backendId === device.capabilities.sensor)
         ? device.capabilities.sensor
         : "",
     );
@@ -197,11 +222,11 @@ export function DeviceFormModal({
 
     // Transport: usa el TYPE del transport actual del device si lo conocemos
     // (de fullCfg), si no cae en la heurística de bloques mqtt/serial del device.
-    const devMqtt   = isObj(device?.mqtt)   ? device!.mqtt!   : {};
+    const devMqtt = isObj(device?.mqtt) ? device!.mqtt! : {};
     const devSerial = isObj(device?.serial) ? device!.serial! : {};
-    if (Object.keys(devMqtt).length)        setTransportType("mqtt");
+    if (Object.keys(devMqtt).length) setTransportType("mqtt");
     else if (Object.keys(devSerial).length) setTransportType("serial");
-    else                                    setTransportType("mqtt");
+    else setTransportType("mqtt");
 
     setTransportId(device?.transport ?? "esp32_mqtt");
     setTopicCommand((devMqtt.topic_command as string) ?? "");
@@ -216,8 +241,10 @@ export function DeviceFormModal({
     setErrors({});
 
     // Cargar el config completo del backend para conocer transports existentes
-    api.iotConfig().then(setFullCfg).catch(() => setFullCfg(null));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    api
+      .iotConfig()
+      .then(setFullCfg)
+      .catch(() => setFullCfg(null));
   }, [open, device]);
 
   // Cuando el usuario elige un transport existente, precarga su host/port
@@ -239,7 +266,9 @@ export function DeviceFormModal({
   // un device con bloque mqtt+serial cargado se vería siempre como mqtt
   // aunque su transport sea de tipo serial.
   const transportReconciled = useRef(false);
-  useEffect(() => { transportReconciled.current = false; }, [open, device]);
+  useEffect(() => {
+    transportReconciled.current = false;
+  }, [open, device]);
   useEffect(() => {
     if (!open || !device || !fullCfg) return;
     if (transportReconciled.current) return;
@@ -273,16 +302,30 @@ export function DeviceFormModal({
     }
     window.clearTimeout(autoSaveTimer.current);
     autoSaveTimer.current = window.setTimeout(() => {
-      onSubmitConfig(device.id, {
-        displayName: displayName.trim() || undefined,
-        updateFreqS: updateFreq,
-        showGraph,
-        sensorKind,
-        kind,
-      }, displayName.trim() || undefined);
+      onSubmitConfig(
+        device.id,
+        {
+          displayName: displayName.trim() || undefined,
+          updateFreqS: updateFreq,
+          showGraph,
+          sensorKind,
+          kind,
+        },
+        displayName.trim() || undefined,
+      );
     }, 250);
     return () => window.clearTimeout(autoSaveTimer.current);
-  }, [open, isBackendEdit, device, displayName, updateFreq, showGraph, sensorKind, kind, onSubmitConfig]);
+  }, [
+    open,
+    isBackendEdit,
+    device,
+    displayName,
+    updateFreq,
+    showGraph,
+    sensorKind,
+    kind,
+    onSubmitConfig,
+  ]);
 
   // Cuando se cierra el modal, resetea la guard de first-render para
   // que la próxima apertura no auto-guarde un cambio fantasma
@@ -302,7 +345,12 @@ export function DeviceFormModal({
     } else if (k === "switch") {
       setCaps({ on_off: true, dimmable: false, rgb: false, sensor: null });
     } else if (k === "sensor") {
-      setCaps({ on_off: false, dimmable: false, rgb: false, sensor: SENSOR_PRESETS.find((p) => p.id === sensorKind)?.backendId || "temperature" });
+      setCaps({
+        on_off: false,
+        dimmable: false,
+        rgb: false,
+        sensor: SENSOR_PRESETS.find((p) => p.id === sensorKind)?.backendId || "temperature",
+      });
       setShowGraph(true);
     } else {
       setCaps({ on_off: true, dimmable: false, rgb: false, sensor: null });
@@ -314,7 +362,12 @@ export function DeviceFormModal({
   function toggleCap(k: keyof IoTCapabilities) {
     setCaps((c) => {
       if (k === "sensor") {
-        return { ...c, sensor: c.sensor ? null : (SENSOR_PRESETS.find((p) => p.id === sensorKind)?.backendId || "temperature") };
+        return {
+          ...c,
+          sensor: c.sensor
+            ? null
+            : SENSOR_PRESETS.find((p) => p.id === sensorKind)?.backendId || "temperature",
+        };
       }
       return { ...c, [k]: !c[k] };
     });
@@ -327,22 +380,25 @@ export function DeviceFormModal({
     const finalId = id.trim() || slugify(name);
 
     if (!name.trim()) errs.name = "Pon un nombre.";
-    if (!finalId)     errs.id   = "Necesita un identificador.";
+    if (!finalId) errs.id = "Necesita un identificador.";
     if (finalId && /[^a-z0-9_]/i.test(finalId)) errs.id = "Solo letras, números y _.";
 
     if (transportType !== "custom" && !transportId.trim()) {
       errs.transport = "Necesita un ID de transporte.";
     }
 
-    if (Object.keys(errs).length) { setErrors(errs); return false; }
+    if (Object.keys(errs).length) {
+      setErrors(errs);
+      return false;
+    }
 
     setSubmitting(true);
     try {
       // 1. Si vamos a crear/actualizar un transport, hazlo primero
       if (transportType === "mqtt") {
         const tBody: IoTTransportBody = {
-          type:      "mqtt",
-          host:      mqttHost.trim(),
+          type: "mqtt",
+          host: mqttHost.trim(),
           mqtt_port: mqttPort,
           client_id: "orion",
         };
@@ -358,15 +414,15 @@ export function DeviceFormModal({
 
       // 2. Capabilities finales
       const finalSensor = isSensor
-        ? (sensorKind === "custom"
-            ? (customSensor.trim() || "custom")
-            : SENSOR_PRESETS.find((p) => p.id === sensorKind)?.backendId || "custom")
+        ? sensorKind === "custom"
+          ? customSensor.trim() || "custom"
+          : SENSOR_PRESETS.find((p) => p.id === sensorKind)?.backendId || "custom"
         : null;
       const finalCaps: IoTCapabilities = {
-        on_off:   isSensor ? false : !!caps.on_off,
+        on_off: isSensor ? false : !!caps.on_off,
         dimmable: isSensor ? false : !!caps.dimmable,
-        rgb:      isSensor ? false : !!caps.rgb,
-        sensor:   finalSensor,
+        rgb: isSensor ? false : !!caps.rgb,
+        sensor: finalSensor,
       };
 
       // 3. Construimos AMBOS bloques (mqtt y serial) desde el estado actual
@@ -377,15 +433,15 @@ export function DeviceFormModal({
       const serialBlock: Record<string, unknown> = {};
 
       if (topicCommand.trim()) mqttBlock.topic_command = topicCommand.trim();
-      if (topicState.trim())   mqttBlock.topic_state   = topicState.trim();
-      if (sensorField.trim())  mqttBlock.sensor_field  = sensorField.trim();
+      if (topicState.trim()) mqttBlock.topic_state = topicState.trim();
+      if (sensorField.trim()) mqttBlock.sensor_field = sensorField.trim();
       if (finalCaps.on_off) {
-        mqttBlock.payload_on  = payloadOn  || "ON";
+        mqttBlock.payload_on = payloadOn || "ON";
         mqttBlock.payload_off = payloadOff || "OFF";
       }
 
       if (finalCaps.on_off) {
-        serialBlock.cmd_on  = cmdOn  || `${finalId.toUpperCase()}_ON`;
+        serialBlock.cmd_on = cmdOn || `${finalId.toUpperCase()}_ON`;
         serialBlock.cmd_off = cmdOff || `${finalId.toUpperCase()}_OFF`;
       }
       if (finalCaps.sensor && serialSensorPrefix.trim()) {
@@ -393,10 +449,10 @@ export function DeviceFormModal({
       }
 
       const body: IoTDeviceBody = {
-        name:         name.trim(),
-        transport:    transportId.trim(),
+        name: name.trim(),
+        transport: transportId.trim(),
         capabilities: finalCaps,
-        ...(Object.keys(mqttBlock).length   && { mqtt:   mqttBlock   }),
+        ...(Object.keys(mqttBlock).length && { mqtt: mqttBlock }),
         ...(Object.keys(serialBlock).length && { serial: serialBlock }),
       };
 
@@ -410,8 +466,8 @@ export function DeviceFormModal({
       onSubmitConfig(finalId, {
         displayName: displayName.trim() || undefined,
         updateFreqS: updateFreq,
-        showGraph:   isSensor ? showGraph : false,
-        sensorKind:  isSensor ? sensorKind : undefined,
+        showGraph: isSensor ? showGraph : false,
+        sensorKind: isSensor ? sensorKind : undefined,
         kind,
       });
 
@@ -424,18 +480,45 @@ export function DeviceFormModal({
       setSubmitting(false);
     }
   }, [
-    id, name, transportType, transportId,
-    mqttHost, mqttPort, serialPort, serialBaud,
-    topicCommand, topicState, sensorField, payloadOn, payloadOff, cmdOn, cmdOff, serialSensorPrefix,
-    caps, isSensor, sensorKind, customSensor,
-    displayName, updateFreq, showGraph,
-    mode, device, onSaved, onSubmitConfig,
+    id,
+    name,
+    transportType,
+    transportId,
+    mqttHost,
+    mqttPort,
+    serialPort,
+    serialBaud,
+    topicCommand,
+    topicState,
+    sensorField,
+    payloadOn,
+    payloadOff,
+    cmdOn,
+    cmdOff,
+    serialSensorPrefix,
+    caps,
+    isSensor,
+    sensorKind,
+    customSensor,
+    displayName,
+    updateFreq,
+    showGraph,
+    mode,
+    device,
+    kind,
+    onSaved,
+    onSubmitConfig,
   ]);
 
   /* ── borrar device del backend ───────────────────────────────── */
   async function deleteFromBackend() {
     if (!device) return;
-    if (!confirm(`¿Borrar el dispositivo "${device.name}" del backend?\n\nEsto edita iot_config.json y reinicia las conexiones del transport.`)) return;
+    if (
+      !confirm(
+        `¿Borrar el dispositivo "${device.name}" del backend?\n\nEsto edita iot_config.json y reinicia las conexiones del transport.`,
+      )
+    )
+      return;
     setSubmitting(true);
     try {
       await api.iotDeleteDevice(device.id);
@@ -486,7 +569,9 @@ export function DeviceFormModal({
     <>
       {(mode === "edit-local" || mode === "edit-backend") && (
         <Button
-          variant="danger" size="md" icon="trash"
+          variant="danger"
+          size="md"
+          icon="trash"
           disabled={submitting}
           onClick={() => {
             if (mode === "edit-local" && onDeleteLocal) {
@@ -503,9 +588,10 @@ export function DeviceFormModal({
           Borrar
         </Button>
       )}
-      <Button variant="ghost" size="md" onClick={onClose} disabled={submitting}>Cancelar</Button>
-      <Button variant="primary" size="md" icon="save"
-              onClick={submit} loading={submitting}>
+      <Button variant="ghost" size="md" onClick={onClose} disabled={submitting}>
+        Cancelar
+      </Button>
+      <Button variant="primary" size="md" icon="save" onClick={submit} loading={submitting}>
         {mode === "create" ? "Crear dispositivo" : "Guardar cambios"}
       </Button>
     </>
@@ -515,18 +601,23 @@ export function DeviceFormModal({
     <Modal
       open={open}
       onClose={onClose}
-      eyebrow={mode === "create" ? "Nuevo dispositivo" : isLocal ? "Editar (local)" : "Editar dispositivo"}
+      eyebrow={
+        mode === "create" ? "Nuevo dispositivo" : isLocal ? "Editar (local)" : "Editar dispositivo"
+      }
       title={
         mode === "create"
           ? "Añadir un dispositivo IoT"
-          : (displayName || device?.name || "Dispositivo")
+          : displayName || device?.name || "Dispositivo"
       }
       size="lg"
       footer={footer}
     >
       <div className="space-y-6">
         {errors.submit && (
-          <Surface level={2} className="flex items-start gap-3 p-3 border border-danger/30 bg-danger/10">
+          <Surface
+            level={2}
+            className="flex items-start gap-3 p-3 border border-danger/30 bg-danger/10"
+          >
             <Icon name="alert" size={14} className="text-danger shrink-0 mt-0.5" />
             <span className="text-xs text-danger">{errors.submit}</span>
           </Surface>
@@ -539,8 +630,8 @@ export function DeviceFormModal({
               Los cambios de <b>frecuencia</b>, <b>gráfico</b> y <b>nombre visible</b> se guardan
               automáticamente al instante (no necesitas el botón). El botón
               <b> Guardar cambios</b> aplica modificaciones de transporte y capabilities al
-              <code className="mx-1 font-mono">iot_config.json</code>
-              y reconecta el transport en caliente.
+              <code className="mx-1 font-mono">iot_config.json</code>y reconecta el transport en
+              caliente.
             </p>
           </Surface>
         )}
@@ -562,8 +653,7 @@ export function DeviceFormModal({
                       : "bg-elevated/40 border-white/[0.06] hover:border-white/[0.14]",
                   ].join(" ")}
                 >
-                  <Icon name={k.icon} size={18}
-                        className={active ? "text-pri" : "text-text-dim"} />
+                  <Icon name={k.icon} size={18} className={active ? "text-pri" : "text-text-dim"} />
                   <div className="mt-2 text-sm font-medium text-text leading-tight">{k.label}</div>
                   <div className="text-[10px] text-muted mt-0.5">{k.hint}</div>
                 </button>
@@ -585,7 +675,10 @@ export function DeviceFormModal({
           <Field label="Identificador" hint="usa snake_case" error={errors.id}>
             <TextInput
               value={id}
-              onChange={(e) => { setId(slugify(e.target.value)); setIdTouched(true); }}
+              onChange={(e) => {
+                setId(slugify(e.target.value));
+                setIdTouched(true);
+              }}
               placeholder="foco_salon"
               disabled={mode !== "create"}
             />
@@ -614,7 +707,7 @@ export function DeviceFormModal({
                   onClick={() => {
                     setTransportType(t.id);
                     // Sugerir un transport_id sensato según el tipo
-                    if (t.id === "mqtt"   && !device) setTransportId("esp32_mqtt");
+                    if (t.id === "mqtt" && !device) setTransportId("esp32_mqtt");
                     if (t.id === "serial" && !device) setTransportId("main_arduino");
                   }}
                   className={[
@@ -625,7 +718,11 @@ export function DeviceFormModal({
                   ].join(" ")}
                 >
                   <div className="flex items-center gap-2">
-                    <Icon name={t.icon} size={16} className={active ? "text-pri" : "text-text-dim"} />
+                    <Icon
+                      name={t.icon}
+                      size={16}
+                      className={active ? "text-pri" : "text-text-dim"}
+                    />
                     <span className="text-sm font-medium text-text">{t.label}</span>
                   </div>
                   <div className="text-[10px] text-muted mt-1">{t.hint}</div>
@@ -639,7 +736,11 @@ export function DeviceFormModal({
         {transportType !== "custom" && (
           <Surface level={2} className="p-4 space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-              <Field label="ID del transport" hint="se reutiliza entre dispositivos" error={errors.transport}>
+              <Field
+                label="ID del transport"
+                hint="se reutiliza entre dispositivos"
+                error={errors.transport}
+              >
                 <TextInput
                   value={transportId}
                   onChange={(e) => setTransportId(slugify(e.target.value))}
@@ -675,7 +776,12 @@ export function DeviceFormModal({
                     <NumInput value={serialBaud} onChange={setSerialBaud} min={300} max={1000000} />
                     <div className="mt-2 flex flex-wrap gap-1.5">
                       {[9600, 19200, 38400, 57600, 115200].map((v) => (
-                        <QuickPick key={v} active={serialBaud === v} onClick={() => setSerialBaud(v)} label={`${v}`} />
+                        <QuickPick
+                          key={v}
+                          active={serialBaud === v}
+                          onClick={() => setSerialBaud(v)}
+                          label={`${v}`}
+                        />
                       ))}
                     </div>
                   </Field>
@@ -696,7 +802,8 @@ export function DeviceFormModal({
               <div className="mt-2 flex flex-wrap gap-1.5">
                 {Object.keys(fullCfg.transports).map((tid) => (
                   <QuickPick
-                    key={tid} active={transportId === tid}
+                    key={tid}
+                    active={transportId === tid}
                     onClick={() => setTransportId(tid)}
                     label={`${tid} · ${fullCfg.transports[tid].type as string}`}
                   />
@@ -709,9 +816,11 @@ export function DeviceFormModal({
         {/* TOPICS / COMANDOS específicos del device en este transport */}
         {transportType === "mqtt" && (
           <Surface level={2} className="p-4 space-y-3">
-            <div className="text-[11px] uppercase tracking-[0.18em] text-text-dim">Topics MQTT del dispositivo</div>
+            <div className="text-[11px] uppercase tracking-[0.18em] text-text-dim">
+              Topics MQTT del dispositivo
+            </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {(!isSensor) && (
+              {!isSensor && (
                 <Field label="Topic de comandos" hint="ORION publica aquí">
                   <TextInput
                     value={topicCommand}
@@ -720,15 +829,23 @@ export function DeviceFormModal({
                   />
                 </Field>
               )}
-              <Field label="Topic de estado / sensor" hint={isSensor ? "ESP32 publica aquí" : "ESP32 confirma su estado"}>
+              <Field
+                label="Topic de estado / sensor"
+                hint={isSensor ? "ESP32 publica aquí" : "ESP32 confirma su estado"}
+              >
                 <TextInput
                   value={topicState}
                   onChange={(e) => setTopicState(e.target.value)}
-                  placeholder={isSensor ? "orion/zahir/esp_sensores/dht" : "orion/zahir/foco_1/state"}
+                  placeholder={
+                    isSensor ? "orion/zahir/esp_sensores/dht" : "orion/zahir/foco_1/state"
+                  }
                 />
               </Field>
               {isSensor && (
-                <Field label="Campo JSON (opcional)" hint="si el payload es JSON y quieres un campo">
+                <Field
+                  label="Campo JSON (opcional)"
+                  hint="si el payload es JSON y quieres un campo"
+                >
                   <TextInput
                     value={sensorField}
                     onChange={(e) => setSensorField(e.target.value)}
@@ -752,13 +869,23 @@ export function DeviceFormModal({
 
         {transportType === "serial" && !isSensor && (
           <Surface level={2} className="p-4">
-            <div className="text-[11px] uppercase tracking-[0.18em] text-text-dim mb-3">Comandos serial</div>
+            <div className="text-[11px] uppercase tracking-[0.18em] text-text-dim mb-3">
+              Comandos serial
+            </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <Field label="Comando encender">
-                <TextInput value={cmdOn}  onChange={(e) => setCmdOn(e.target.value)}  placeholder="FOCO1_ON" />
+                <TextInput
+                  value={cmdOn}
+                  onChange={(e) => setCmdOn(e.target.value)}
+                  placeholder="FOCO1_ON"
+                />
               </Field>
               <Field label="Comando apagar">
-                <TextInput value={cmdOff} onChange={(e) => setCmdOff(e.target.value)} placeholder="FOCO1_OFF" />
+                <TextInput
+                  value={cmdOff}
+                  onChange={(e) => setCmdOff(e.target.value)}
+                  placeholder="FOCO1_OFF"
+                />
               </Field>
             </div>
           </Surface>
@@ -766,7 +893,9 @@ export function DeviceFormModal({
 
         {transportType === "serial" && isSensor && (
           <Surface level={2} className="p-4">
-            <div className="text-[11px] uppercase tracking-[0.18em] text-text-dim mb-3">Lectura serial del sensor</div>
+            <div className="text-[11px] uppercase tracking-[0.18em] text-text-dim mb-3">
+              Lectura serial del sensor
+            </div>
             <Field
               label="Prefijo de la lectura"
               hint="texto antes de ':' que envía el Arduino. Ej: TEMPERATURA → TEMPERATURA:23.5"
@@ -778,9 +907,10 @@ export function DeviceFormModal({
               />
             </Field>
             <p className="text-[11px] text-text-dim mt-2 leading-relaxed">
-              Si lo dejas vacío, ORION usa el ID en mayúsculas como prefijo
-              (<code className="text-acc font-mono">{(id || "SENSOR").toUpperCase()}</code>).
-              Debe coincidir <i>exactamente</i> con lo que tu sketch imprime por <code className="text-acc font-mono">Serial.print()</code>.
+              Si lo dejas vacío, ORION usa el ID en mayúsculas como prefijo (
+              <code className="text-acc font-mono">{(id || "SENSOR").toUpperCase()}</code>). Debe
+              coincidir <i>exactamente</i> con lo que tu sketch imprime por{" "}
+              <code className="text-acc font-mono">Serial.print()</code>.
             </p>
           </Surface>
         )}
@@ -791,10 +921,25 @@ export function DeviceFormModal({
           hint={isSensor ? "Los sensores no controlan; solo leen" : "Marca todo lo que aplique"}
         >
           <div className="flex flex-wrap gap-2">
-            <CapChip label="On / Off"     active={!!caps.on_off}   disabled={isSensor}  onClick={() => toggleCap("on_off")} />
-            <CapChip label="Regulable"    active={!!caps.dimmable} disabled={isSensor}  onClick={() => toggleCap("dimmable")} />
-            <CapChip label="RGB"          active={!!caps.rgb}      disabled={isSensor}  onClick={() => toggleCap("rgb")} />
-            <CapChip label="Sensor"       active={!!caps.sensor}   onClick={() => toggleCap("sensor")} />
+            <CapChip
+              label="On / Off"
+              active={!!caps.on_off}
+              disabled={isSensor}
+              onClick={() => toggleCap("on_off")}
+            />
+            <CapChip
+              label="Regulable"
+              active={!!caps.dimmable}
+              disabled={isSensor}
+              onClick={() => toggleCap("dimmable")}
+            />
+            <CapChip
+              label="RGB"
+              active={!!caps.rgb}
+              disabled={isSensor}
+              onClick={() => toggleCap("rgb")}
+            />
+            <CapChip label="Sensor" active={!!caps.sensor} onClick={() => toggleCap("sensor")} />
           </div>
         </Field>
 
@@ -843,14 +988,20 @@ export function DeviceFormModal({
                   <NumInput
                     value={updateFreq}
                     onChange={(n) => setUpdateFreq(Math.max(0.1, n))}
-                    min={0.1} step={0.5} className="w-28"
+                    min={0.1}
+                    step={0.5}
+                    className="w-28"
                   />
                   <span className="text-xs text-text-dim">segundos</span>
                 </div>
                 <div className="mt-2 flex flex-wrap gap-1.5">
                   {[1, 5, 10, 30, 60, 300].map((v) => (
-                    <QuickPick key={v} active={updateFreq === v} onClick={() => setUpdateFreq(v)}
-                               label={v < 60 ? `${v}s` : `${v / 60}m`} />
+                    <QuickPick
+                      key={v}
+                      active={updateFreq === v}
+                      onClick={() => setUpdateFreq(v)}
+                      label={v < 60 ? `${v}s` : `${v / 60}m`}
+                    />
                   ))}
                   <button
                     type="button"
@@ -863,10 +1014,7 @@ export function DeviceFormModal({
                 </div>
               </Field>
 
-              <Field
-                label="Mostrar gráfico"
-                hint="Sparkline en la tarjeta"
-              >
+              <Field label="Mostrar gráfico" hint="Sparkline en la tarjeta">
                 <Surface level={2} className="flex items-center justify-between px-3.5 h-10">
                   <span className="inline-flex items-center gap-2 text-sm text-text">
                     <Icon name="chart-line" size={14} className="text-pri" />
@@ -886,14 +1034,20 @@ export function DeviceFormModal({
               <NumInput
                 value={updateFreq}
                 onChange={(n) => setUpdateFreq(Math.max(0.1, n))}
-                min={0.1} step={0.5} className="w-28"
+                min={0.1}
+                step={0.5}
+                className="w-28"
               />
               <span className="text-xs text-text-dim">segundos</span>
             </div>
             <div className="mt-2 flex flex-wrap gap-1.5">
               {[1, 5, 10, 30, 60].map((v) => (
-                <QuickPick key={v} active={updateFreq === v} onClick={() => setUpdateFreq(v)}
-                           label={v < 60 ? `${v}s` : `${v / 60}m`} />
+                <QuickPick
+                  key={v}
+                  active={updateFreq === v}
+                  onClick={() => setUpdateFreq(v)}
+                  label={v < 60 ? `${v}s` : `${v / 60}m`}
+                />
               ))}
             </div>
           </Field>
@@ -910,10 +1064,12 @@ function readOnlyBackendBadges(device: IoTDevice | LocalDevice | undefined, mode
   return (
     <Field label="Capacidades reales del backend (lectura)">
       <div className="flex flex-wrap gap-1.5">
-        {device.capabilities.on_off   && <Badge tone="info">on/off</Badge>}
+        {device.capabilities.on_off && <Badge tone="info">on/off</Badge>}
         {device.capabilities.dimmable && <Badge tone="accent">dim</Badge>}
-        {device.capabilities.rgb      && <Badge tone="neutral">rgb</Badge>}
-        {device.capabilities.sensor   && <Badge tone="warn">sensor · {device.capabilities.sensor}</Badge>}
+        {device.capabilities.rgb && <Badge tone="neutral">rgb</Badge>}
+        {device.capabilities.sensor && (
+          <Badge tone="warn">sensor · {device.capabilities.sensor}</Badge>
+        )}
       </div>
     </Field>
   );
@@ -921,11 +1077,18 @@ function readOnlyBackendBadges(device: IoTDevice | LocalDevice | undefined, mode
 
 /* ── helpers visuales ─────────────────────────────────────────────── */
 function NumInput({
-  value, onChange, min, max, step, className,
+  value,
+  onChange,
+  min,
+  max,
+  step,
+  className,
 }: {
   value: number;
   onChange: (n: number) => void;
-  min?: number; max?: number; step?: number;
+  min?: number;
+  max?: number;
+  step?: number;
   className?: string;
 }) {
   return (
@@ -934,7 +1097,10 @@ function NumInput({
       value={Number.isFinite(value) ? value : ""}
       onChange={(e) => {
         const raw = e.target.value;
-        if (raw === "") { onChange(0); return; }
+        if (raw === "") {
+          onChange(0);
+          return;
+        }
         const n = Number(raw);
         if (Number.isNaN(n)) return;
         let v = n;
@@ -951,8 +1117,14 @@ function NumInput({
 }
 
 function QuickPick({
-  active, onClick, label,
-}: { active: boolean; onClick: () => void; label: string }) {
+  active,
+  onClick,
+  label,
+}: {
+  active: boolean;
+  onClick: () => void;
+  label: string;
+}) {
   return (
     <button
       type="button"
@@ -970,8 +1142,16 @@ function QuickPick({
 }
 
 function CapChip({
-  label, active, disabled, onClick,
-}: { label: string; active: boolean; disabled?: boolean; onClick: () => void }) {
+  label,
+  active,
+  disabled,
+  onClick,
+}: {
+  label: string;
+  active: boolean;
+  disabled?: boolean;
+  onClick: () => void;
+}) {
   return (
     <button
       type="button"
@@ -990,9 +1170,11 @@ function CapChip({
       <span
         className={[
           "h-2 w-2 rounded-full transition-colors",
-          disabled ? "bg-white/[0.08]"
-                   : active ? "bg-pri shadow-[0_0_8px_rgb(var(--orion-pri))]"
-                            : "bg-white/[0.15]",
+          disabled
+            ? "bg-white/[0.08]"
+            : active
+              ? "bg-pri shadow-[0_0_8px_rgb(var(--orion-pri))]"
+              : "bg-white/[0.15]",
         ].join(" ")}
       />
       {label}

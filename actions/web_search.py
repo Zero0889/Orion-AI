@@ -1,17 +1,15 @@
-#web_search.py
-from config import get_api_key
+# web_search.py
 from utils.cache import ttl_cache
 
 
 # El cache se aplica a las funciones internas (no al wrapper público) para
 # que también beneficie a las llamadas internas de _compare(). 5 minutos es
 # suficiente para evitar repetir la misma búsqueda en una sesión.
-@ttl_cache(ttl_seconds=300, max_entries=64,
-           skip_if=lambda r: not r or len(str(r)) < 20)
+@ttl_cache(ttl_seconds=300, max_entries=64, skip_if=lambda r: not r or len(str(r)) < 20)
 def _gemini_search(query: str) -> str:
     from core import gemini
 
-    client   = gemini.get_client()
+    client = gemini.get_client()
     response = client.models.generate_content(
         model="gemini-2.5-flash",
         contents=query,
@@ -29,8 +27,7 @@ def _gemini_search(query: str) -> str:
     return text
 
 
-@ttl_cache(ttl_seconds=300, max_entries=64,
-           skip_if=lambda r: not r)
+@ttl_cache(ttl_seconds=300, max_entries=64, skip_if=lambda r: not r)
 def _ddg_search(query: str, max_results: int = 6) -> list[dict]:
     try:
         from ddgs import DDGS
@@ -40,11 +37,13 @@ def _ddg_search(query: str, max_results: int = 6) -> list[dict]:
     results = []
     with DDGS() as ddgs:
         for r in ddgs.text(query, max_results=max_results):
-            results.append({
-                "title":   r.get("title",  ""),
-                "snippet": r.get("body",   ""),
-                "url":     r.get("href",   ""),
-            })
+            results.append(
+                {
+                    "title": r.get("title", ""),
+                    "snippet": r.get("body", ""),
+                    "url": r.get("href", ""),
+                }
+            )
     return results
 
 
@@ -54,11 +53,15 @@ def _format_ddg(query: str, results: list[dict]) -> str:
 
     lines = [f"Resultados de búsqueda para: {query}\n"]
     for i, r in enumerate(results, 1):
-        if r.get("title"):   lines.append(f"{i}. {r['title']}")
-        if r.get("snippet"): lines.append(f"   {r['snippet']}")
-        if r.get("url"):     lines.append(f"   {r['url']}")
+        if r.get("title"):
+            lines.append(f"{i}. {r['title']}")
+        if r.get("snippet"):
+            lines.append(f"   {r['snippet']}")
+        if r.get("url"):
+            lines.append(f"   {r['url']}")
         lines.append("")
     return "\n".join(lines).strip()
+
 
 def _compare(items: list[str], aspect: str) -> str:
     query = (
@@ -86,16 +89,17 @@ def _compare(items: list[str], aspect: str) -> str:
                 lines.append(f"  • {r['snippet']}")
     return "\n".join(lines)
 
+
 def web_search(
-    parameters:     dict,
+    parameters: dict,
     response=None,
     player=None,
     session_memory=None,
 ) -> str:
     params = parameters or {}
-    query  = params.get("query", "").strip()
-    mode   = params.get("mode",  "search").lower().strip()
-    items  = params.get("items", [])
+    query = params.get("query", "").strip()
+    mode = params.get("mode", "search").lower().strip()
+    items = params.get("items", [])
     aspect = params.get("aspect", "general").strip() or "general"
 
     if not query and not items:
@@ -124,7 +128,7 @@ def web_search(
         except Exception as e:
             print(f"[WebSearch] ⚠️ Gemini falló ({e}) — intentando con DDG...")
             results = _ddg_search(query)
-            result  = _format_ddg(query, results)
+            result = _format_ddg(query, results)
             print(f"[WebSearch] ✅ DDG: {len(results)} resultado(s).")
             return result
 

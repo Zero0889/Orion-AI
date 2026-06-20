@@ -1,0 +1,26 @@
+# Configuración de gitleaks para O.R.I.O.N
+# Extiende los defaults de gitleaks (no los reemplaza).
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Falsos positivos conocidos en el repo"
+
+# Archivos que son SCHEMAS o EJEMPLOS — no contienen secretos reales.
+paths = [
+    '''(.*?)\.example\.json$''',
+    '''^memory/long_term\.json$''',     # solo notas de usuario
+    '''^config/iot_config\.json$''',    # tokens MQTT son por dispositivo, no API keys
+    '''^config/iot_sheets\.json$''',
+    '''^config/notifications\.json$''',
+    '''^config/sharing\.json$''',
+    '''^skills-lock\.json$''',
+    '''^.*\.bak\.json$''',
+    '''^web/package-lock\.json$''',
+    '''^web/src/lib/markdown\.tsx$''',  # contiene strings que parecen tokens (sanitizer)
+]
+
+# NOTA: NO whitelisteamos patrones de Google API key (AIza*), tokens OAuth
+# ni JWTs. Si gitleaks marca un falso positivo, agregar el ARCHIVO concreto
+# a `paths` arriba — nunca el patrón global.

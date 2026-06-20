@@ -13,24 +13,37 @@ from __future__ import annotations
 
 import json
 import re
-from typing import Optional
 
 from .config import IoTConfig
 from .devices import Device
 
-
 # ── Normalización de texto (números en palabras, ruido del STT) ─────────────
 
 _NUM_WORDS = {
-    r"\buno\b": "1",  r"\buna\b": "1",  r"\bun\b": "1",
-    r"\bdos\b": "2",  r"\btres\b": "3",  r"\bcuatro\b": "4",
-    r"\bcinco\b": "5", r"\bseis\b": "6",  r"\bsiete\b": "7",
-    r"\bocho\b": "8", r"\bnueve\b": "9", r"\bdiez\b": "10",
-    r"\bonce\b": "11", r"\bdoce\b": "12", r"\bquince\b": "15",
-    r"\bveinte\b": "20", r"\btreinta\b": "30",
-    r"\bcuarenta\b": "40", r"\bcincuenta\b": "50",
-    r"\bsesenta\b": "60", r"\bsetenta\b": "70",
-    r"\bochenta\b": "80", r"\bnoventa\b": "90", r"\bcien\b": "100",
+    r"\buno\b": "1",
+    r"\buna\b": "1",
+    r"\bun\b": "1",
+    r"\bdos\b": "2",
+    r"\btres\b": "3",
+    r"\bcuatro\b": "4",
+    r"\bcinco\b": "5",
+    r"\bseis\b": "6",
+    r"\bsiete\b": "7",
+    r"\bocho\b": "8",
+    r"\bnueve\b": "9",
+    r"\bdiez\b": "10",
+    r"\bonce\b": "11",
+    r"\bdoce\b": "12",
+    r"\bquince\b": "15",
+    r"\bveinte\b": "20",
+    r"\btreinta\b": "30",
+    r"\bcuarenta\b": "40",
+    r"\bcincuenta\b": "50",
+    r"\bsesenta\b": "60",
+    r"\bsetenta\b": "70",
+    r"\bochenta\b": "80",
+    r"\bnoventa\b": "90",
+    r"\bcien\b": "100",
 }
 
 
@@ -38,7 +51,7 @@ def normalize(text: str) -> str:
     """Limpieza ligera para que las reglas locales tengan más chance."""
     text = (text or "").lower().strip()
     # Errores típicos del STT con "segundos"
-    text = text.replace("segun2",  "segundos")
+    text = text.replace("segun2", "segundos")
     text = text.replace("segun dos", "segundos")
     for pat, num in _NUM_WORDS.items():
         text = re.sub(pat, num, text)
@@ -54,7 +67,7 @@ _DUR_RE = re.compile(
 )
 
 
-def parse_duration(text: str) -> tuple[Optional[int], str]:
+def parse_duration(text: str) -> tuple[int | None, str]:
     """Extrae duración en SEGUNDOS y devuelve (segundos, texto_sin_duración)."""
     m = _DUR_RE.search(text)
     if not m:
@@ -76,7 +89,7 @@ _PCT_RE = re.compile(r"\b(\d{1,3})\s*%")
 _AT_LEVEL_RE = re.compile(r"\bal\s+(\d{1,3})\b")  # "pon el foco al 30"
 
 
-def parse_percent(text: str) -> Optional[int]:
+def parse_percent(text: str) -> int | None:
     """Devuelve el primer porcentaje 0-100 que encuentre, o None."""
     for pattern in (_PCT_RE, _AT_LEVEL_RE):
         m = pattern.search(text)
@@ -90,23 +103,33 @@ def parse_percent(text: str) -> Optional[int]:
 # ── Parseo de color (palabras + hex) ────────────────────────────────────────
 
 _COLOR_WORDS: dict[str, tuple[int, int, int]] = {
-    "blanco":   (255, 255, 255), "negro":    (0,   0,   0),
-    "rojo":     (255, 0,   0),   "verde":    (0,   255, 0),
-    "azul":     (0,   0,   255), "amarillo": (255, 255, 0),
-    "cian":     (0,   255, 255), "magenta":  (255, 0,   255),
-    "rosa":     (255, 105, 180), "naranja":  (255, 140, 0),
-    "morado":   (128, 0,   128), "violeta":  (148, 0,   211),
-    "turquesa": (64,  224, 208), "lima":     (50,  205, 50),
-    "celeste":  (135, 206, 235), "ambar":    (255, 191, 0),
-    "ámbar":    (255, 191, 0),   "calido":   (255, 197, 143),
-    "cálido":   (255, 197, 143), "frio":     (180, 220, 255),
-    "frío":     (180, 220, 255),
+    "blanco": (255, 255, 255),
+    "negro": (0, 0, 0),
+    "rojo": (255, 0, 0),
+    "verde": (0, 255, 0),
+    "azul": (0, 0, 255),
+    "amarillo": (255, 255, 0),
+    "cian": (0, 255, 255),
+    "magenta": (255, 0, 255),
+    "rosa": (255, 105, 180),
+    "naranja": (255, 140, 0),
+    "morado": (128, 0, 128),
+    "violeta": (148, 0, 211),
+    "turquesa": (64, 224, 208),
+    "lima": (50, 205, 50),
+    "celeste": (135, 206, 235),
+    "ambar": (255, 191, 0),
+    "ámbar": (255, 191, 0),
+    "calido": (255, 197, 143),
+    "cálido": (255, 197, 143),
+    "frio": (180, 220, 255),
+    "frío": (180, 220, 255),
 }
 
 _HEX_RE = re.compile(r"#?([0-9a-f]{6})\b", re.IGNORECASE)
 
 
-def parse_color(text: str) -> Optional[tuple[int, int, int]]:
+def parse_color(text: str) -> tuple[int, int, int] | None:
     """Devuelve (r,g,b) si encuentra un color claro en el texto."""
     t = text.lower()
     for word, rgb in _COLOR_WORDS.items():
@@ -126,30 +149,54 @@ def parse_color(text: str) -> Optional[tuple[int, int, int]]:
 # ── Reglas globales (todo on/off) ───────────────────────────────────────────
 
 _ALL_OFF_PHRASES = [
-    "mucha luz", "demasiada luz", "mucho brillo", "ya hay luz",
-    "no necesito luz", "suficiente luz",
-    "apaga todo", "apaga todos", "apaga los focos",
-    "apagame todo", "apagame los focos",
-    "apaga la luz", "apaga las luces",
+    "mucha luz",
+    "demasiada luz",
+    "mucho brillo",
+    "ya hay luz",
+    "no necesito luz",
+    "suficiente luz",
+    "apaga todo",
+    "apaga todos",
+    "apaga los focos",
+    "apagame todo",
+    "apagame los focos",
+    "apaga la luz",
+    "apaga las luces",
 ]
 
 _ALL_ON_PHRASES = [
-    "esta oscuro", "está oscuro", "falta luz", "necesito luz",
-    "hay poca luz", "poca luz", "muy oscuro",
-    "no veo nada", "no se ve", "no se ve nada",
-    "prende todo", "prende todos", "prende los focos",
-    "enciende todo", "enciende todos", "enciende los focos",
-    "prendeme todo", "prendeme todos", "prendeme los focos",
-    "enciendeme todo", "enciendeme todos",
-    "prende la luz", "prende las luces",
-    "enciende la luz", "enciende las luces",
+    "esta oscuro",
+    "está oscuro",
+    "falta luz",
+    "necesito luz",
+    "hay poca luz",
+    "poca luz",
+    "muy oscuro",
+    "no veo nada",
+    "no se ve",
+    "no se ve nada",
+    "prende todo",
+    "prende todos",
+    "prende los focos",
+    "enciende todo",
+    "enciende todos",
+    "enciende los focos",
+    "prendeme todo",
+    "prendeme todos",
+    "prendeme los focos",
+    "enciendeme todo",
+    "enciendeme todos",
+    "prende la luz",
+    "prende las luces",
+    "enciende la luz",
+    "enciende las luces",
 ]
 
 
 # ── Resolución de dispositivo individual ────────────────────────────────────
 
 
-def find_device(text: str, cfg: IoTConfig) -> Optional[Device]:
+def find_device(text: str, cfg: IoTConfig) -> Device | None:
     """Busca el dispositivo más probable mencionado en el texto.
 
     Estrategia en 2 pasadas:
@@ -167,7 +214,7 @@ def find_device(text: str, cfg: IoTConfig) -> Optional[Device]:
     t = (text or "").lower()
 
     # ── Pasada 1: nombre/id completo ──
-    best: Optional[Device] = None
+    best: Device | None = None
     best_len = 0
     for dev in cfg.devices.values():
         for needle in (dev.name.lower(), dev.id.lower()):
@@ -178,7 +225,7 @@ def find_device(text: str, cfg: IoTConfig) -> Optional[Device]:
         return best
 
     # ── Pasada 2: primera palabra como alias (si es única) ──
-    first_word_to_dev: dict[str, Optional[Device]] = {}
+    first_word_to_dev: dict[str, Device | None] = {}
     for dev in cfg.devices.values():
         parts = dev.name.lower().split()
         if not parts:
@@ -202,7 +249,7 @@ def find_device(text: str, cfg: IoTConfig) -> Optional[Device]:
 # ── Resultado estructurado de la interpretación ─────────────────────────────
 
 
-def detect_intent_local(text: str, cfg: IoTConfig) -> Optional[dict]:
+def detect_intent_local(text: str, cfg: IoTConfig) -> dict | None:
     """Intenta resolver SIN llamar a Gemini. Devuelve un dict con la
     intención si hay match claro, o None si necesita IA.
 
@@ -259,7 +306,7 @@ def detect_intent_local(text: str, cfg: IoTConfig) -> Optional[dict]:
 # ── Fallback con Gemini ─────────────────────────────────────────────────────
 
 
-def detect_intent_with_gemini(text: str, cfg: IoTConfig) -> Optional[dict]:
+def detect_intent_with_gemini(text: str, cfg: IoTConfig) -> dict | None:
     """Pregunta a Gemini cuando las reglas locales no decidieron. Devuelve
     el mismo formato de dict que :func:`detect_intent_local`, o None.
     """
@@ -268,16 +315,17 @@ def detect_intent_with_gemini(text: str, cfg: IoTConfig) -> Optional[dict]:
     devices_desc = []
     for dev in cfg.devices.values():
         caps = []
-        if dev.capabilities.on_off:   caps.append("on/off")
-        if dev.capabilities.dimmable: caps.append("dim")
-        if dev.capabilities.rgb:      caps.append("rgb")
-        if dev.capabilities.sensor:   caps.append(f"sensor:{dev.capabilities.sensor}")
+        if dev.capabilities.on_off:
+            caps.append("on/off")
+        if dev.capabilities.dimmable:
+            caps.append("dim")
+        if dev.capabilities.rgb:
+            caps.append("rgb")
+        if dev.capabilities.sensor:
+            caps.append(f"sensor:{dev.capabilities.sensor}")
         devices_desc.append(f'  - id="{dev.id}" name="{dev.name}" caps=[{", ".join(caps)}]')
 
-    scenes_desc = [
-        f'  - id="{sid}" name="{s.get("name", sid)}"'
-        for sid, s in cfg.scenes.items()
-    ]
+    scenes_desc = [f'  - id="{sid}" name="{s.get("name", sid)}"' for sid, s in cfg.scenes.items()]
 
     prompt = f"""You interpret natural-language IoT commands (Spanish or English)
 into a JSON action plan for a home automation system.

@@ -27,12 +27,10 @@ from __future__ import annotations
 import json
 import re
 import threading
-from pathlib import Path
-from typing import Any
 
 from config import BASE_DIR
 from core.llm.base import _OPENAI_COMPAT  # set de providers OpenAI-compatible
-
+import contextlib
 
 _AGENTS_PATH = BASE_DIR / "config" / "agents.json"
 _LOCK = threading.Lock()
@@ -42,6 +40,7 @@ _VALID_PROVIDERS = {"gemini"} | _OPENAI_COMPAT
 
 
 # ── Lectura ────────────────────────────────────────────────────────────────
+
 
 def load_config() -> dict:
     """Lee el JSON completo. Devuelve ``{}`` si no existe o está roto."""
@@ -60,6 +59,7 @@ def get_agent_spec(agent_id: str) -> dict | None:
 
 # ── Escritura ──────────────────────────────────────────────────────────────
 
+
 def _save_atomic(data: dict) -> None:
     """Escribe ``agents.json`` de forma atómica.
 
@@ -74,16 +74,15 @@ def _save_atomic(data: dict) -> None:
     except OSError:
         # Windows fallback: el archivo destino está bloqueado.
         _AGENTS_PATH.write_text(payload, encoding="utf-8")
-        try:
+        with contextlib.suppress(OSError):
             tmp.unlink()
-        except OSError:
-            pass
 
 
 def _invalidate_registry() -> None:
     """Forza al registry a releer agents.json en la próxima llamada."""
     try:
         from agent.registry import reset_cache
+
         reset_cache()
     except Exception as e:
         print(f"[OrchestraAdmin] ⚠️ no pude invalidar registry: {e}")
@@ -100,8 +99,7 @@ def _validate_spec(agent_id: str, spec: dict, *, creating: bool) -> None:
     provider = spec.get("provider")
     if provider and provider not in _VALID_PROVIDERS:
         raise ValueError(
-            f"provider '{provider}' no soportado. Conocidos: "
-            f"{', '.join(sorted(_VALID_PROVIDERS))}"
+            f"provider '{provider}' no soportado. Conocidos: {', '.join(sorted(_VALID_PROVIDERS))}"
         )
     if "tools" in spec and not isinstance(spec["tools"], list):
         raise ValueError("'tools' debe ser una lista de strings.")
@@ -132,18 +130,16 @@ def upsert_agent(agent_id: str, spec: dict) -> dict:
         merged = {**existing, **spec}
         # Defaults razonables al crear.
         if creating:
-            merged.setdefault("enabled",     True)
+            merged.setdefault("enabled", True)
             merged.setdefault("temperature", 0.5)
-            merged.setdefault("tools",       [])
-            merged.setdefault("icon",        "circle-dot")
-            merged.setdefault("system",      "")
+            merged.setdefault("tools", [])
+            merged.setdefault("icon", "circle-dot")
+            merged.setdefault("system", "")
             merged.setdefault("description", "")
-            merged.setdefault("role",        agent_id.replace("_", " ").title())
+            merged.setdefault("role", agent_id.replace("_", " ").title())
 
         if not merged.get("provider") or not merged.get("model"):
-            raise ValueError(
-                "Un agente necesita al menos 'provider' y 'model' configurados."
-            )
+            raise ValueError("Un agente necesita al menos 'provider' y 'model' configurados.")
 
         cfg["agents"][agent_id] = merged
         _save_atomic(cfg)

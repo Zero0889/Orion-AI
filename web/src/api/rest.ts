@@ -5,11 +5,7 @@
 
 import { inferBackendUrl } from "@/api/ws";
 
-async function request<T>(
-  method: string,
-  path: string,
-  body?: unknown,
-): Promise<T> {
+async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
   const { http } = inferBackendUrl();
   const res = await fetch(`${http}${path}`, {
     method,
@@ -18,8 +14,11 @@ async function request<T>(
   });
   if (!res.ok) {
     let detail: string;
-    try { detail = (await res.json())?.detail ?? res.statusText; }
-    catch { detail = res.statusText; }
+    try {
+      detail = (await res.json())?.detail ?? res.statusText;
+    } catch {
+      detail = res.statusText;
+    }
     throw new Error(`${method} ${path} → ${res.status} ${detail}`);
   }
   if (res.status === 204) return undefined as T;
@@ -28,65 +27,63 @@ async function request<T>(
 
 export const api = {
   // Notes
-  listNotes:    () => request<Array<NoteApi>>("GET", "/api/notes"),
-  createNote:   (text: string, pinned = false) =>
+  listNotes: () => request<Array<NoteApi>>("GET", "/api/notes"),
+  createNote: (text: string, pinned = false) =>
     request<NoteApi>("POST", "/api/notes", { text, pinned }),
-  updateNote:   (id: string, patch: Partial<{ text: string; pinned: boolean; color: string }>) =>
+  updateNote: (id: string, patch: Partial<{ text: string; pinned: boolean; color: string }>) =>
     request<{ ok: true; id: string }>("PATCH", `/api/notes/${id}`, patch),
-  deleteNote:   (id: string) => request<void>("DELETE", `/api/notes/${id}`),
+  deleteNote: (id: string) => request<void>("DELETE", `/api/notes/${id}`),
 
   // Memory
-  getMemory:    () => request<MemoryShape>("GET", "/api/memory"),
-  putMemory:    (category: string, key: string, value: string) =>
+  getMemory: () => request<MemoryShape>("GET", "/api/memory"),
+  putMemory: (category: string, key: string, value: string) =>
     request<{ ok: true }>("PUT", `/api/memory/${category}/${key}`, { value }),
   deleteMemory: (category: string, key: string) =>
     request<void>("DELETE", `/api/memory/${category}/${key}`),
 
   // Conversations
-  listConversations: () =>
-    request<Array<ConversationSummary>>("GET", "/api/conversations"),
-  getConversation:   (id: string) =>
-    request<ConversationDetail>("GET", `/api/conversations/${id}`),
-  deleteConversation: (id: string) =>
-    request<void>("DELETE", `/api/conversations/${id}`),
+  listConversations: () => request<Array<ConversationSummary>>("GET", "/api/conversations"),
+  getConversation: (id: string) => request<ConversationDetail>("GET", `/api/conversations/${id}`),
+  deleteConversation: (id: string) => request<void>("DELETE", `/api/conversations/${id}`),
   bulkDeleteConversations: (ids: string[]) =>
     request<{ deleted: number }>("POST", "/api/conversations/bulk_delete", { ids }),
-  deleteAllConversations: () =>
-    request<{ deleted: number }>("DELETE", "/api/conversations"),
+  deleteAllConversations: () => request<{ deleted: number }>("DELETE", "/api/conversations"),
 
   // NotebookLM auth
-  notebookLMStatus: () =>
-    request<NotebookLMStatus>("GET", "/api/notebooklm/status"),
-  notebookLMLogin:  () =>
+  notebookLMStatus: () => request<NotebookLMStatus>("GET", "/api/notebooklm/status"),
+  notebookLMLogin: () =>
     request<{ ok: boolean; pid?: number; message: string }>("POST", "/api/notebooklm/login"),
   notebookLMCancel: () =>
     request<{ ok: boolean; message: string }>("POST", "/api/notebooklm/cancel"),
 
   // Settings
-  getTheme:   () => request<ThemeInfo>("GET", "/api/settings/theme"),
-  setTheme:   (name: string) =>
+  getTheme: () => request<ThemeInfo>("GET", "/api/settings/theme"),
+  setTheme: (name: string) =>
     request<{ ok: true; name: string; theme: Record<string, unknown> }>(
-      "PATCH", "/api/settings/theme", { name },
+      "PATCH",
+      "/api/settings/theme",
+      { name },
     ),
   getApiKeyStatus: () => request<ApiKeyStatus>("GET", "/api/settings/api_key"),
-  setApiKey:       (key: string) =>
+  setApiKey: (key: string) =>
     request<{ ok: true; configured: true }>("POST", "/api/settings/api_key", { key }),
-  getSharing:      () => request<SharingState>("GET", "/api/settings/sharing"),
-  setSharing:      (enabled: boolean) =>
+  getSharing: () => request<SharingState>("GET", "/api/settings/sharing"),
+  setSharing: (enabled: boolean) =>
     request<SharingState & { ok: true }>("POST", "/api/settings/sharing", { enabled }),
 
   // Agent — chat directo + orquesta CRUD
-  listOrchestra:   () => request<Array<OrchestraAgent>>("GET", "/api/agent/orchestra"),
-  listProviders:   () => request<Array<ProviderCatalog>>("GET", "/api/agent/providers"),
-  createAgent:     (spec: AgentSpec) =>
-    request<OrchestraAgent>("POST", "/api/agent/orchestra", spec),
-  updateAgent:     (id: string, patch: Partial<AgentSpec>) =>
+  listOrchestra: () => request<Array<OrchestraAgent>>("GET", "/api/agent/orchestra"),
+  listProviders: () => request<Array<ProviderCatalog>>("GET", "/api/agent/providers"),
+  createAgent: (spec: AgentSpec) => request<OrchestraAgent>("POST", "/api/agent/orchestra", spec),
+  updateAgent: (id: string, patch: Partial<AgentSpec>) =>
     request<OrchestraAgent>("PUT", `/api/agent/orchestra/${id}`, patch),
-  deleteAgent:     (id: string) =>
+  deleteAgent: (id: string) =>
     request<{ ok: true; id: string }>("DELETE", `/api/agent/orchestra/${id}`),
-  agentChat:       (agentId: string, message: string, history?: Array<{role: string; text: string}>) =>
+  agentChat: (agentId: string, message: string, history?: Array<{ role: string; text: string }>) =>
     request<{ agent_id: string; message: string; response: string }>(
-      "POST", `/api/agent/${agentId}/chat`, { message, history: history ?? [] },
+      "POST",
+      `/api/agent/${agentId}/chat`,
+      { message, history: history ?? [] },
     ),
 
   // Files / drop-zone
@@ -97,33 +94,36 @@ export const api = {
     const res = await fetch(`${http}/api/files/upload`, { method: "POST", body: form });
     if (!res.ok) {
       let detail: string;
-      try { detail = (await res.json())?.detail ?? res.statusText; }
-      catch { detail = res.statusText; }
+      try {
+        detail = (await res.json())?.detail ?? res.statusText;
+      } catch {
+        detail = res.statusText;
+      }
       throw new Error(`Upload failed: ${res.status} ${detail}`);
     }
     return (await res.json()) as FileUploadResult;
   },
-  getCurrentFile:   () => request<{ current: CurrentFile | null }>("GET", "/api/files/current"),
+  getCurrentFile: () => request<{ current: CurrentFile | null }>("GET", "/api/files/current"),
   clearCurrentFile: () => request<void>("DELETE", "/api/files/current"),
 
   // IoT
-  iotDevices:  () => request<Array<IoTDevice>>("GET", "/api/iot/devices"),
-  iotScenes:   () => request<Array<IoTScene>>("GET",  "/api/iot/scenes"),
-  iotSensors:  () => request<Record<string, IoTSensor>>("GET", "/api/iot/sensors"),
-  iotAction:   (
+  iotDevices: () => request<Array<IoTDevice>>("GET", "/api/iot/devices"),
+  iotScenes: () => request<Array<IoTScene>>("GET", "/api/iot/scenes"),
+  iotSensors: () => request<Record<string, IoTSensor>>("GET", "/api/iot/sensors"),
+  iotAction: (
     deviceId: string,
     body: { action: string; value?: number; color?: string; duration?: number },
   ) =>
     request<{ ok: true; device: string; action: string; result: string }>(
-      "POST", `/api/iot/devices/${deviceId}/action`, body,
+      "POST",
+      `/api/iot/devices/${deviceId}/action`,
+      body,
     ),
   iotRunScene: (sceneId: string) =>
-    request<{ ok: true; scene: string; result: string }>(
-      "POST", `/api/iot/scenes/${sceneId}/run`,
-    ),
+    request<{ ok: true; scene: string; result: string }>("POST", `/api/iot/scenes/${sceneId}/run`),
 
   // ── IoT admin (mutaciones de iot_config.json) ─────────────────────
-  iotConfig:     () => request<IoTFullConfig>("GET", "/api/iot/config"),
+  iotConfig: () => request<IoTFullConfig>("GET", "/api/iot/config"),
   iotCreateDevice: (body: IoTDeviceBody) =>
     request<{ ok: true; id: string }>("POST", "/api/iot/admin/devices", body),
   iotUpdateDevice: (id: string, body: IoTDeviceBody) =>
@@ -134,45 +134,46 @@ export const api = {
     request<{ ok: true; id: string }>("PUT", `/api/iot/admin/transports/${id}`, body),
   iotDeleteTransport: (id: string) =>
     request<{ ok: true; id: string }>("DELETE", `/api/iot/admin/transports/${id}`),
-  iotReload:     () => request<{ ok: true }>("POST", "/api/iot/admin/reload"),
+  iotReload: () => request<{ ok: true }>("POST", "/api/iot/admin/reload"),
   iotPausedStatus: () => request<{ paused: boolean }>("GET", "/api/iot/admin/paused"),
-  iotDisconnect:   () => request<{ ok: true; paused: true }>("POST", "/api/iot/admin/disconnect"),
-  iotConnect:      () => request<{ ok: true; paused: false }>("POST", "/api/iot/admin/connect"),
+  iotDisconnect: () => request<{ ok: true; paused: true }>("POST", "/api/iot/admin/disconnect"),
+  iotConnect: () => request<{ ok: true; paused: false }>("POST", "/api/iot/admin/connect"),
 
   // ── Google Sheets sync ────────────────────────────────────────────
-  iotSheetsStatus:     () => request<IoTSheetsState>("GET", "/api/iot/sheets/status"),
-  iotSheetsConnect:    (body: { account: string; title?: string }) =>
+  iotSheetsStatus: () => request<IoTSheetsState>("GET", "/api/iot/sheets/status"),
+  iotSheetsConnect: (body: { account: string; title?: string }) =>
     request<IoTSheetsState>("POST", "/api/iot/sheets/connect", body),
-  iotSheetsDisconnect: () =>
-    request<IoTSheetsState>("POST", "/api/iot/sheets/disconnect"),
-  iotSheetsSyncNow:    () => request<{ ok: true }>("POST", "/api/iot/sheets/sync_now"),
+  iotSheetsDisconnect: () => request<IoTSheetsState>("POST", "/api/iot/sheets/disconnect"),
+  iotSheetsSyncNow: () => request<{ ok: true }>("POST", "/api/iot/sheets/sync_now"),
+  iotSheetsReformat: () => request<{ ok: true }>("POST", "/api/iot/sheets/reformat"),
+  iotSheetsSetInterval: (sync_interval_s: number) =>
+    request<IoTSheetsState>("PUT", "/api/iot/sheets/interval", { sync_interval_s }),
 
   // ── Integraciones (gog / Google) ──────────────────────────────────
-  gogAccounts:    () => request<GogAccount[]>("GET", "/api/integrations/gog/accounts"),
-  gogServices:    () => request<GogService[]>("GET", "/api/integrations/gog/services"),
-  gogFlowStatus:  () => request<GogFlowStatus>("GET", "/api/integrations/gog/flow_status"),
-  gogStartAuth:   (body: { account: string; services?: string[]; force_consent?: boolean }) =>
+  gogAccounts: () => request<GogAccount[]>("GET", "/api/integrations/gog/accounts"),
+  gogServices: () => request<GogService[]>("GET", "/api/integrations/gog/services"),
+  gogFlowStatus: () => request<GogFlowStatus>("GET", "/api/integrations/gog/flow_status"),
+  gogStartAuth: (body: { account: string; services?: string[]; force_consent?: boolean }) =>
     request<GogFlowStatus>("POST", "/api/integrations/gog/start_auth", body),
-  gogCancelAuth:  () => request<GogFlowStatus>("POST", "/api/integrations/gog/cancel"),
-  gogResetAuth:   () => request<GogFlowStatus>("POST", "/api/integrations/gog/reset"),
+  gogCancelAuth: () => request<GogFlowStatus>("POST", "/api/integrations/gog/cancel"),
+  gogResetAuth: () => request<GogFlowStatus>("POST", "/api/integrations/gog/reset"),
   gogCheckScopes: (body: { account: string; services: string[] }) =>
     request<GogCheckResult>("POST", "/api/integrations/gog/check", body),
 
   // ── MCP (servidores externos) ─────────────────────────────────────
-  mcpListServers:   () => request<Array<MCPServerStatus>>("GET", "/api/mcp/servers"),
-  mcpListTools:     () => request<Array<MCPToolInfo>>("GET", "/api/mcp/tools"),
-  mcpCreateServer:  (body: MCPServerBody & { id: string }) =>
+  mcpListServers: () => request<Array<MCPServerStatus>>("GET", "/api/mcp/servers"),
+  mcpListTools: () => request<Array<MCPToolInfo>>("GET", "/api/mcp/tools"),
+  mcpCreateServer: (body: MCPServerBody & { id: string }) =>
     request<MCPServerStatus>("POST", "/api/mcp/servers", body),
-  mcpUpdateServer:  (id: string, body: MCPServerBody) =>
+  mcpUpdateServer: (id: string, body: MCPServerBody) =>
     request<MCPServerStatus>("PUT", `/api/mcp/servers/${id}`, body),
-  mcpDeleteServer:  (id: string) =>
-    request<void>("DELETE", `/api/mcp/servers/${id}`),
+  mcpDeleteServer: (id: string) => request<void>("DELETE", `/api/mcp/servers/${id}`),
   mcpRestartServer: (id: string) =>
     request<{ ok: true; server_id: string; tool_count: number }>(
-      "POST", `/api/mcp/servers/${id}/restart`,
+      "POST",
+      `/api/mcp/servers/${id}/restart`,
     ),
-  mcpReload:        () =>
-    request<{ ok: true; tool_count: number }>("POST", "/api/mcp/reload"),
+  mcpReload: () => request<{ ok: true; tool_count: number }>("POST", "/api/mcp/reload"),
   mcpRegistrySearch: (q: string, limit = 20, cursor?: string) => {
     const qs = new URLSearchParams({ q, limit: String(limit) });
     if (cursor) qs.set("cursor", cursor);
@@ -181,33 +182,40 @@ export const api = {
   mcpRegistryStars: (repoUrl: string) => {
     const qs = new URLSearchParams({ repo_url: repoUrl });
     return request<{ repo_url: string; stars: number | null }>(
-      "GET", `/api/mcp/registry/stars?${qs.toString()}`,
+      "GET",
+      `/api/mcp/registry/stars?${qs.toString()}`,
     );
   },
   mcpRecipes: () => request<MCPRecipe[]>("GET", "/api/mcp/recipes"),
 
   // ── Skills (formato SKILL.md tipo OpenClaw/Anthropic) ─────────────
-  listSkills:   () => request<Array<SkillSummary>>("GET", "/api/skills/"),
-  getSkill:     (id: string) => request<SkillDetail>("GET", `/api/skills/${id}`),
+  listSkills: () => request<Array<SkillSummary>>("GET", "/api/skills/"),
+  getSkill: (id: string) => request<SkillDetail>("GET", `/api/skills/${id}`),
   reloadSkills: () => request<{ ok: true; count: number }>("POST", "/api/skills/reload"),
   searchSkillRegistry: (q = "") =>
-    request<Array<SkillRegistryItem>>("GET", `/api/skills/registry/search?q=${encodeURIComponent(q)}`),
+    request<Array<SkillRegistryItem>>(
+      "GET",
+      `/api/skills/registry/search?q=${encodeURIComponent(q)}`,
+    ),
   installSkill: (name: string, source = "openclaw") =>
     request<{ ok: true; id: string; files: string[]; path: string; loaded: boolean }>(
-      "POST", "/api/skills/install", { name, source },
+      "POST",
+      "/api/skills/install",
+      { name, source },
     ),
   // Legacy aliases (compat con código viejo del panel; usan los genéricos por debajo)
-  gogStatus:  () => request<CliStatus>("GET", "/api/skills/cli/gog/status"),
+  gogStatus: () => request<CliStatus>("GET", "/api/skills/cli/gog/status"),
   gogInstall: (force = false) =>
     request<{ ok: true; name: string; path: string }>(
-      "POST", `/api/skills/cli/gog/install${force ? "?force=true" : ""}`,
+      "POST",
+      `/api/skills/cli/gog/install${force ? "?force=true" : ""}`,
     ),
-  listCli:   () => request<Array<CliInfo>>("GET", "/api/skills/cli"),
-  cliStatus: (name: string) =>
-    request<CliStatus>("GET", `/api/skills/cli/${name}/status`),
+  listCli: () => request<Array<CliInfo>>("GET", "/api/skills/cli"),
+  cliStatus: (name: string) => request<CliStatus>("GET", `/api/skills/cli/${name}/status`),
   cliInstall: (name: string, force = false) =>
     request<{ ok: true; name: string; path: string }>(
-      "POST", `/api/skills/cli/${name}/install${force ? "?force=true" : ""}`,
+      "POST",
+      `/api/skills/cli/${name}/install${force ? "?force=true" : ""}`,
     ),
 
   // ── Notificaciones (Gmail + Classroom) ──────────────────────────────
@@ -218,233 +226,231 @@ export const api = {
     const qs = q.toString();
     return request<Array<NotifItem>>("GET", `/api/notifications${qs ? "?" + qs : ""}`);
   },
-  notificationsStatus: () =>
-    request<NotifPollerStatus>("GET", "/api/notifications/status"),
+  notificationsStatus: () => request<NotifPollerStatus>("GET", "/api/notifications/status"),
   pollNotifications: (source?: string) =>
     request<Record<string, unknown>>(
-      "POST", `/api/notifications/poll${source ? "?source=" + encodeURIComponent(source) : ""}`,
+      "POST",
+      `/api/notifications/poll${source ? "?source=" + encodeURIComponent(source) : ""}`,
     ),
   markNotificationsRead: (uids: string[]) =>
-    request<{ ok: true; marked: number }>(
-      "POST", "/api/notifications/mark-read", { uids },
-    ),
+    request<{ ok: true; marked: number }>("POST", "/api/notifications/mark-read", { uids }),
   markAllNotificationsRead: (source?: string) =>
     request<{ ok: true; marked: number }>(
-      "POST", `/api/notifications/mark-all-read${source ? "?source=" + encodeURIComponent(source) : ""}`,
+      "POST",
+      `/api/notifications/mark-all-read${source ? "?source=" + encodeURIComponent(source) : ""}`,
     ),
   authorizeClassroom: () =>
-    request<{ ok: true; token_path: string }>(
-      "POST", "/api/notifications/classroom/authorize",
-    ),
+    request<{ ok: true; token_path: string }>("POST", "/api/notifications/classroom/authorize"),
 
   // ── Circuit-from-image ─────────────────────────────────────────────
   circuitFromImage: (imagePath: string, outputs?: Array<"spice" | "kicad">) =>
-    request<CircuitGenerateResult>(
-      "POST", "/api/circuit/from-image",
-      { image_path: imagePath, outputs },
-    ),
-  circuitList:   () => request<{ items: CircuitItem[] }>("GET", "/api/circuit/list"),
+    request<CircuitGenerateResult>("POST", "/api/circuit/from-image", {
+      image_path: imagePath,
+      outputs,
+    }),
+  circuitList: () => request<{ items: CircuitItem[] }>("GET", "/api/circuit/list"),
   circuitDelete: (path: string) =>
     request<{ ok: true }>("DELETE", `/api/circuit/item?path=${encodeURIComponent(path)}`),
   circuitProteusAutodraw: (
     cirPath: string,
     opts: { countdown?: number; placeInCanvas?: boolean; cols?: number } = {},
   ) =>
-    request<{ ok: boolean; summary: string }>(
-      "POST", "/api/circuit/proteus-autodraw",
-      {
-        cir_path:        cirPath,
-        countdown:       opts.countdown ?? 3,
-        place_in_canvas: opts.placeInCanvas ?? true,
-        cols:            opts.cols ?? 3,
-      },
-    ),
+    request<{ ok: boolean; summary: string }>("POST", "/api/circuit/proteus-autodraw", {
+      cir_path: cirPath,
+      countdown: opts.countdown ?? 3,
+      place_in_canvas: opts.placeInCanvas ?? true,
+      cols: opts.cols ?? 3,
+    }),
 };
 
 export interface NotifItem {
-  uid:         string;
-  source:      string;
-  title:       string;
-  summary:     string;
-  url:         string | null;
+  uid: string;
+  source: string;
+  title: string;
+  summary: string;
+  url: string | null;
   received_ts: number;
-  metadata:    Record<string, unknown>;
+  metadata: Record<string, unknown>;
 }
 
 export interface NotifPollerStatus {
-  running:     boolean;
+  running: boolean;
   last_status: Record<string, { ok: boolean; ts: number; error?: string }>;
   // Opcional para tolerar backends viejos que no expongan este campo.
   is_configured?: Record<string, boolean>;
-  config:      {
-    enabled:          boolean;
+  config: {
+    enabled: boolean;
     interval_seconds: number;
-    max_per_source:   number;
-    sources:          Record<string, { enabled: boolean }>;
+    max_per_source: number;
+    sources: Record<string, { enabled: boolean }>;
   };
 }
 
 export interface SkillSummary {
-  id:             string;
-  name:           string;
-  description:    string;
+  id: string;
+  name: string;
+  description: string;
   user_invocable: boolean;
-  char_count:     number;
-  path:           string;
+  char_count: number;
+  path: string;
 }
 
 export interface SkillDetail extends SkillSummary {
-  body:        string;
+  body: string;
   frontmatter: Record<string, unknown>;
-  max_inject:  number;
+  max_inject: number;
 }
 
 export interface SkillRegistryItem {
-  id:       string;
+  id: string;
   html_url: string;
-  source:   "openclaw";
+  source: "openclaw";
 }
 
 export interface CliInfo {
-  name:        string;
-  repo:        string;
-  version:     string;
+  name: string;
+  repo: string;
+  version: string;
   description: string;
-  installed:   boolean;
-  path:        string | null;
+  installed: boolean;
+  path: string | null;
 }
 
 export interface CliStatus {
-  name:      string;
+  name: string;
   installed: boolean;
-  path:      string | null;
-  managed:   boolean;
-  version:   string;
+  path: string | null;
+  managed: boolean;
+  version: string;
 }
 
 // ── Types ──────────────────────────────────────────────────────────────
 export interface NoteApi {
-  id:      string;
-  text:    string;
-  pinned:  boolean;
-  color?:  string;
+  id: string;
+  text: string;
+  pinned: boolean;
+  color?: string;
   created: string;
   updated: string;
 }
 
 export interface MemoryEntry {
-  value:   string;
+  value: string;
   updated?: string;
 }
 
 export type MemoryCategory =
-  | "identity" | "preferences" | "projects"
-  | "relationships" | "wishes" | "notes";
+  | "identity"
+  | "preferences"
+  | "projects"
+  | "relationships"
+  | "wishes"
+  | "notes";
 
 export type MemoryShape = Record<MemoryCategory, Record<string, MemoryEntry>>;
 
 export interface ConversationSummary {
-  id:       string;
-  started:  string;
-  title:    string;
+  id: string;
+  started: string;
+  title: string;
   messages: number;
 }
 
 export interface ConversationDetail {
-  id:       string;
-  started:  string;
-  title:    string;
+  id: string;
+  started: string;
+  title: string;
   messages: Array<{ role: string; text: string; ts: string }>;
 }
 
 export interface ThemeInfo {
-  name:      string;
-  theme:     Record<string, unknown>;
+  name: string;
+  theme: Record<string, unknown>;
   available: Array<{ id: string; name: string }>;
 }
 
 export interface ApiKeyStatus {
   configured: boolean;
-  source:     "env" | "file" | null;
-  path:       string | null;
+  source: "env" | "file" | null;
+  path: string | null;
 }
 
 export interface SharingState {
-  enabled:      boolean;
+  enabled: boolean;
   tailscale_ip: string | null;
-  port:         number;
+  port: number;
 }
 
 export interface OrchestraAgent {
-  id:                string;
-  role:              string;
-  icon:              string;
-  description:       string;
-  provider:          string;
-  model:             string;
-  temperature:       number;
-  tools:             string[];
-  system:            string;
-  enabled:           boolean;
+  id: string;
+  role: string;
+  icon: string;
+  description: string;
+  provider: string;
+  model: string;
+  temperature: number;
+  tools: string[];
+  system: string;
+  enabled: boolean;
   fallback_provider: string | null;
-  fallback_model:    string | null;
-  available:         boolean;
+  fallback_model: string | null;
+  available: boolean;
 }
 
 /** Lo que mandamos al POST (crear) y PUT (patch parcial) de /api/agent/orchestra. */
 export interface AgentSpec {
-  id?:                string;   // solo en POST
-  role?:              string;
-  icon?:              string;
-  description?:       string;
-  provider?:          string;
-  model?:             string;
-  temperature?:       number;
-  tools?:             string[];
-  system?:            string;
-  enabled?:           boolean;
+  id?: string; // solo en POST
+  role?: string;
+  icon?: string;
+  description?: string;
+  provider?: string;
+  model?: string;
+  temperature?: number;
+  tools?: string[];
+  system?: string;
+  enabled?: boolean;
   fallback_provider?: string | null;
-  fallback_model?:    string | null;
+  fallback_model?: string | null;
 }
 
 export interface ProviderModel {
-  id:    string;
+  id: string;
   label: string;
 }
 
 export interface ProviderCatalog {
-  id:        string;          // "gemini", "openrouter", "groq", ...
-  label:     string;          // "Gemini", "OpenRouter", ...
-  free:      boolean;         // ¿tier gratuito?
-  auth_hint: string;          // dónde poner la key
-  models:    ProviderModel[]; // sugeridos en dropdown
-  available: boolean;         // ¿key configurada?
+  id: string; // "gemini", "openrouter", "groq", ...
+  label: string; // "Gemini", "OpenRouter", ...
+  free: boolean; // ¿tier gratuito?
+  auth_hint: string; // dónde poner la key
+  models: ProviderModel[]; // sugeridos en dropdown
+  available: boolean; // ¿key configurada?
 }
 
 export interface IoTCapabilities {
-  on_off:   boolean;
+  on_off: boolean;
   dimmable: boolean;
-  rgb:      boolean;
-  sensor:   string | null;
+  rgb: boolean;
+  sensor: string | null;
 }
 
 export interface IoTDevice {
-  id:           string;
-  name:         string;
-  transport:    string;
+  id: string;
+  name: string;
+  transport: string;
   capabilities: IoTCapabilities;
-  serial?:      Record<string, unknown> | null;
-  mqtt?:        Record<string, unknown> | null;
+  serial?: Record<string, unknown> | null;
+  mqtt?: Record<string, unknown> | null;
 }
 
 /** Lo que mandamos al POST/PUT de admin/devices. */
 export interface IoTDeviceBody {
-  id?:          string;          // solo en POST
-  name:         string;
-  transport:    string;
+  id?: string; // solo en POST
+  name: string;
+  transport: string;
   capabilities: IoTCapabilities;
-  serial?:      Record<string, unknown>;
-  mqtt?:        Record<string, unknown>;
+  serial?: Record<string, unknown>;
+  mqtt?: Record<string, unknown>;
 }
 
 /** Transport en disco. Discriminado por `type`. */
@@ -461,216 +467,216 @@ export type IoTTransportBody =
     };
 
 export interface IoTFullConfig {
-  version:    number;
+  version: number;
   transports: Record<string, Record<string, unknown>>;
-  devices:    Record<string, Record<string, unknown>>;
-  scenes:     Record<string, unknown>;
+  devices: Record<string, Record<string, unknown>>;
+  scenes: Record<string, unknown>;
 }
 
 export interface IoTScene {
-  id:    string;
-  name:  string;
+  id: string;
+  name: string;
   steps: number;
 }
 
 export interface IoTSensor {
-  value:   string;
+  value: string;
   numeric: number | null;
-  age_s:   number;
+  age_s: number;
 }
 
 export interface GogAccount {
-  email:      string;
-  services:   string[];
-  scopes:     string[];
-  client:     string;
+  email: string;
+  services: string[];
+  scopes: string[];
+  client: string;
   created_at: string;
 }
 
 export interface GogService {
   service: string;
-  scopes:  string[];
-  apis:    string[];
-  user:    boolean;
+  scopes: string[];
+  apis: string[];
+  user: boolean;
 }
 
 export interface GogFlowStatus {
-  status:       "idle" | "running" | "success" | "error" | "cancelled";
-  account?:     string;
-  services?:    string[];
-  started_at?:  number;
+  status: "idle" | "running" | "success" | "error" | "cancelled";
+  account?: string;
+  services?: string[];
+  started_at?: number;
   finished_at?: number;
-  auth_url?:    string | null;
-  message?:     string | null;
+  auth_url?: string | null;
+  message?: string | null;
 }
 
 export interface GogCheckResult {
-  satisfied:      boolean;
-  missing:        string[];
+  satisfied: boolean;
+  missing: string[];
   account_exists: boolean;
-  error?:         string;
+  error?: string;
 }
 
 export interface IoTSheetsState {
-  enabled:          boolean;
-  account:          string | null;
-  spreadsheet_id:   string | null;
-  spreadsheet_url:  string | null;
-  sheet_name:       string;
-  last_pushed_row:  number;
-  last_sync_at:     string | null;
-  last_error:       string | null;
-  sync_interval_s:  number;
+  enabled: boolean;
+  account: string | null;
+  spreadsheet_id: string | null;
+  spreadsheet_url: string | null;
+  sheet_name: string;
+  last_pushed_row: number;
+  last_sync_at: string | null;
+  last_error: string | null;
+  sync_interval_s: number;
 }
 
 export interface FileUploadResult {
-  ok:       true;
-  path:     string;
-  name:     string;
+  ok: true;
+  path: string;
+  name: string;
   original: string;
-  size:     number;
+  size: number;
 }
 
 export interface CurrentFile {
-  path:   string;
-  name:   string;
-  size:   number | null;
+  path: string;
+  name: string;
+  size: number | null;
   exists: boolean;
 }
 
 // ── Circuit-from-image ──────────────────────────────────────────────────
 export interface CircuitGenerateResult {
-  ok:           true;
-  summary:      string;
-  spice_path?:  string;
-  kicad_path?:  string;
+  ok: true;
+  summary: string;
+  spice_path?: string;
+  kicad_path?: string;
 }
 
 export interface CircuitItem {
-  name:     string;
-  path:     string;
-  kind:     "spice" | "kicad";
-  size:     number;
+  name: string;
+  path: string;
+  kind: "spice" | "kicad";
+  size: number;
   modified: number;
 }
 
 // ── MCP ─────────────────────────────────────────────────────────────────
 // ── NotebookLM ──────────────────────────────────────────────────────────
 export interface NotebookLMLoginState {
-  status:       "idle" | "running" | "success" | "failed";
-  message:      string;
-  started_at:   number;
-  finished_at:  number;
-  elapsed:      number;
+  status: "idle" | "running" | "success" | "failed";
+  message: string;
+  started_at: number;
+  finished_at: number;
+  elapsed: number;
 }
 export interface NotebookLMStatus {
-  installed:   boolean;
-  cli_path:    string | null;
+  installed: boolean;
+  cli_path: string | null;
   has_session: boolean;
-  login:       NotebookLMLoginState;
+  login: NotebookLMLoginState;
 }
 
 export interface MCPServerBody {
-  command:          string;
-  args?:            string[];
-  env?:             Record<string, string>;
-  enabled?:         boolean;
-  cwd?:             string | null;
+  command: string;
+  args?: string[];
+  env?: Record<string, string>;
+  enabled?: boolean;
+  cwd?: string | null;
   startup_timeout?: number;
-  call_timeout?:    number;
+  call_timeout?: number;
 }
 
 export interface MCPToolBrief {
-  name:        string;
+  name: string;
   description: string;
 }
 
 export interface MCPServerStatus {
-  id:               string;
-  command:          string;
-  args:             string[];
-  env:              Record<string, string>;
-  enabled:          boolean;
-  cwd:              string | null;
-  startup_timeout:  number;
-  call_timeout:     number;
-  running:          boolean;
-  tool_count:       number;
-  tools:            MCPToolBrief[];
-  error?:           string | null;
+  id: string;
+  command: string;
+  args: string[];
+  env: Record<string, string>;
+  enabled: boolean;
+  cwd: string | null;
+  startup_timeout: number;
+  call_timeout: number;
+  running: boolean;
+  tool_count: number;
+  tools: MCPToolBrief[];
+  error?: string | null;
 }
 
 export interface MCPToolInfo {
-  name:        string;
-  server_id:   string;
+  name: string;
+  server_id: string;
   description: string;
-  timeout:     number;
+  timeout: number;
 }
 
 // ── Registry (catálogo público) ─────────────────────────────────────────
 export interface MCPRegistryEnvVar {
-  name:        string;
+  name: string;
   description: string;
-  required:    boolean;
+  required: boolean;
 }
 
 export interface MCPRegistryPackage {
-  command:       string;
-  args:          string[];
-  env_required:  MCPRegistryEnvVar[];
+  command: string;
+  args: string[];
+  env_required: MCPRegistryEnvVar[];
   registry_type: string;
-  identifier:    string;
-  version:       string;
+  identifier: string;
+  version: string;
 }
 
 export interface MCPRegistryServer {
-  name:         string;
-  title:        string;
-  description:  string;
-  version:      string;
-  repository:   string | null;
-  packages:     MCPRegistryPackage[];
-  installable:  boolean;
+  name: string;
+  title: string;
+  description: string;
+  version: string;
+  repository: string | null;
+  packages: MCPRegistryPackage[];
+  installable: boolean;
   /** True si el server solo expone transports HTTP/SSE (remote-only).
    *  El cliente MCP actual de ORION es stdio, así que no son instalables
    *  hoy — pero los mostramos diferenciados para que se sepa que existen. */
-  remote:       boolean;
+  remote: boolean;
   remote_kinds: string[];
 }
 
 export interface MCPRegistryPage {
-  servers:     MCPRegistryServer[];
+  servers: MCPRegistryServer[];
   next_cursor: string | null;
-  count:       number;
+  count: number;
 }
 
 // ── Recetas curadas (servers populares pre-armados) ────────────────────
 export type MCPRecipeCategory = "files" | "dev" | "web" | "ai" | "system";
 
 export interface MCPRecipePrompt {
-  key:         string;
-  label:       string;
+  key: string;
+  label: string;
   description: string;
-  default:     string;
-  required:    boolean;
+  default: string;
+  required: boolean;
 }
 
 export interface MCPRecipeEnv {
-  name:        string;
+  name: string;
   description: string;
-  required:    boolean;
+  required: boolean;
 }
 
 export interface MCPRecipe {
-  recipe_id:     string;
-  title:         string;
-  description:   string;
-  category:      MCPRecipeCategory;
-  command:       string;
+  recipe_id: string;
+  title: string;
+  description: string;
+  category: MCPRecipeCategory;
+  command: string;
   args_template: string[];
-  suggested_id:  string;
-  repo_url:      string;
-  prompts:       MCPRecipePrompt[];
-  env_required:  MCPRecipeEnv[];
-  official:      boolean;
+  suggested_id: string;
+  repo_url: string;
+  prompts: MCPRecipePrompt[];
+  env_required: MCPRecipeEnv[];
+  official: boolean;
 }

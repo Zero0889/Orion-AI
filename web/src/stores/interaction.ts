@@ -25,35 +25,35 @@ import { create } from "zustand";
 const AUTO_CLEAR_MS = 90_000;
 
 interface ActiveTool {
-  name:      string;
-  args:      Record<string, string>;
+  name: string;
+  args: Record<string, string>;
   startedAt: number;
 }
 
 interface ActiveAgent {
-  taskId:    string | null;
-  status:    "pending" | "running" | "completed" | "cancelled";
-  goal:      string;
+  taskId: string | null;
+  status: "pending" | "running" | "completed" | "cancelled";
+  goal: string;
   lastSpeech: string | null;
   updatedAt: number;
 }
 
 interface State {
-  tool:  ActiveTool  | null;
+  tool: ActiveTool | null;
   agent: ActiveAgent | null;
 
-  setActiveTool:   (name: string, args: Record<string, string>) => void;
+  setActiveTool: (name: string, args: Record<string, string>) => void;
   clearActiveTool: () => void;
 
   upsertAgentTask: (taskId: string, status: ActiveAgent["status"], goal?: string) => void;
-  setAgentSpeech:  (taskId: string | null, text: string) => void;
-  clearAgent:      () => void;
+  setAgentSpeech: (taskId: string | null, text: string) => void;
+  clearAgent: () => void;
 }
 
 let autoClearTimer: number | null = null;
 
 export const useInteractionStore = create<State>((set, get) => ({
-  tool:  null,
+  tool: null,
   agent: null,
 
   setActiveTool(name, args) {

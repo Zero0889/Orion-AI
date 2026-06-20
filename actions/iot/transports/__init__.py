@@ -24,11 +24,10 @@ from typing import Optional
 
 from .base import Transport
 
-
 # Mapa `type` (del config) → import lazy `(módulo, clase)`
 _TRANSPORT_TYPES = {
     "serial": ("actions.iot.transports.serial_tx", "SerialTransport"),
-    "mqtt":   ("actions.iot.transports.mqtt_tx",   "MQTTTransport"),
+    "mqtt": ("actions.iot.transports.mqtt_tx", "MQTTTransport"),
 }
 
 
@@ -36,7 +35,7 @@ _instances: dict[str, Transport] = {}
 _lock = threading.Lock()
 
 
-def get_transport(transport_id: str, cfg: dict) -> Optional[Transport]:
+def get_transport(transport_id: str, cfg: dict) -> Transport | None:
     """Devuelve la instancia del transporte (cacheada).
 
     :param transport_id: clave única del transporte (ej. "main_arduino").
@@ -58,7 +57,7 @@ def get_transport(transport_id: str, cfg: dict) -> Optional[Transport]:
         module_path, class_name = target
         try:
             module = __import__(module_path, fromlist=[class_name])
-            klass  = getattr(module, class_name)
+            klass = getattr(module, class_name)
         except ImportError as e:
             print(f"[IoT-Transport] '{ttype}' no disponible: {e}")
             return None
@@ -83,4 +82,4 @@ def close_all() -> None:
         _instances.clear()
 
 
-__all__ = ["Transport", "get_transport", "close_all"]
+__all__ = ["Transport", "close_all", "get_transport"]

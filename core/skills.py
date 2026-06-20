@@ -58,9 +58,9 @@ import json
 import re
 import threading
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 from config import BASE_DIR
 
@@ -68,9 +68,9 @@ from config import BASE_DIR
 
 _CONFIG_PATH = BASE_DIR / "config" / "skills.json"
 _DEFAULT_CONFIG: dict[str, Any] = {
-    "search_paths":       ["skills"],
-    "enabled":            [],     # vacío = todas
-    "max_inject_chars":   8000,
+    "search_paths": ["skills"],
+    "enabled": [],  # vacío = todas
+    "max_inject_chars": 8000,
 }
 
 
@@ -91,12 +91,12 @@ def _load_config() -> dict[str, Any]:
 
 @dataclass(frozen=True)
 class Skill:
-    id:           str                # nombre de la carpeta
-    name:         str                # del frontmatter
-    description:  str
-    path:         Path               # ruta absoluta a SKILL.md
-    body:         str                # markdown post-frontmatter
-    frontmatter:  dict[str, Any]     # crudo, para metadata extra
+    id: str  # nombre de la carpeta
+    name: str  # del frontmatter
+    description: str
+    path: Path  # ruta absoluta a SKILL.md
+    body: str  # markdown post-frontmatter
+    frontmatter: dict[str, Any]  # crudo, para metadata extra
     user_invocable: bool = True
 
     @property
@@ -130,12 +130,13 @@ def _parse_frontmatter(text: str) -> tuple[dict[str, Any], str]:
     m = _FRONTMATTER_RE.match(text)
     if not m:
         return {}, text
-    raw  = m.group(1)
-    body = text[m.end():]
+    raw = m.group(1)
+    body = text[m.end() :]
 
     # Intento con PyYAML primero (presente en muchos venvs como dep transitiva).
     try:
         import yaml  # type: ignore
+
         parsed = yaml.safe_load(raw) or {}
         if isinstance(parsed, dict):
             return parsed, body
@@ -146,7 +147,7 @@ def _parse_frontmatter(text: str) -> tuple[dict[str, Any], str]:
 
     # Fallback: parser ingenuo línea-a-línea.
     out: dict[str, Any] = {}
-    current_key: Optional[str] = None
+    current_key: str | None = None
     buf: list[str] = []
     for line in raw.splitlines():
         if not line.strip():
@@ -171,7 +172,7 @@ def _parse_frontmatter(text: str) -> tuple[dict[str, Any], str]:
     return out, body
 
 
-def _load_one(skill_dir: Path) -> Optional[Skill]:
+def _load_one(skill_dir: Path) -> Skill | None:
     md_path = skill_dir / "SKILL.md"
     if not md_path.exists():
         return None
@@ -187,6 +188,7 @@ def _load_one(skill_dir: Path) -> Optional[Skill]:
     # Solo bloqueamos en críticos; warnings se loguean y la skill se carga igual.
     try:
         from core.skill_scanner import validate_frontmatter
+
         fm_findings = validate_frontmatter(fm)
         for f in fm_findings:
             if f.severity == "critical":
@@ -197,7 +199,7 @@ def _load_one(skill_dir: Path) -> Optional[Skill]:
     except ImportError:
         pass  # scanner opcional
 
-    sid  = (fm.get("name") or skill_dir.name).strip()
+    sid = (fm.get("name") or skill_dir.name).strip()
     desc = (fm.get("description") or "").strip()
     # user-invocable puede venir como bool o string "true"/"false"
     raw_ui = fm.get("user-invocable", fm.get("user_invocable", True))
@@ -210,6 +212,7 @@ def _load_one(skill_dir: Path) -> Optional[Skill]:
     # pipe-to-shell, crypto-mining, etc.). Los warnings solo se loguean.
     try:
         from core.skill_scanner import scan_skill_dir
+
         scan = scan_skill_dir(skill_dir)
         if scan.has_critical():
             print(f"[Skills] BLOCKED {skill_dir.name}: critical scan findings, skill not loaded.")
@@ -222,13 +225,13 @@ def _load_one(skill_dir: Path) -> Optional[Skill]:
         pass
 
     return Skill(
-        id            = skill_dir.name,
-        name          = sid,
-        description   = desc,
-        path          = md_path.resolve(),
-        body          = body.strip(),
-        frontmatter   = fm,
-        user_invocable = ui,
+        id=skill_dir.name,
+        name=sid,
+        description=desc,
+        path=md_path.resolve(),
+        body=body.strip(),
+        frontmatter=fm,
+        user_invocable=ui,
     )
 
 
@@ -275,7 +278,7 @@ def list_skills(force: bool = False) -> list[Skill]:
         return list(_cache.values())
 
 
-def get_skill(skill_id: str) -> Optional[Skill]:
+def get_skill(skill_id: str) -> Skill | None:
     for s in list_skills():
         if s.id == skill_id:
             return s

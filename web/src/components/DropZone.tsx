@@ -12,29 +12,37 @@ import { api } from "@/api/rest";
 import { Icon } from "@/ui/Icon";
 
 export function DropZone() {
-  const [dragging,  setDragging]  = useState(false);
+  const [dragging, setDragging] = useState(false);
   const [uploading, setUploading] = useState(false);
-  const [error,     setError]     = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let depth = 0;
     const onEnter = (e: DragEvent) => {
-      if (!hasFiles(e)) return; e.preventDefault();
-      depth++; setDragging(true);
+      if (!hasFiles(e)) return;
+      e.preventDefault();
+      depth++;
+      setDragging(true);
     };
-    const onOver  = (e: DragEvent) => { if (hasFiles(e)) e.preventDefault(); };
+    const onOver = (e: DragEvent) => {
+      if (hasFiles(e)) e.preventDefault();
+    };
     const onLeave = (e: DragEvent) => {
-      if (!hasFiles(e)) return; e.preventDefault();
+      if (!hasFiles(e)) return;
+      e.preventDefault();
       depth = Math.max(0, depth - 1);
       if (depth === 0) setDragging(false);
     };
     const onDrop = async (e: DragEvent) => {
-      if (!hasFiles(e)) return; e.preventDefault();
-      depth = 0; setDragging(false);
+      if (!hasFiles(e)) return;
+      e.preventDefault();
+      depth = 0;
+      setDragging(false);
       const f = e.dataTransfer?.files?.[0];
       if (!f) return;
       try {
-        setUploading(true); setError(null);
+        setUploading(true);
+        setError(null);
         await api.uploadFile(f);
       } catch (err) {
         setError(String(err));
@@ -44,28 +52,32 @@ export function DropZone() {
     };
 
     window.addEventListener("dragenter", onEnter);
-    window.addEventListener("dragover",  onOver);
+    window.addEventListener("dragover", onOver);
     window.addEventListener("dragleave", onLeave);
-    window.addEventListener("drop",      onDrop);
+    window.addEventListener("drop", onDrop);
     return () => {
       window.removeEventListener("dragenter", onEnter);
-      window.removeEventListener("dragover",  onOver);
+      window.removeEventListener("dragover", onOver);
       window.removeEventListener("dragleave", onLeave);
-      window.removeEventListener("drop",      onDrop);
+      window.removeEventListener("drop", onDrop);
     };
   }, []);
 
   if (!dragging && !uploading && !error) return null;
 
   return (
-    <div className="fixed inset-0 z-40 grid place-items-center bg-bg/55 backdrop-blur-md
-                    pointer-events-none animate-fade-in">
+    <div
+      className="fixed inset-0 z-40 grid place-items-center bg-bg/55 backdrop-blur-md
+                    pointer-events-none animate-fade-in"
+    >
       {/* ambient halo */}
       <div className="absolute h-[420px] w-[420px] rounded-full bg-pri/12 blur-3xl animate-halo" />
 
-      <div className="relative max-w-md w-[88%] rounded-2xl border border-dashed
+      <div
+        className="relative max-w-md w-[88%] rounded-2xl border border-dashed
                       border-pri/55 surface-glass px-10 py-9 text-center shadow-lift
-                      animate-scale-in">
+                      animate-scale-in"
+      >
         {uploading ? (
           <>
             <Spinner />
@@ -80,7 +92,9 @@ export function DropZone() {
             <button
               onClick={() => setError(null)}
               className="mt-4 text-xs underline text-text-dim pointer-events-auto hover:text-text"
-            >Cerrar</button>
+            >
+              Cerrar
+            </button>
           </>
         ) : (
           <>

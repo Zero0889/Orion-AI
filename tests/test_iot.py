@@ -22,81 +22,85 @@ import time
 import unittest
 from pathlib import Path
 
-from actions.iot.config  import load_config, _is_v1, _migrate_v1_to_v2, IoTConfig
+from actions.iot.config import IoTConfig, _is_v1, _migrate_v1_to_v2, load_config
 from actions.iot.devices import Capabilities, Device
-from actions.iot.rules   import (
-    normalize, parse_duration, parse_percent, parse_color, find_device,
+from actions.iot.rules import (
     detect_intent_local,
+    find_device,
+    normalize,
+    parse_color,
+    parse_duration,
+    parse_percent,
 )
-from actions.iot.scenes  import find_scene, list_scenes, execute_scene
+from actions.iot.scenes import execute_scene, find_scene, list_scenes
 from actions.iot.sensors import SensorCache
-
 
 # ── Fixtures ────────────────────────────────────────────────────────────────
 
 
 V1_SAMPLE = {
     "serial_port": "COM3",
-    "baud_rate":   115200,
+    "baud_rate": 115200,
     "devices": {
         "foco_1": {"name": "foco 1", "cmd_on": "FOCO1_ON", "cmd_off": "FOCO1_OFF"},
         "foco_2": {"name": "foco 2", "cmd_on": "FOCO2_ON", "cmd_off": "FOCO2_OFF"},
     },
-    "cmd_all_on":  "TODOS_ON",
+    "cmd_all_on": "TODOS_ON",
     "cmd_all_off": "TODOS_OFF",
 }
 
 
 def sample_v2_cfg() -> IoTConfig:
     """Config v2 con un foco simple, una tira RGB dimmable y un sensor."""
-    return IoTConfig.from_dict({
-        "version": 2,
-        "transports": {
-            "main_arduino": {"type": "serial", "port": "COM1", "baud": 9600},
-        },
-        "devices": {
-            "foco_1": {
-                "name": "foco 1",
-                "transport": "main_arduino",
-                "capabilities": {"on_off": True, "dimmable": False, "rgb": False},
-                "serial": {"cmd_on": "FOCO1_ON", "cmd_off": "FOCO1_OFF"},
+    return IoTConfig.from_dict(
+        {
+            "version": 2,
+            "transports": {
+                "main_arduino": {"type": "serial", "port": "COM1", "baud": 9600},
             },
-            "tira_led": {
-                "name": "tira led",
-                "transport": "main_arduino",
-                "capabilities": {"on_off": True, "dimmable": True, "rgb": True},
-                "serial": {
-                    "cmd_on":  "TIRA_ON",
-                    "cmd_off": "TIRA_OFF",
-                    "cmd_dim": "TIRA_DIM_{value}",
-                    "cmd_rgb": "TIRA_RGB_{r}_{g}_{b}",
+            "devices": {
+                "foco_1": {
+                    "name": "foco 1",
+                    "transport": "main_arduino",
+                    "capabilities": {"on_off": True, "dimmable": False, "rgb": False},
+                    "serial": {"cmd_on": "FOCO1_ON", "cmd_off": "FOCO1_OFF"},
+                },
+                "tira_led": {
+                    "name": "tira led",
+                    "transport": "main_arduino",
+                    "capabilities": {"on_off": True, "dimmable": True, "rgb": True},
+                    "serial": {
+                        "cmd_on": "TIRA_ON",
+                        "cmd_off": "TIRA_OFF",
+                        "cmd_dim": "TIRA_DIM_{value}",
+                        "cmd_rgb": "TIRA_RGB_{r}_{g}_{b}",
+                    },
+                },
+                "temp_sala": {
+                    "name": "termómetro sala",
+                    "transport": "main_arduino",
+                    "capabilities": {"on_off": False, "sensor": "temperature"},
+                    "serial": {"sensor_prefix": "TEMP_SALA"},
                 },
             },
-            "temp_sala": {
-                "name": "termómetro sala",
-                "transport": "main_arduino",
-                "capabilities": {"on_off": False, "sensor": "temperature"},
-                "serial": {"sensor_prefix": "TEMP_SALA"},
+            "global_commands": {"all_on": "TODOS_ON", "all_off": "TODOS_OFF"},
+            "scenes": {
+                "modo_pelicula": {
+                    "name": "Modo Película",
+                    "actions": [
+                        {"device": "foco_1", "command": "off"},
+                        {"device": "tira_led", "command": "rgb", "color": [50, 0, 100]},
+                    ],
+                },
             },
-        },
-        "global_commands": {"all_on": "TODOS_ON", "all_off": "TODOS_OFF"},
-        "scenes": {
-            "modo_pelicula": {
-                "name": "Modo Película",
-                "actions": [
-                    {"device": "foco_1", "command": "off"},
-                    {"device": "tira_led", "command": "rgb", "color": [50, 0, 100]},
-                ],
-            },
-        },
-    })
+        }
+    )
 
 
 # ── Migración v1 → v2 ──────────────────────────────────────────────────────
 
 
 class TestConfigMigration(unittest.TestCase):
-
     def test_detects_v1(self):
         self.assertTrue(_is_v1(V1_SAMPLE))
         self.assertFalse(_is_v1({"version": 2, "transports": {}, "devices": {}}))
@@ -148,7 +152,6 @@ class TestConfigMigration(unittest.TestCase):
 
 
 class TestDevices(unittest.TestCase):
-
     def test_default_capabilities_are_on_off_only(self):
         caps = Capabilities.from_dict({})
         self.assertTrue(caps.on_off)
@@ -158,7 +161,9 @@ class TestDevices(unittest.TestCase):
 
     def test_require_returns_error_message_when_missing(self):
         dev = Device(
-            id="x", name="X", transport="t",
+            id="x",
+            name="X",
+            transport="t",
             capabilities=Capabilities(on_off=True, dimmable=False),
         )
         self.assertIsNone(dev.require("on_off"))
@@ -169,7 +174,9 @@ class TestDevices(unittest.TestCase):
 
     def test_dimmable_opt_in_succeeds(self):
         dev = Device(
-            id="x", name="X", transport="t",
+            id="x",
+            name="X",
+            transport="t",
             capabilities=Capabilities(dimmable=True),
         )
         self.assertIsNone(dev.require("dimmable"))
@@ -179,7 +186,6 @@ class TestDevices(unittest.TestCase):
 
 
 class TestRulesParsers(unittest.TestCase):
-
     def test_normalize_number_words(self):
         self.assertIn("30", normalize("treinta segundos"))
         self.assertIn("3", normalize("por tres segundos"))
@@ -221,7 +227,6 @@ class TestRulesParsers(unittest.TestCase):
 
 
 class TestIntentLocal(unittest.TestCase):
-
     def setUp(self):
         self.cfg = sample_v2_cfg()
 
@@ -284,7 +289,6 @@ class TestIntentLocal(unittest.TestCase):
 
 
 class TestScenes(unittest.TestCase):
-
     def setUp(self):
         self.cfg = sample_v2_cfg()
 
@@ -340,7 +344,6 @@ class TestScenes(unittest.TestCase):
 
 
 class TestSensorCache(unittest.TestCase):
-
     def test_update_and_get(self):
         c = SensorCache()
         c.update("temp_sala", "24.5")

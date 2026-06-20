@@ -33,8 +33,6 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Optional
-
 
 # ── Tipos ───────────────────────────────────────────────────────────────
 
@@ -42,18 +40,18 @@ from typing import Optional
 @dataclass(frozen=True)
 class Finding:
     rule_id: str
-    severity: str          # "critical" | "warn" | "info"
-    file:    str           # path relativo a la skill_dir
-    line:    int           # 0 si no aplica
+    severity: str  # "critical" | "warn" | "info"
+    file: str  # path relativo a la skill_dir
+    line: int  # 0 si no aplica
     message: str
-    evidence: str          # snippet de hasta 120 chars
+    evidence: str  # snippet de hasta 120 chars
 
 
 @dataclass
 class ScanResult:
     skill_dir: Path
-    findings:  list[Finding] = field(default_factory=list)
-    scanned_files: int        = 0
+    findings: list[Finding] = field(default_factory=list)
+    scanned_files: int = 0
 
     def has_critical(self) -> bool:
         return any(f.severity == "critical" for f in self.findings)
@@ -73,16 +71,16 @@ class ScanResult:
     def to_dict(self) -> dict:
         return {
             "scanned_files": self.scanned_files,
-            "critical":      len(self.by_severity("critical")),
-            "warn":          len(self.by_severity("warn")),
-            "info":          len(self.by_severity("info")),
+            "critical": len(self.by_severity("critical")),
+            "warn": len(self.by_severity("warn")),
+            "info": len(self.by_severity("info")),
             "findings": [
                 {
-                    "rule_id":  f.rule_id,
+                    "rule_id": f.rule_id,
                     "severity": f.severity,
-                    "file":     f.file,
-                    "line":     f.line,
-                    "message":  f.message,
+                    "file": f.file,
+                    "line": f.line,
+                    "message": f.message,
                     "evidence": f.evidence,
                 }
                 for f in self.findings
@@ -99,24 +97,26 @@ class ScanResult:
 LINE_RULES = [
     # Ejecución dinámica de código
     {
-        "id":       "dynamic-code-execution",
+        "id": "dynamic-code-execution",
         "severity": "critical",
-        "msg":      "Dynamic code execution detected (eval/exec)",
-        "pattern":  re.compile(r"\beval\s*\(|\bexec\s*\(|__import__\s*\("),
+        "msg": "Dynamic code execution detected (eval/exec)",
+        "pattern": re.compile(r"\beval\s*\(|\bexec\s*\(|__import__\s*\("),
     },
     # Crypto mining markers
     {
-        "id":       "crypto-mining",
+        "id": "crypto-mining",
         "severity": "critical",
-        "msg":      "Possible crypto-mining reference",
-        "pattern":  re.compile(r"stratum\+tcp|stratum\+ssl|coinhive|cryptonight|xmrig", re.I),
+        "msg": "Possible crypto-mining reference",
+        "pattern": re.compile(r"stratum\+tcp|stratum\+ssl|coinhive|cryptonight|xmrig", re.I),
     },
     # Persistencia/backdoor patterns
     {
-        "id":       "persistence-task",
+        "id": "persistence-task",
         "severity": "warn",
-        "msg":      "Possible persistence mechanism (scheduled task / autostart)",
-        "pattern":  re.compile(r"schtasks|crontab\s+-e|/etc/rc\.local|/Library/LaunchAgents|HKCU.*Run", re.I),
+        "msg": "Possible persistence mechanism (scheduled task / autostart)",
+        "pattern": re.compile(
+            r"schtasks|crontab\s+-e|/etc/rc\.local|/Library/LaunchAgents|HKCU.*Run", re.I
+        ),
     },
 ]
 
@@ -124,27 +124,29 @@ LINE_RULES = [
 SOURCE_RULES = [
     # Lectura de archivos + envío de red → exfiltración
     {
-        "id":       "potential-exfiltration",
+        "id": "potential-exfiltration",
         "severity": "warn",
-        "msg":      "File read combined with network send — possible data exfiltration",
-        "primary":  re.compile(r"open\s*\(|read_text|read_bytes|readFile"),
-        "context":  re.compile(r"requests\.|urllib|httpx|aiohttp|fetch\s*\(|socket\."),
+        "msg": "File read combined with network send — possible data exfiltration",
+        "primary": re.compile(r"open\s*\(|read_text|read_bytes|readFile"),
+        "context": re.compile(r"requests\.|urllib|httpx|aiohttp|fetch\s*\(|socket\."),
     },
     # Variables de entorno + red → harvesting de credenciales
     {
-        "id":       "env-harvesting",
+        "id": "env-harvesting",
         "severity": "critical",
-        "msg":      "Environment variable access + network send — possible credential harvesting",
-        "primary":  re.compile(r"os\.environ|getenv|process\.env"),
-        "context":  re.compile(r"requests\.|urllib|httpx|aiohttp|fetch\s*\(|socket\."),
+        "msg": "Environment variable access + network send — possible credential harvesting",
+        "primary": re.compile(r"os\.environ|getenv|process\.env"),
+        "context": re.compile(r"requests\.|urllib|httpx|aiohttp|fetch\s*\(|socket\."),
     },
     # Obfuscation
     {
-        "id":       "obfuscated-code",
+        "id": "obfuscated-code",
         "severity": "warn",
-        "msg":      "Hex/base64 obfuscation pattern",
-        "primary":  re.compile(r"(\\x[0-9a-fA-F]{2}){8,}|(?:b64decode|atob)\s*\(\s*['\"][A-Za-z0-9+/=]{200,}"),
-        "context":  None,
+        "msg": "Hex/base64 obfuscation pattern",
+        "primary": re.compile(
+            r"(\\x[0-9a-fA-F]{2}){8,}|(?:b64decode|atob)\s*\(\s*['\"][A-Za-z0-9+/=]{200,}"
+        ),
+        "context": None,
     },
 ]
 
@@ -153,43 +155,48 @@ SOURCE_RULES = [
 # las lee, podría obedecerlas y bypassear nuestras reglas.
 SKILL_CONTENT_RULES = [
     {
-        "id":       "prompt-injection-ignore-instructions",
+        "id": "prompt-injection-ignore-instructions",
         "severity": "critical",
-        "msg":      "Skill text tries to override prior instructions",
-        "pattern":  re.compile(r"ignore (all|any|previous|above|prior) instructions", re.I),
+        "msg": "Skill text tries to override prior instructions",
+        "pattern": re.compile(r"ignore (all|any|previous|above|prior) instructions", re.I),
     },
     {
-        "id":       "prompt-injection-system",
+        "id": "prompt-injection-system",
         "severity": "critical",
-        "msg":      "Skill text references hidden prompt layers",
-        "pattern":  re.compile(r"\b(system prompt|developer message|hidden instructions)\b", re.I),
+        "msg": "Skill text references hidden prompt layers",
+        "pattern": re.compile(r"\b(system prompt|developer message|hidden instructions)\b", re.I),
     },
     {
-        "id":       "prompt-injection-tool",
+        "id": "prompt-injection-tool",
         "severity": "critical",
-        "msg":      "Skill text encourages bypassing tool approval",
-        "pattern":  re.compile(
+        "msg": "Skill text encourages bypassing tool approval",
+        "pattern": re.compile(
             r"\b(run|execute|invoke|call)\b.{0,50}\btool\b.{0,50}\bwithout\b.{0,30}\b(permission|approval)",
             re.I,
         ),
     },
     {
-        "id":       "shell-pipe-to-shell",
+        "id": "shell-pipe-to-shell",
         "severity": "critical",
-        "msg":      "Skill text includes curl|sh / wget|sh install pattern",
-        "pattern":  re.compile(r"\b(curl|wget|iwr|Invoke-WebRequest)\b[^|\n]{0,120}\|\s*(sh|bash|zsh|pwsh|powershell)\b", re.I),
+        "msg": "Skill text includes curl|sh / wget|sh install pattern",
+        "pattern": re.compile(
+            r"\b(curl|wget|iwr|Invoke-WebRequest)\b[^|\n]{0,120}\|\s*(sh|bash|zsh|pwsh|powershell)\b",
+            re.I,
+        ),
     },
     {
-        "id":       "destructive-delete",
+        "id": "destructive-delete",
         "severity": "warn",
-        "msg":      "Skill text contains broad destructive delete",
-        "pattern":  re.compile(r"\brm\s+-rf\s+(\/|\$HOME|~|\.)|Remove-Item.*-Recurse.*-Force.*[CcDd]:\\", re.I),
+        "msg": "Skill text contains broad destructive delete",
+        "pattern": re.compile(
+            r"\brm\s+-rf\s+(\/|\$HOME|~|\.)|Remove-Item.*-Recurse.*-Force.*[CcDd]:\\", re.I
+        ),
     },
     {
-        "id":       "unsafe-permissions",
+        "id": "unsafe-permissions",
         "severity": "warn",
-        "msg":      "Skill text contains unsafe chmod 777",
-        "pattern":  re.compile(r"\bchmod\s+(-R\s+)?777\b", re.I),
+        "msg": "Skill text contains unsafe chmod 777",
+        "pattern": re.compile(r"\bchmod\s+(-R\s+)?777\b", re.I),
     },
 ]
 
@@ -198,9 +205,9 @@ SKILL_CONTENT_RULES = [
 _SCANNABLE_EXTS = {".py", ".sh", ".bash", ".zsh", ".ps1", ".bat", ".js", ".ts", ".mjs"}
 
 # Límites duros.
-_MAX_FILES        = 100
-_MAX_FILE_BYTES   = 1 * 1024 * 1024     # 1 MB por archivo
-_MAX_BODY_BYTES   = 500 * 1024          # 500 KB para SKILL.md
+_MAX_FILES = 100
+_MAX_FILE_BYTES = 1 * 1024 * 1024  # 1 MB por archivo
+_MAX_BODY_BYTES = 500 * 1024  # 500 KB para SKILL.md
 
 
 # ── API ─────────────────────────────────────────────────────────────────
@@ -221,14 +228,16 @@ def scan_skill_dir(skill_dir: Path) -> ScanResult:
         except OSError:
             data = b""
         if len(data) > _MAX_BODY_BYTES:
-            res.findings.append(Finding(
-                rule_id="skill-too-large",
-                severity="critical",
-                file="SKILL.md",
-                line=0,
-                message=f"SKILL.md excede {_MAX_BODY_BYTES} bytes ({len(data)})",
-                evidence="",
-            ))
+            res.findings.append(
+                Finding(
+                    rule_id="skill-too-large",
+                    severity="critical",
+                    file="SKILL.md",
+                    line=0,
+                    message=f"SKILL.md excede {_MAX_BODY_BYTES} bytes ({len(data)})",
+                    evidence="",
+                )
+            )
         else:
             text = data.decode("utf-8", errors="replace")
             _apply_content_rules(text, "SKILL.md", res)
@@ -250,14 +259,16 @@ def scan_skill_dir(skill_dir: Path) -> ScanResult:
         except OSError:
             continue
         if size > _MAX_FILE_BYTES:
-            res.findings.append(Finding(
-                rule_id="file-too-large",
-                severity="info",
-                file=str(sub.relative_to(skill_dir)),
-                line=0,
-                message=f"Archivo {size} bytes — skip de scan",
-                evidence="",
-            ))
+            res.findings.append(
+                Finding(
+                    rule_id="file-too-large",
+                    severity="info",
+                    file=str(sub.relative_to(skill_dir)),
+                    line=0,
+                    message=f"Archivo {size} bytes — skip de scan",
+                    evidence="",
+                )
+            )
             count += 1
             continue
         try:
@@ -282,42 +293,50 @@ def validate_frontmatter(fm: dict) -> list[Finding]:
     desc = (fm.get("description") or "").strip()
 
     if not name:
-        out.append(Finding(
-            rule_id="frontmatter-missing-name",
-            severity="critical",
-            file="SKILL.md",
-            line=0,
-            message="Falta el campo 'name' en el frontmatter",
-            evidence="",
-        ))
+        out.append(
+            Finding(
+                rule_id="frontmatter-missing-name",
+                severity="critical",
+                file="SKILL.md",
+                line=0,
+                message="Falta el campo 'name' en el frontmatter",
+                evidence="",
+            )
+        )
     elif len(name) > 80 or not re.fullmatch(r"[a-zA-Z0-9_\-.]+", name):
-        out.append(Finding(
-            rule_id="frontmatter-bad-name",
-            severity="critical",
-            file="SKILL.md",
-            line=0,
-            message=f"'name' inválido: '{name[:40]}' (solo alfanumérico, guiones, puntos; <80 chars)",
-            evidence=name[:80],
-        ))
+        out.append(
+            Finding(
+                rule_id="frontmatter-bad-name",
+                severity="critical",
+                file="SKILL.md",
+                line=0,
+                message=f"'name' inválido: '{name[:40]}' (solo alfanumérico, guiones, puntos; <80 chars)",
+                evidence=name[:80],
+            )
+        )
 
     if not desc:
-        out.append(Finding(
-            rule_id="frontmatter-missing-description",
-            severity="critical",
-            file="SKILL.md",
-            line=0,
-            message="Falta el campo 'description' en el frontmatter",
-            evidence="",
-        ))
+        out.append(
+            Finding(
+                rule_id="frontmatter-missing-description",
+                severity="critical",
+                file="SKILL.md",
+                line=0,
+                message="Falta el campo 'description' en el frontmatter",
+                evidence="",
+            )
+        )
     elif len(desc) > 500:
-        out.append(Finding(
-            rule_id="frontmatter-long-description",
-            severity="warn",
-            file="SKILL.md",
-            line=0,
-            message=f"'description' demasiado larga ({len(desc)} chars) — recortala a ~140 para el catálogo",
-            evidence=desc[:80],
-        ))
+        out.append(
+            Finding(
+                rule_id="frontmatter-long-description",
+                severity="warn",
+                file="SKILL.md",
+                line=0,
+                message=f"'description' demasiado larga ({len(desc)} chars) — recortala a ~140 para el catálogo",
+                evidence=desc[:80],
+            )
+        )
 
     return out
 
@@ -334,11 +353,16 @@ def _apply_line_rules(text: str, rel_path: str, res: ScanResult) -> None:
     for i, line in enumerate(text.splitlines(), start=1):
         for rule in LINE_RULES:
             if rule["pattern"].search(line):
-                res.findings.append(Finding(
-                    rule_id=rule["id"], severity=rule["severity"],
-                    file=rel_path, line=i, message=rule["msg"],
-                    evidence=_evidence(line),
-                ))
+                res.findings.append(
+                    Finding(
+                        rule_id=rule["id"],
+                        severity=rule["severity"],
+                        file=rel_path,
+                        line=i,
+                        message=rule["msg"],
+                        evidence=_evidence(line),
+                    )
+                )
 
 
 def _apply_source_rules(text: str, rel_path: str, res: ScanResult) -> None:
@@ -350,19 +374,29 @@ def _apply_source_rules(text: str, rel_path: str, res: ScanResult) -> None:
             continue
         # Buscamos número de línea aproximado del primary match.
         line_no = text.count("\n", 0, prim.start()) + 1
-        res.findings.append(Finding(
-            rule_id=rule["id"], severity=rule["severity"],
-            file=rel_path, line=line_no, message=rule["msg"],
-            evidence=_evidence(prim.group(0)),
-        ))
+        res.findings.append(
+            Finding(
+                rule_id=rule["id"],
+                severity=rule["severity"],
+                file=rel_path,
+                line=line_no,
+                message=rule["msg"],
+                evidence=_evidence(prim.group(0)),
+            )
+        )
 
 
 def _apply_content_rules(text: str, rel_path: str, res: ScanResult) -> None:
     for i, line in enumerate(text.splitlines(), start=1):
         for rule in SKILL_CONTENT_RULES:
             if rule["pattern"].search(line):
-                res.findings.append(Finding(
-                    rule_id=rule["id"], severity=rule["severity"],
-                    file=rel_path, line=i, message=rule["msg"],
-                    evidence=_evidence(line),
-                ))
+                res.findings.append(
+                    Finding(
+                        rule_id=rule["id"],
+                        severity=rule["severity"],
+                        file=rel_path,
+                        line=i,
+                        message=rule["msg"],
+                        evidence=_evidence(line),
+                    )
+                )

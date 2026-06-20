@@ -32,7 +32,7 @@ from google.genai import types
 from config import get_api_key
 
 # ── Alias de modelos (nombre legible → ID real) ─────────────────────────────
-FLASH      = "gemini-2.5-flash"
+FLASH = "gemini-2.5-flash"
 FLASH_LITE = "gemini-2.5-flash-lite"
 
 
@@ -82,7 +82,9 @@ def generate(
     """
     config = _build_config(system_instruction, temperature, response_mime_type)
     return get_client().models.generate_content(
-        model=model, contents=contents, config=config,
+        model=model,
+        contents=contents,
+        config=config,
     )
 
 
@@ -111,6 +113,7 @@ def generate_text(
 # ``model.generate_content(...)`` en muchos sitios. Para migrarlos sin tocar
 # cada call site, :func:`model` devuelve un objeto con la misma interfaz
 # ``.generate_content`` pero apoyado en el cliente nuevo y cacheado.
+
 
 class _ModelHandle:
     """Adaptador mínimo: imita ``GenerativeModel.generate_content`` del SDK

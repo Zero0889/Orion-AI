@@ -14,6 +14,7 @@ import faulthandler
 import sys
 import traceback
 from pathlib import Path
+import contextlib
 
 # Asegurar que estamos en el directorio del proyecto
 HERE = Path(__file__).resolve().parent
@@ -30,47 +31,51 @@ def main() -> None:
     class _Tee:
         def __init__(self, *streams):
             self._streams = streams
+
         def write(self, s):
             for st in self._streams:
-                try:
+                with contextlib.suppress(Exception):
                     st.write(s)
-                except Exception:
-                    pass
+
         def flush(self):
             for st in self._streams:
-                try:
+                with contextlib.suppress(Exception):
                     st.flush()
-                except Exception:
-                    pass
 
     sys.stdout = _Tee(sys.__stdout__, log_file)
     sys.stderr = _Tee(sys.__stderr__, log_file)
 
-    print(f"=== ORION DEBUG LAUNCHER ===")
+    print("=== ORION DEBUG LAUNCHER ===")
     print(f"Log: {LOG_PATH}")
     print(f"Python: {sys.version}")
     print(f"Working dir: {HERE}")
-    print(f"=" * 30)
+    print("=" * 30)
 
     try:
         # Hook de excepciones no manejadas
         def _on_unhandled(exctype, value, tb):
             print("\n!!! EXCEPCIÓN NO MANEJADA !!!", file=sys.stderr)
             traceback.print_exception(exctype, value, tb, file=sys.stderr)
+
         sys.excepthook = _on_unhandled
 
         # Hook para excepciones en hilos
         import threading
+
         def _on_thread_unhandled(args):
             print(f"\n!!! EXCEPCIÓN EN THREAD {args.thread.name} !!!", file=sys.stderr)
             traceback.print_exception(
-                args.exc_type, args.exc_value, args.exc_traceback,
+                args.exc_type,
+                args.exc_value,
+                args.exc_traceback,
                 file=sys.stderr,
             )
+
         threading.excepthook = _on_thread_unhandled
 
         # Ejecutar main.main()
         from main import main as orion_main
+
         orion_main()
 
     except SystemExit:
@@ -85,10 +90,8 @@ def main() -> None:
         log_file.flush()
         log_file.close()
         # Pausa para que el usuario lea si está en doble-click
-        try:
+        with contextlib.suppress(EOFError):
             input("\nPresiona Enter para cerrar...")
-        except EOFError:
-            pass
 
 
 if __name__ == "__main__":

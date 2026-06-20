@@ -30,6 +30,7 @@ class GmailAdapter(NotificationAdapter):
 
     def is_configured(self) -> bool:
         from core.cli_installer import cli_path
+
         return cli_path("gog") is not None
 
     def fetch(self, *, max_items: int = 20) -> list[NotificationItem]:
@@ -58,8 +59,8 @@ class GmailAdapter(NotificationAdapter):
             )
         except FileNotFoundError as e:
             raise RuntimeError(f"No pude ejecutar `gog`: {e}") from e
-        except subprocess.TimeoutExpired:
-            raise RuntimeError("`gog gmail search` superó el timeout (30s).")
+        except subprocess.TimeoutExpired as e:
+            raise RuntimeError("`gog gmail search` superó el timeout (30s).") from e
 
         stdout = r.stdout or ""
         stderr = r.stderr or ""
@@ -89,25 +90,27 @@ class GmailAdapter(NotificationAdapter):
         for t in threads[:max_items]:
             if not isinstance(t, dict):
                 continue
-            mid     = str(t.get("id") or "").strip()
+            mid = str(t.get("id") or "").strip()
             if not mid:
                 continue
             subject = (t.get("subject") or "(sin asunto)").strip()
-            sender  = (t.get("from") or "").strip()
-            ts      = _parse_gog_date(t.get("date"))
-            items.append(NotificationItem(
-                uid         = f"gmail:{mid}",
-                source      = "gmail",
-                title       = f"✉️ {sender}: {subject}" if sender else f"✉️ {subject}",
-                summary     = "",   # gog -j no trae snippet en search
-                url         = f"https://mail.google.com/mail/u/0/#inbox/{mid}",
-                received_ts = ts,
-                metadata    = {
-                    "thread_id":     mid,
-                    "labels":        list(t.get("labels") or []),
-                    "message_count": int(t.get("messageCount") or 1),
-                },
-            ))
+            sender = (t.get("from") or "").strip()
+            ts = _parse_gog_date(t.get("date"))
+            items.append(
+                NotificationItem(
+                    uid=f"gmail:{mid}",
+                    source="gmail",
+                    title=f"✉️ {sender}: {subject}" if sender else f"✉️ {subject}",
+                    summary="",  # gog -j no trae snippet en search
+                    url=f"https://mail.google.com/mail/u/0/#inbox/{mid}",
+                    received_ts=ts,
+                    metadata={
+                        "thread_id": mid,
+                        "labels": list(t.get("labels") or []),
+                        "message_count": int(t.get("messageCount") or 1),
+                    },
+                )
+            )
         return items
 
 
@@ -115,9 +118,11 @@ def _parse_gog_date(s: str | None) -> float:
     """gog devuelve fechas tipo '2026-06-07 09:28'. Si falla, usamos ahora."""
     if not s:
         import time as _time
+
         return _time.time()
     try:
         return datetime.strptime(s.strip(), "%Y-%m-%d %H:%M").timestamp()
     except (ValueError, TypeError):
         import time as _time
+
         return _time.time()

@@ -38,6 +38,7 @@ def test_pyinstaller_spec_exists():
 def test_pyinstaller_spec_is_parsable_python():
     """No corremos el spec; solo verificamos que tiene sintaxis válida."""
     import ast
+
     spec = (PROJECT_ROOT / "packaging" / "orion_backend.spec").read_text(encoding="utf-8")
     ast.parse(spec)
 
@@ -88,9 +89,7 @@ def test_tauri_main_rs_exists_and_spawns_sidecar():
     src = main_rs.read_text(encoding="utf-8")
     assert "new_sidecar" in src, "main.rs debe usar tauri ... new_sidecar"
     assert "orion-backend" in src, "main.rs debe referir al sidecar orion-backend"
-    assert "127.0.0.1:8765" in src or "8765" in src, (
-        "main.rs debe esperar al backend en :8765"
-    )
+    assert "127.0.0.1:8765" in src or "8765" in src, "main.rs debe esperar al backend en :8765"
 
 
 def test_tauri_build_rs_calls_tauri_build():

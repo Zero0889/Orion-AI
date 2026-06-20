@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48">
+  <rect x="4" y="8" width="40" height="32" rx="2" fill="#0F9D58"/>
+  <rect x="4" y="8" width="40" height="32" rx="2" fill="url(#cr-grad)"/>
+  <circle cx="24" cy="22" r="3" fill="#FFFFFF"/>
+  <path d="M17 32c0-3.5 3.1-6 7-6s7 2.5 7 6v1H17v-1Z" fill="#FFFFFF"/>
+  <circle cx="14" cy="23" r="2.4" fill="#57BB8A"/>
+  <path d="M9 31c0-2.4 2.2-4 5-4s5 1.6 5 4v.6H9V31Z" fill="#57BB8A"/>
+  <circle cx="34" cy="23" r="2.4" fill="#57BB8A"/>
+  <path d="M29 31c0-2.4 2.2-4 5-4s5 1.6 5 4v.6H29V31Z" fill="#57BB8A"/>
+  <defs>
+    <linearGradient id="cr-grad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.04"/>
+      <stop offset="1" stop-color="#000000" stop-opacity="0.1"/>
+    </linearGradient>
+  </defs>
+</svg>

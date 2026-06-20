@@ -26,40 +26,41 @@ Cada receta declara:
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field, asdict
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
 
 @dataclass
 class RecipePrompt:
     """Campo que la UI pregunta al usuario al instalar la receta."""
-    key:         str                          # placeholder name, e.g. "ROOT_PATH"
-    label:       str                          # input label
-    description: str = ""                     # hint debajo
-    default:     str = ""                     # valor sugerido
-    required:    bool = True
+
+    key: str  # placeholder name, e.g. "ROOT_PATH"
+    label: str  # input label
+    description: str = ""  # hint debajo
+    default: str = ""  # valor sugerido
+    required: bool = True
 
 
 @dataclass
 class RecipeEnv:
-    name:        str
+    name: str
     description: str = ""
-    required:    bool = True
+    required: bool = True
 
 
 @dataclass
 class Recipe:
-    recipe_id:     str
-    title:         str
-    description:   str
-    category:      str
-    command:       str
-    args_template: list[str]                  # puede tener "{PROMPT_KEY}"
-    suggested_id:  str
-    repo_url:      str = ""
-    prompts:       list[RecipePrompt] = field(default_factory=list)
-    env_required:  list[RecipeEnv]    = field(default_factory=list)
-    official:      bool = False
+    recipe_id: str
+    title: str
+    description: str
+    category: str
+    command: str
+    args_template: list[str]  # puede tener "{PROMPT_KEY}"
+    suggested_id: str
+    repo_url: str = ""
+    prompts: list[RecipePrompt] = field(default_factory=list)
+    env_required: list[RecipeEnv] = field(default_factory=list)
+    official: bool = False
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -191,7 +192,6 @@ RECIPES: list[Recipe] = [
         repo_url="https://github.com/modelcontextprotocol/servers/tree/main/src/everything",
         official=True,
     ),
-
     # ── Populares de la comunidad ─────────────────────────────────────
     Recipe(
         recipe_id="github",
@@ -271,7 +271,7 @@ RECIPES: list[Recipe] = [
         repo_url="https://github.com/modelcontextprotocol/servers/tree/main/src/slack",
         env_required=[
             RecipeEnv(name="SLACK_BOT_TOKEN", description="xoxb-..."),
-            RecipeEnv(name="SLACK_TEAM_ID",   description="T..."),
+            RecipeEnv(name="SLACK_TEAM_ID", description="T..."),
             RecipeEnv(
                 name="SLACK_CHANNEL_IDS",
                 description="Canales separados por coma. Ej: C123,C456",

@@ -17,26 +17,26 @@ import { create } from "zustand";
 export type ToastTone = "success" | "info" | "warn" | "error";
 
 export interface ToastItem {
-  id:        string;
-  tone:      ToastTone;
-  title:     string;
-  detail?:   string;
-  duration:  number;   // ms — 0 = persistente
+  id: string;
+  tone: ToastTone;
+  title: string;
+  detail?: string;
+  duration: number; // ms — 0 = persistente
   // Si está seteado, el toast pinta dos botones y al elegir cualquiera
   // resuelve la promesa correspondiente.
-  confirm?:  {
-    label:   string;
+  confirm?: {
+    label: string;
     onConfirm: () => void;
     onCancel?: () => void;
-    danger?:  boolean;
+    danger?: boolean;
   };
 }
 
 interface ToastState {
   items: ToastItem[];
-  push:    (t: Omit<ToastItem, "id" | "duration"> & { duration?: number }) => string;
+  push: (t: Omit<ToastItem, "id" | "duration"> & { duration?: number }) => string;
   dismiss: (id: string) => void;
-  clear:   () => void;
+  clear: () => void;
 }
 
 let nextId = 1;
@@ -55,7 +55,9 @@ export const useToastStore = create<ToastState>((set, get) => ({
   dismiss(id) {
     set((s) => ({ items: s.items.filter((x) => x.id !== id) }));
   },
-  clear() { set({ items: [] }); },
+  clear() {
+    set({ items: [] });
+  },
 }));
 
 /* ── Helpers ergonómicos ──────────────────────────────────────────── */
@@ -63,33 +65,39 @@ export const useToastStore = create<ToastState>((set, get) => ({
 export const toast = {
   success: (title: string, detail?: string) =>
     useToastStore.getState().push({ tone: "success", title, detail }),
-  info:    (title: string, detail?: string) =>
-    useToastStore.getState().push({ tone: "info",    title, detail }),
-  warn:    (title: string, detail?: string) =>
-    useToastStore.getState().push({ tone: "warn",    title, detail }),
-  error:   (title: string, detail?: string) =>
-    useToastStore.getState().push({ tone: "error",   title, detail }),
+  info: (title: string, detail?: string) =>
+    useToastStore.getState().push({ tone: "info", title, detail }),
+  warn: (title: string, detail?: string) =>
+    useToastStore.getState().push({ tone: "warn", title, detail }),
+  error: (title: string, detail?: string) =>
+    useToastStore.getState().push({ tone: "error", title, detail }),
 
   /** Reemplaza al `confirm()` nativo. Devuelve una promesa con la
    *  decisión del usuario. El toast permanece hasta que elija. */
   confirm(opts: {
-    title:    string;
-    detail?:  string;
+    title: string;
+    detail?: string;
     confirmLabel?: string;
-    danger?:  boolean;
+    danger?: boolean;
   }): Promise<boolean> {
     return new Promise((resolve) => {
       const { push, dismiss } = useToastStore.getState();
       const id = push({
-        tone:    opts.danger ? "warn" : "info",
-        title:   opts.title,
-        detail:  opts.detail,
+        tone: opts.danger ? "warn" : "info",
+        title: opts.title,
+        detail: opts.detail,
         duration: 0,
         confirm: {
-          label:    opts.confirmLabel ?? "Confirmar",
-          danger:   opts.danger,
-          onConfirm: () => { dismiss(id); resolve(true); },
-          onCancel:  () => { dismiss(id); resolve(false); },
+          label: opts.confirmLabel ?? "Confirmar",
+          danger: opts.danger,
+          onConfirm: () => {
+            dismiss(id);
+            resolve(true);
+          },
+          onCancel: () => {
+            dismiss(id);
+            resolve(false);
+          },
         },
       });
     });

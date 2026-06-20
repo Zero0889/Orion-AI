@@ -27,7 +27,7 @@ interface Props {
 
 export function AskUserPrompt({ send }: Props) {
   const pending = useAskUserStore((s) => s.pending);
-  const clear   = useAskUserStore((s) => s.clear);
+  const clear = useAskUserStore((s) => s.clear);
 
   // Estado local para el modo "Otro" — input de texto libre
   const [otherMode, setOtherMode] = useState(false);
@@ -56,17 +56,17 @@ export function AskUserPrompt({ send }: Props) {
       <div className="mx-auto max-w-3xl px-4 md:px-8 py-4">
         {/* Header: badge + pregunta */}
         <div className="flex items-start gap-3 mb-3">
-          <div className="grid place-items-center h-7 w-7 rounded-md bg-pri/15 text-pri shrink-0
-                          shadow-[0_0_12px_rgb(var(--orion-pri-glow)/0.35)]">
+          <div
+            className="grid place-items-center h-7 w-7 rounded-md bg-pri/15 text-pri shrink-0
+                          shadow-[0_0_12px_rgb(var(--orion-pri-glow)/0.35)]"
+          >
             <Icon name="search" size={14} />
           </div>
           <div className="min-w-0 flex-1">
             <div className="text-[10px] uppercase tracking-[0.24em] text-pri/80 font-mono">
               Orion pregunta
             </div>
-            <div className="mt-1 text-sm text-text leading-relaxed">
-              {pending.question}
-            </div>
+            <div className="mt-1 text-sm text-text leading-relaxed">{pending.question}</div>
           </div>
           <button
             onClick={cancel}
@@ -91,9 +91,7 @@ export function AskUserPrompt({ send }: Props) {
                            hover:border-pri/40 hover:bg-pri/10
                            transition-all duration-150 animate-fade-in-up"
               >
-                <div className="text-sm text-text font-medium leading-snug">
-                  {opt.label}
-                </div>
+                <div className="text-sm text-text font-medium leading-snug">{opt.label}</div>
                 {opt.description && (
                   <div className="text-[11px] text-text-dim mt-0.5 leading-relaxed">
                     {opt.description}
@@ -116,8 +114,10 @@ export function AskUserPrompt({ send }: Props) {
                            hover:border-pri/40 hover:bg-pri/[0.04]
                            transition-all duration-150"
               >
-                <div className="text-sm text-text-dim italic leading-snug
-                                flex items-center gap-2">
+                <div
+                  className="text-sm text-text-dim italic leading-snug
+                                flex items-center gap-2"
+                >
                   <Icon name="edit" size={12} />
                   Otro… (escribir respuesta libre)
                 </div>
@@ -133,14 +133,20 @@ export function AskUserPrompt({ send }: Props) {
               onChange={(e) => setOtherText(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === "Enter" && otherText.trim()) submit(otherText.trim());
-                if (e.key === "Escape") { setOtherMode(false); setOtherText(""); }
+                if (e.key === "Escape") {
+                  setOtherMode(false);
+                  setOtherText("");
+                }
               }}
               placeholder="Tu respuesta…"
               className="flex-1 h-9 rounded-md bg-elevated border border-pri/40
                          px-3 text-sm placeholder-muted focus:outline-none focus:border-pri"
             />
             <button
-              onClick={() => { setOtherMode(false); setOtherText(""); }}
+              onClick={() => {
+                setOtherMode(false);
+                setOtherText("");
+              }}
               className="h-9 px-3 rounded-md text-xs text-text-dim hover:text-text
                          hover:bg-white/[0.05] transition-colors"
             >

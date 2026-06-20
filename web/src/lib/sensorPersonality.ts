@@ -13,19 +13,17 @@
 
 import type { IconName } from "@/ui/Icon";
 
-export type SensorKind =
-  | "temperature" | "humidity" | "light"
-  | "geo" | "count" | "default";
+export type SensorKind = "temperature" | "humidity" | "light" | "geo" | "count" | "default";
 
 export interface SensorPersonality {
   /** Etiqueta humana, mostrada en chips y headers. */
-  label:  string;
+  label: string;
   /** Icono Lucide-like del set local. */
-  icon:   IconName;
+  icon: IconName;
   /** Color de acento en CSS (hex). Usado en barra lateral, icono y unidad. */
-  color:  string;
+  color: string;
   /** Sufijo de unidad (con el espacio incluido si corresponde). */
-  unit:   string;
+  unit: string;
   /** Rango esperado [min, max] para visualizaciones tipo "fill bar". */
   range?: [number, number];
   /** Cuántos decimales mostrar al renderizar el valor. */
@@ -37,51 +35,51 @@ export interface SensorPersonality {
 const PRESETS: Record<SensorKind, SensorPersonality> = {
   temperature: {
     label: "Temperatura",
-    icon:  "thermometer",
+    icon: "thermometer",
     color: "#FF7A5C",
-    unit:  " °C",
+    unit: " °C",
     range: [0, 40],
     decimals: 1,
-    hint:  "ambiente",
+    hint: "ambiente",
   },
   humidity: {
     label: "Humedad",
-    icon:  "droplet",
+    icon: "droplet",
     color: "#5BCBF5",
-    unit:  " %",
+    unit: " %",
     range: [0, 100],
     decimals: 0,
-    hint:  "relativa",
+    hint: "relativa",
   },
   light: {
     label: "Luz",
-    icon:  "sun",
+    icon: "sun",
     color: "#F5C04F",
-    unit:  " lx",
+    unit: " lx",
     range: [0, 1000],
     decimals: 0,
-    hint:  "lux",
+    hint: "lux",
   },
   geo: {
     label: "Posición",
-    icon:  "compass",
+    icon: "compass",
     color: "#A78BFA",
-    unit:  "",
+    unit: "",
     decimals: 4,
-    hint:  "GPS",
+    hint: "GPS",
   },
   count: {
     label: "Cuenta",
-    icon:  "sigma",
+    icon: "sigma",
     color: "#7EE7FF",
-    unit:  "",
+    unit: "",
     decimals: 0,
   },
   default: {
     label: "Sensor",
-    icon:  "sensors",
+    icon: "sensors",
     color: "#7EE7FF",
-    unit:  "",
+    unit: "",
     decimals: 1,
   },
 };

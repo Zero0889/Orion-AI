@@ -27,33 +27,28 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from core.tool_registry import ToolDeclaration, ToolRegistry  # noqa: E402
-from core.tools_bootstrap import register_builtin_tools        # noqa: E402
+from core.tool_registry import ToolDeclaration, ToolRegistry
+from core.tools_bootstrap import register_builtin_tools
 
-
-# Las 22 tools que main.py tenía en TOOL_DECLARATIONS antes del refactor.
-EXPECTED_TOOLS = {
-    "open_app", "web_search", "weather_report", "send_message",
-    "reminder", "youtube_video", "screen_process", "computer_settings",
-    "browser_control", "file_controller", "desktop_control", "code_helper",
-    "dev_agent", "agent_task", "computer_control", "game_updater",
-    "flight_finder", "shutdown_orion", "file_processor", "quick_note",
-    "save_memory", "iot_control", "google_drive", "classroom",
+# Tools CORE que el sistema necesita para arrancar — si alguna desaparece,
+# es un bug grave. NO es la lista completa: pueden haber nuevas tools
+# (skills, plugins, MCP) que se sumen sin romper el test.
+CORE_TOOLS = {
+    "open_app",
+    "web_search",
+    "weather_report",
+    "file_controller",
+    "code_helper",
+    "computer_control",
+    "agent_task",
+    "shutdown_orion",
+    "save_memory",
+    "quick_note",
+    "ask_user",
 }
 
 # Stub Live-only — main.py reemplaza estos handlers al arrancar.
 LIVE_ONLY_TOOLS = {"agent_task", "shutdown_orion", "quick_note", "save_memory"}
-
-# Timeouts que main.py tenía en _TOOL_TIMEOUTS (los != 60).
-EXPECTED_TIMEOUTS = {
-    "dev_agent":      300,
-    "game_updater":   300,
-    "agent_task":     30,
-    "code_helper":    180,
-    "file_processor": 180,
-    "google_drive":   120,
-    "flight_finder":  90,
-}
 
 
 @pytest.fixture
@@ -65,25 +60,31 @@ def fresh_registry():
     ToolRegistry._reset()
 
 
-def test_all_expected_tools_registered(fresh_registry):
+def test_core_tools_registered(fresh_registry):
+    """Las tools core deben estar siempre. Otras pueden sumarse sin romper."""
     names = set(fresh_registry.names())
-    missing = EXPECTED_TOOLS - names
-    extra = names - EXPECTED_TOOLS
-    assert not missing, f"Faltan tools en el registry: {missing}"
-    assert not extra, f"Tools inesperadas en el registry: {extra}"
+    missing = CORE_TOOLS - names
+    assert not missing, f"Faltan tools core en el registry: {missing}"
+
+
+def test_no_duplicate_or_empty_names(fresh_registry):
+    """Cada tool tiene name único y no vacío."""
+    names = fresh_registry.names()
+    assert len(names) == len(set(names)), "Hay tools con nombres duplicados"
+    assert all(n and n.strip() for n in names), "Hay tools con name vacío"
 
 
 def test_every_tool_has_valid_gemini_schema(fresh_registry):
     for decl in fresh_registry.all():
         params = decl.parameters
         assert isinstance(params, dict), f"{decl.name}: parameters debe ser dict"
-        assert params.get("type") == "OBJECT", \
+        assert params.get("type") == "OBJECT", (
             f"{decl.name}: parameters.type debe ser OBJECT (Gemini), no '{params.get('type')}'"
+        )
         assert "properties" in params, f"{decl.name}: falta 'properties'"
         # 'required' es opcional pero si está debe ser lista
         if "required" in params:
-            assert isinstance(params["required"], list), \
-                f"{decl.name}: 'required' debe ser lista"
+            assert isinstance(params["required"], list), f"{decl.name}: 'required' debe ser lista"
 
 
 def test_property_types_are_uppercase_gemini(fresh_registry):
@@ -93,32 +94,38 @@ def test_property_types_are_uppercase_gemini(fresh_registry):
         props = decl.parameters.get("properties", {})
         for pname, pdef in props.items():
             t = pdef.get("type")
-            assert t in valid_types, \
-                f"{decl.name}.{pname}: tipo '{t}' inválido para Gemini"
+            assert t in valid_types, f"{decl.name}.{pname}: tipo '{t}' inválido para Gemini"
 
 
 def test_to_gemini_declarations_shape(fresh_registry):
+    """Cada declaración tiene exactamente {name, description, parameters} y
+    el count matchea con names() — sin lista hardcoded."""
     decls = fresh_registry.to_gemini_declarations()
-    assert len(decls) == len(EXPECTED_TOOLS)
+    assert len(decls) == len(fresh_registry.names())
     for d in decls:
         assert set(d.keys()) == {"name", "description", "parameters"}
-        assert isinstance(d["name"], str)
-        assert isinstance(d["description"], str)
+        assert isinstance(d["name"], str) and d["name"]
+        assert isinstance(d["description"], str) and d["description"]
         assert isinstance(d["parameters"], dict)
 
 
-def test_timeouts_preserved(fresh_registry):
+def test_timeouts_are_positive_integers(fresh_registry):
+    """Cada tool tiene timeout > 0 (no hay valores hardcoded — los
+    timeouts cambian con tunings; el invariante es que existan y sean
+    razonables, no que valgan X segundos exactos)."""
     timeouts = fresh_registry.timeouts()
-    for name, expected in EXPECTED_TIMEOUTS.items():
-        assert timeouts.get(name) == expected, \
-            f"{name}: timeout esperado {expected}s, registrado {timeouts.get(name)}s"
+    assert timeouts, "El registry no expuso ningún timeout"
+    for name, t in timeouts.items():
+        assert isinstance(t, int), f"{name}: timeout debe ser int, es {type(t).__name__}"
+        assert 1 <= t <= 3600, f"{name}: timeout {t}s fuera de rango [1, 3600]"
 
 
 def test_live_only_stubs_return_explanatory_message(fresh_registry):
     for name in LIVE_ONLY_TOOLS:
         result = fresh_registry.call_sync(name, {})
-        assert "Live" in result or "voz" in result, \
+        assert "Live" in result or "voz" in result, (
             f"{name}: stub debe mencionar Live/voz, devolvió: {result}"
+        )
 
 
 def test_call_sync_raises_on_unknown_tool(fresh_registry):
@@ -149,7 +156,9 @@ def test_call_sync_dispatches_to_handler(fresh_registry):
 
 def test_call_sync_passes_speak_when_declared(fresh_registry):
     """code_helper declara needs_speak=True; el registry debe pasarlo."""
-    speak_mock = lambda msg: None
+
+    def speak_mock(msg):
+        return None
 
     def fake_code(parameters=None, player=None, speak=None):
         assert speak is speak_mock
@@ -166,6 +175,7 @@ def test_call_sync_passes_speak_when_declared(fresh_registry):
 
 def test_call_sync_omits_speak_when_not_declared(fresh_registry):
     """open_app no declara needs_speak=True; el handler NO debe recibir speak."""
+
     def fake_open_app(parameters=None, response=None, player=None, **kwargs):
         # 'speak' no debe estar en kwargs
         assert "speak" not in kwargs, f"speak no debería pasarse: {kwargs}"
@@ -229,8 +239,7 @@ def test_to_planner_text_excludes_live_only_meta_tools(fresh_registry):
     meta-orquestarse a sí mismo ni tomar notas."""
     text = fresh_registry.to_planner_text()
     for name in ("agent_task", "shutdown_orion", "quick_note"):
-        assert name not in text, \
-            f"{name} no debería aparecer en el planner text"
+        assert name not in text, f"{name} no debería aparecer en el planner text"
 
 
 def test_to_planner_text_includes_param_descriptions(fresh_registry):

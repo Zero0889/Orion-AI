@@ -22,7 +22,6 @@ from pathlib import Path
 
 from config import BASE_DIR
 
-
 # ── Sanitización de mensajes de error (I-07) ─────────────────────────────
 # Antes de devolver un str(e) al cliente, le quitamos:
 #   - rutas absolutas (BASE_DIR del proyecto, HOME, OneDrive)

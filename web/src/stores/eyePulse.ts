@@ -21,15 +21,17 @@ import { create } from "zustand";
 export type PulseKind = "sensor" | "notif" | "tool" | "error";
 
 interface Pulse {
-  id:   number;
+  id: number;
   kind: PulseKind;
 }
 
-const DURATION_MS = 1300;
+// 1700ms cubre los 3 anillos escalonados (último arranca a los 300ms
+// y dura ~1200ms). Si bajamos esto se cortan visualmente.
+const DURATION_MS = 1700;
 
 interface State {
   active: Pulse[];
-  pulse:  (kind: PulseKind) => void;
+  pulse: (kind: PulseKind) => void;
 }
 
 let nextId = 1;

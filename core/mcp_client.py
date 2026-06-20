@@ -67,7 +67,7 @@ class MCPServerConfig:
     call_timeout: float = 60.0
 
     @classmethod
-    def from_dict(cls, server_id: str, raw: dict) -> "MCPServerConfig":
+    def from_dict(cls, server_id: str, raw: dict) -> MCPServerConfig:
         return cls(
             server_id=server_id,
             command=raw["command"],
@@ -112,12 +112,12 @@ def load_servers_config(path: Path) -> list[MCPServerConfig]:
 
 # JSON Schema lowercase types → Gemini OBJECT/STRING/INTEGER/...
 _TYPE_MAP = {
-    "object":  "OBJECT",
-    "string":  "STRING",
+    "object": "OBJECT",
+    "string": "STRING",
     "integer": "INTEGER",
-    "number":  "NUMBER",
+    "number": "NUMBER",
     "boolean": "BOOLEAN",
-    "array":   "ARRAY",
+    "array": "ARRAY",
 }
 
 
@@ -209,8 +209,8 @@ class MCPServer:
                 env=env,
                 text=True,
                 encoding="utf-8",
-                errors="replace",      # tolera bytes no-UTF8 (Windows console)
-                bufsize=1,             # line-buffered
+                errors="replace",  # tolera bytes no-UTF8 (Windows console)
+                bufsize=1,  # line-buffered
             )
         except (FileNotFoundError, OSError) as e:
             raise MCPServerError(f"No se pudo arrancar '{self.config.command}': {e}") from e
@@ -230,7 +230,8 @@ class MCPServer:
             self.tools = self._list_tools(deadline)
             log.info(
                 "[MCP %s] listo — %d tools descubiertas",
-                self.config.server_id, len(self.tools),
+                self.config.server_id,
+                len(self.tools),
             )
         except Exception:
             self.stop()
@@ -286,14 +287,11 @@ class MCPServer:
             self._send_raw(msg)
             remaining = max(0.0, timeout - 0.0)
             if not event.wait(timeout=remaining):
-                raise MCPServerError(
-                    f"Timeout esperando respuesta a '{method}' ({timeout}s)"
-                )
+                raise MCPServerError(f"Timeout esperando respuesta a '{method}' ({timeout}s)")
             if "error" in container:
                 err = container["error"]
                 raise MCPServerError(
-                    f"Servidor MCP devolvió error en '{method}': "
-                    f"{err.get('message', err)}"
+                    f"Servidor MCP devolvió error en '{method}': {err.get('message', err)}"
                 )
             return container.get("result", {})
         finally:
@@ -316,8 +314,9 @@ class MCPServer:
             try:
                 msg = json.loads(line)
             except json.JSONDecodeError as e:
-                log.warning("[MCP %s] línea no-JSON ignorada (%s): %r",
-                            self.config.server_id, e, line[:120])
+                log.warning(
+                    "[MCP %s] línea no-JSON ignorada (%s): %r", self.config.server_id, e, line[:120]
+                )
                 continue
 
             msg_id = msg.get("id")
@@ -406,6 +405,7 @@ class MCPManager:
 
     def __init__(self, config_path: Path | None = None):
         from config import CONFIG_DIR
+
         self._config_path = config_path or (CONFIG_DIR / "mcp_servers.json")
         self._servers: dict[str, MCPServer] = {}
 

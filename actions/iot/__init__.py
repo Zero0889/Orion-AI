@@ -16,6 +16,6 @@ Estructura del paquete
 - :mod:`actions.iot.control`     — orquestador + entry point público
 """
 
-from .control import iot_control, get_system
+from .control import get_system, iot_control
 
-__all__ = ["iot_control", "get_system"]
+__all__ = ["get_system", "iot_control"]

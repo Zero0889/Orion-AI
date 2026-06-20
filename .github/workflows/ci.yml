@@ -1,0 +1,126 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+# Cancela runs viejos del mismo branch cuando llega un push nuevo.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  # ────────────────────────────────────────────────────────────────────
+  # Backend Python — lint, type-check, tests
+  # ────────────────────────────────────────────────────────────────────
+  python:
+    name: Python (${{ matrix.python-version }} / ${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        python-version: ["3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      - name: Install runtime + dev deps
+        shell: bash
+        run: |
+          python -m pip install --upgrade pip
+          # No instalamos requirements.txt entero en CI: tiene paquetes
+          # pesados (playwright, opencv, sounddevice) que ni hacen falta
+          # para correr los tests unitarios. Sólo lo mínimo.
+          pip install \
+            fastapi "uvicorn[standard]" python-multipart websockets \
+            requests beautifulsoup4 pillow numpy psutil \
+            google-genai google-auth google-auth-oauthlib google-api-python-client \
+            pytest ruff mypy
+
+      - name: Ruff (lint)
+        run: ruff check .
+
+      - name: Ruff (format check)
+        run: ruff format --check .
+
+      - name: Mypy (módulos críticos)
+        # Sólo los módulos en [[tool.mypy.overrides]] están bajo gate.
+        # `--follow-imports=silent` evita que mypy reporte errores en
+        # módulos transitivos no anotados (el resto del repo). El gate
+        # sólo bloquea regresiones de tipo en los archivos críticos.
+        run: |
+          mypy --follow-imports=silent \
+            core/logger.py \
+            core/tool_registry.py \
+            core/llm/base.py \
+            server/app.py \
+            server/event_bus.py \
+            server/sharing.py \
+            server/telemetry.py
+
+      - name: Pytest
+        env:
+          PYTHONIOENCODING: utf-8
+        run: pytest -ra
+
+  # ────────────────────────────────────────────────────────────────────
+  # Frontend — typecheck, lint, build
+  # ────────────────────────────────────────────────────────────────────
+  web:
+    name: Web (Node ${{ matrix.node }})
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node: ["20", "22"]
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node ${{ matrix.node }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Format check
+        run: npm run format:check
+
+      - name: Build
+        run: npm run build
+
+  # ────────────────────────────────────────────────────────────────────
+  # Secret scanning — gitleaks sobre todo el diff
+  # ────────────────────────────────────────────────────────────────────
+  gitleaks:
+    name: Gitleaks (secret scan)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # gitleaks necesita el historial completo
+
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

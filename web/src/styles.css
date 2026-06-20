@@ -11,62 +11,76 @@
 :root,
 :root[data-theme="orion-night"] {
   /* surfaces — deep black Perplexity-style */
-  --orion-bg:        0  0  0;         /* #000000 */
-  --orion-sunken:    0  0  0;
-  --orion-surface:   13 13 13;        /* #0D0D0D */
-  --orion-elevated:  22 22 22;        /* #161616 */
-  --orion-glass:     18 18 18;
+  --orion-bg: 0 0 0; /* #000000 */
+  --orion-sunken: 0 0 0;
+  --orion-surface: 13 13 13; /* #0D0D0D */
+  --orion-elevated: 22 22 22; /* #161616 */
+  --orion-glass: 18 18 18;
 
   /* borders */
-  --orion-border:        255 255 255;
+  --orion-border: 255 255 255;
   --orion-border-strong: 255 255 255;
 
   /* brand — muted electric blue like Perplexity */
-  --orion-pri:       96  99 236;      /* #6063EC */
-  --orion-pri-dim:   72  75 178;
-  --orion-acc:       99 102 241;      /* #6366F1 */
-  --orion-pri-glow:  96  99 236;
+  --orion-pri: 96 99 236; /* #6063EC */
+  --orion-pri-dim: 72 75 178;
+  --orion-acc: 99 102 241; /* #6366F1 */
+  --orion-pri-glow: 96 99 236;
 
   /* semantic */
-  --orion-ok:        34 197 94;       /* #22C55E */
-  --orion-warn:     245 158 11;       /* #F59E0B */
-  --orion-danger:   239  68  68;      /* #EF4444 */
+  --orion-ok: 34 197 94; /* #22C55E */
+  --orion-warn: 245 158 11; /* #F59E0B */
+  --orion-danger: 239 68 68; /* #EF4444 */
 
   /* text */
-  --orion-text:     237 237 237;      /* #EDEDED */
-  --orion-text-dim: 161 161 170;      /* #A1A1AA */
-  --orion-muted:    113 113 122;      /* #71717A */
+  --orion-text: 237 237 237; /* #EDEDED */
+  --orion-text-dim: 161 161 170; /* #A1A1AA */
+  --orion-muted: 113 113 122; /* #71717A */
 
-  /* motion */
-  --orion-ease:      cubic-bezier(0.16, 1, 0.3, 1);
+  /* motion — sistema de easings inspirado en visionOS / Apple HIG.
+     · ease       : "out-expo" estándar para reveals.
+     · ease-soft  : suave, ideal para transiciones de color.
+     · ease-spring: rebote ligero para botones / press.
+     · ease-snap  : muy rápido al final para cambios de estado.
+     · ease-glass : sutil, para apariciones de glass / overlays. */
+  --orion-ease: cubic-bezier(0.16, 1, 0.3, 1);
   --orion-ease-soft: cubic-bezier(0.32, 0.72, 0, 1);
+  --orion-ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --orion-ease-snap: cubic-bezier(0.22, 1, 0.36, 1);
+  --orion-ease-glass: cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* elevación — sombras canónicas. Negro puro + opacidad escalonada. */
+  --orion-shadow-1: 0 1px 2px rgb(0 0 0 / 0.2);
+  --orion-shadow-2: 0 4px 12px rgb(0 0 0 / 0.3), 0 1px 2px rgb(0 0 0 / 0.2);
+  --orion-shadow-3: 0 12px 32px rgb(0 0 0 / 0.4), 0 2px 6px rgb(0 0 0 / 0.25);
+  --orion-shadow-pri: 0 0 24px -4px rgb(var(--orion-pri-glow) / 0.45);
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
    Light theme — clean glass-morphism light mode
    ═══════════════════════════════════════════════════════════════════════ */
 :root[data-theme="orion-light"] {
-  --orion-bg:        245 247 251;     /* #F5F7FB */
-  --orion-sunken:    238 241 246;
-  --orion-surface:   255 255 255;     /* #FFFFFF */
-  --orion-elevated:  248 250 254;     /* #F8FAFE */
-  --orion-glass:     255 255 255;
+  --orion-bg: 245 247 251; /* #F5F7FB */
+  --orion-sunken: 238 241 246;
+  --orion-surface: 255 255 255; /* #FFFFFF */
+  --orion-elevated: 248 250 254; /* #F8FAFE */
+  --orion-glass: 255 255 255;
 
-  --orion-border:        0 0 0;
+  --orion-border: 0 0 0;
   --orion-border-strong: 0 0 0;
 
-  --orion-pri:       67  97  238;     /* #4361EE */
-  --orion-pri-dim:   58  80  185;
-  --orion-acc:       0  176 216;      /* #00B0D8 */
-  --orion-pri-glow:  67  97 238;
+  --orion-pri: 67 97 238; /* #4361EE */
+  --orion-pri-dim: 58 80 185;
+  --orion-acc: 0 176 216; /* #00B0D8 */
+  --orion-pri-glow: 67 97 238;
 
-  --orion-ok:        22 163 74;       /* #16A34A */
-  --orion-warn:     217 119   6;      /* #D97706 */
-  --orion-danger:   220  38  38;      /* #DC2626 */
+  --orion-ok: 22 163 74; /* #16A34A */
+  --orion-warn: 217 119 6; /* #D97706 */
+  --orion-danger: 220 38 38; /* #DC2626 */
 
-  --orion-text:     24  27  34;       /* #181B22 */
-  --orion-text-dim: 100 110 135;      /* #646E87 */
-  --orion-muted:    148 155 172;      /* #949BAC */
+  --orion-text: 24 27 34; /* #181B22 */
+  --orion-text-dim: 100 110 135; /* #646E87 */
+  --orion-muted: 148 155 172; /* #949BAC */
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
@@ -77,81 +91,91 @@
 /* ── Violet ──────────────────────────────────────────────────────────── */
 :root[data-theme="orion-violet"] {
   --orion-pri: 167 139 250;
-  --orion-pri-dim: 124  58 237;
+  --orion-pri-dim: 124 58 237;
   --orion-acc: 232 121 249;
   --orion-pri-glow: 167 139 250;
 }
 /* ── Emerald ─────────────────────────────────────────────────────────── */
 :root[data-theme="orion-emerald"] {
-  --orion-pri:  52 211 153;
+  --orion-pri: 52 211 153;
   --orion-pri-dim: 16 185 129;
   --orion-acc: 110 231 183;
   --orion-pri-glow: 52 211 153;
 }
 /* ── Amber ────────────────────────────────────────────────────────────── */
 :root[data-theme="orion-amber"] {
-  --orion-pri: 251 191  36;
-  --orion-pri-dim: 217 119   6;
-  --orion-acc: 252 211  77;
+  --orion-pri: 251 191 36;
+  --orion-pri-dim: 217 119 6;
+  --orion-acc: 252 211 77;
   --orion-pri-glow: 251 191 36;
 }
 /* ── Red ──────────────────────────────────────────────────────────────── */
 :root[data-theme="orion-red"] {
-  --orion-pri: 255  42  77;
-  --orion-pri-dim: 160  24  40;
-  --orion-acc: 255 107  26;
+  --orion-pri: 255 42 77;
+  --orion-pri-dim: 160 24 40;
+  --orion-acc: 255 107 26;
   --orion-pri-glow: 255 42 77;
   --orion-text: 255 196 204;
-  --orion-text-dim: 138  58  72;
-  --orion-bg:        10  2  5;
-  --orion-surface:   20  3  7;
-  --orion-elevated:  26  4 10;
-  --orion-sunken:     6  1  3;
+  --orion-text-dim: 138 58 72;
+  --orion-bg: 10 2 5;
+  --orion-surface: 20 3 7;
+  --orion-elevated: 26 4 10;
+  --orion-sunken: 6 1 3;
 }
 /* ── Cyan HUD ─────────────────────────────────────────────────────────── */
 :root[data-theme="orion-cyan"] {
-  --orion-pri:  42 255 214;
+  --orion-pri: 42 255 214;
   --orion-pri-dim: 24 160 140;
-  --orion-acc:  26 184 255;
+  --orion-acc: 26 184 255;
   --orion-pri-glow: 42 255 214;
   --orion-text: 196 255 234;
   --orion-text-dim: 58 122 138;
-  --orion-bg:        2   8  10;
-  --orion-surface:   3  19  24;
-  --orion-elevated:  4  24  31;
-  --orion-sunken:    1   5   7;
+  --orion-bg: 2 8 10;
+  --orion-surface: 3 19 24;
+  --orion-elevated: 4 24 31;
+  --orion-sunken: 1 5 7;
 }
 /* ── Matrix Green ─────────────────────────────────────────────────────── */
 :root[data-theme="orion-green"] {
-  --orion-pri:  42 255 102;
+  --orion-pri: 42 255 102;
   --orion-pri-dim: 24 160 64;
-  --orion-acc:  26 255 153;
+  --orion-acc: 26 255 153;
   --orion-pri-glow: 42 255 102;
   --orion-text: 196 255 204;
   --orion-text-dim: 58 122 72;
-  --orion-bg:        2  10   4;
-  --orion-surface:   3  21  10;
-  --orion-elevated:  4  26  13;
-  --orion-sunken:    1   7   2;
+  --orion-bg: 2 10 4;
+  --orion-surface: 3 21 10;
+  --orion-elevated: 4 26 13;
+  --orion-sunken: 1 7 2;
 }
 /* ── Deep Purple ──────────────────────────────────────────────────────── */
 :root[data-theme="orion-purple"] {
-  --orion-pri: 139  92 246;
-  --orion-pri-dim:  90  58 160;
+  --orion-pri: 139 92 246;
+  --orion-pri-dim: 90 58 160;
   --orion-acc: 192 132 252;
   --orion-pri-glow: 139 92 246;
   --orion-text: 237 233 254;
   --orion-text-dim: 106 84 138;
-  --orion-bg:        8   4  15;
-  --orion-surface:  16   8  31;
-  --orion-elevated: 23  11  44;
-  --orion-sunken:    5   2  10;
+  --orion-bg: 8 4 15;
+  --orion-surface: 16 8 31;
+  --orion-elevated: 23 11 44;
+  --orion-sunken: 5 2 10;
 }
 
 @layer base {
-  html, body, #root {
+  html,
+  body,
+  #root {
     height: 100%;
     overflow: hidden;
+  }
+  /* Zoom global: el factor lo setea useZoomShortcuts en --orion-zoom y
+     aplica `zoom: N` sobre #root. Compensamos el box de #root con calc
+     para que la app reflowee dentro de la ventana visible (sin clipping
+     ni scrollbars) en cualquier nivel de zoom. */
+  #root {
+    width: calc(100vw / var(--orion-zoom, 1));
+    height: calc(100vh / var(--orion-zoom, 1));
   }
   body {
     font-family: theme("fontFamily.sans");
@@ -159,7 +183,7 @@
     color: rgb(var(--orion-text));
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
-    font-feature-settings: "ss01", "cv11";
+    font-feature-settings: "ss01", "cv11", "tnum";
   }
   /* dynamic color-scheme based on theme */
   :root[data-theme="orion-light"] {
@@ -180,7 +204,11 @@
       0 0 0 4px rgb(var(--orion-pri) / 0.55);
     border-radius: 8px;
   }
-  input, textarea, select { color-scheme: inherit; }
+  input,
+  textarea,
+  select {
+    color-scheme: inherit;
+  }
 }
 
 @layer utilities {
@@ -213,12 +241,12 @@
     --hud-w: 1.5px;
     --hud-l: 12px;
     background:
-      linear-gradient(var(--hud-c), var(--hud-c)) top    left  / var(--hud-l) var(--hud-w) no-repeat,
-      linear-gradient(var(--hud-c), var(--hud-c)) top    left  / var(--hud-w) var(--hud-l) no-repeat,
-      linear-gradient(var(--hud-c), var(--hud-c)) top    right / var(--hud-l) var(--hud-w) no-repeat,
-      linear-gradient(var(--hud-c), var(--hud-c)) top    right / var(--hud-w) var(--hud-l) no-repeat,
-      linear-gradient(var(--hud-c), var(--hud-c)) bottom left  / var(--hud-l) var(--hud-w) no-repeat,
-      linear-gradient(var(--hud-c), var(--hud-c)) bottom left  / var(--hud-w) var(--hud-l) no-repeat,
+      linear-gradient(var(--hud-c), var(--hud-c)) top left / var(--hud-l) var(--hud-w) no-repeat,
+      linear-gradient(var(--hud-c), var(--hud-c)) top left / var(--hud-w) var(--hud-l) no-repeat,
+      linear-gradient(var(--hud-c), var(--hud-c)) top right / var(--hud-l) var(--hud-w) no-repeat,
+      linear-gradient(var(--hud-c), var(--hud-c)) top right / var(--hud-w) var(--hud-l) no-repeat,
+      linear-gradient(var(--hud-c), var(--hud-c)) bottom left / var(--hud-l) var(--hud-w) no-repeat,
+      linear-gradient(var(--hud-c), var(--hud-c)) bottom left / var(--hud-w) var(--hud-l) no-repeat,
       linear-gradient(var(--hud-c), var(--hud-c)) bottom right / var(--hud-l) var(--hud-w) no-repeat,
       linear-gradient(var(--hud-c), var(--hud-c)) bottom right / var(--hud-w) var(--hud-l) no-repeat;
     opacity: 0.55;
@@ -227,7 +255,9 @@
   /* en hover los brackets brillan más — refuerzo visual de que la card
      es interactiva sin necesidad de cambiar el fondo. */
   .surface-1:hover::before,
-  .surface-2:hover::before { opacity: 0.95; }
+  .surface-2:hover::before {
+    opacity: 0.95;
+  }
 
   /* ── Chrome reactivo al estado del ojo ─────────────────────────────
      `useEyeState` (en App.tsx) escribe en <html data-eye-state="..."> y
@@ -235,52 +265,123 @@
      sidebar y la topbar leen esta variable en sus pseudoelementos para
      mostrar un borde + glow que respira con el estado real de Orion. */
   :root {
-    --orion-state-rgb:   var(--orion-pri);
+    --orion-state-rgb: var(--orion-pri);
     --orion-state-alpha: 0.14;
   }
   [data-eye-state="listening"] {
-    --orion-state-rgb:   126 231 255;
+    --orion-state-rgb: 126 231 255;
     --orion-state-alpha: 0.38;
   }
   [data-eye-state="thinking"] {
-    --orion-state-rgb:   255 0 85;
+    --orion-state-rgb: 255 0 85;
     --orion-state-alpha: 0.32;
   }
   [data-eye-state="speaking"] {
-    --orion-state-rgb:   0 255 170;
+    --orion-state-rgb: 0 255 170;
     --orion-state-alpha: 0.32;
   }
   [data-eye-state="error"] {
-    --orion-state-rgb:   255 0 17;
+    --orion-state-rgb: 255 0 17;
     --orion-state-alpha: 0.48;
   }
 
-  /* Sidebar — borde derecho + halo hacia el contenido principal. */
+  /* Sidebar — borde derecho con tinte fijo azul muy sutil.
+     El color queda anclado al primary (azul) en vez de seguir el estado
+     del ojo; así nunca aparece un tinte rojo/morado raro al cambiar
+     de estado. La opacidad es baja (8%) para que el borde se sienta,
+     no se imponga. */
   .chrome-edge-right {
-    border-right-color: rgb(var(--orion-state-rgb) / var(--orion-state-alpha)) !important;
-    box-shadow: 6px 0 28px -10px rgb(var(--orion-state-rgb) / var(--orion-state-alpha));
-    transition: border-color 600ms cubic-bezier(0.4, 0, 0.2, 1),
-                box-shadow   600ms cubic-bezier(0.4, 0, 0.2, 1);
+    border-right-color: rgb(var(--orion-pri) / 0.1) !important;
+    transition: border-color 400ms cubic-bezier(0.4, 0, 0.2, 1);
   }
-  /* TopBar — borde inferior + halo hacia el área de trabajo. */
+  /* TopBar — borde inferior con el mismo tratamiento. La línea separa
+     el shell del área de trabajo sin crear una franja luminosa. */
   .chrome-edge-bottom {
-    border-bottom-color: rgb(var(--orion-state-rgb) / var(--orion-state-alpha)) !important;
-    box-shadow: 0 6px 28px -10px rgb(var(--orion-state-rgb) / var(--orion-state-alpha));
-    transition: border-color 600ms cubic-bezier(0.4, 0, 0.2, 1),
-                box-shadow   600ms cubic-bezier(0.4, 0, 0.2, 1);
+    border-bottom-color: rgb(var(--orion-pri) / 0.1) !important;
+    transition: border-color 400ms cubic-bezier(0.4, 0, 0.2, 1);
   }
   .surface-glass {
+    position: relative;
     background:
-      linear-gradient(180deg,
-        rgb(var(--orion-glass) / 0.78) 0%,
-        rgb(var(--orion-glass) / 0.50) 100%);
+      /* highlight interior superior: línea fina de luz que insinúa
+         el "borde de cristal" — característica visionOS / Apple HIG. */
+      linear-gradient(
+        180deg,
+        rgb(255 255 255 / 0.045) 0%,
+        rgb(255 255 255 / 0) 1px,
+        transparent 1px
+      ),
+      linear-gradient(180deg, rgb(var(--orion-glass) / 0.78) 0%, rgb(var(--orion-glass) / 0.5) 100%);
     backdrop-filter: blur(20px) saturate(160%);
     -webkit-backdrop-filter: blur(20px) saturate(160%);
     border: 1px solid rgb(var(--orion-border) / 0.06);
-    box-shadow: 0 4px 24px -8px rgb(0 0 0 / 0.40);
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 0.04),
+      0 4px 24px -8px rgb(0 0 0 / 0.4);
   }
-  .hairline   { border-color: rgb(var(--orion-border) / 0.08); }
-  .hairline-2 { border-color: rgb(var(--orion-border) / 0.14); }
+
+  /* ── surface-premium ──────────────────────────────────────────────
+     Variante con borde de gradiente sutil + sombra estratificada.
+     Para hero cards y elementos de máximo enfoque visual. */
+  .surface-premium {
+    position: relative;
+    background: rgb(var(--orion-elevated));
+    border-radius: inherit;
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 0.05),
+      inset 0 0 0 1px rgb(var(--orion-border) / 0.08),
+      0 12px 36px -16px rgb(0 0 0 / 0.55),
+      0 0 60px -24px rgb(var(--orion-pri-glow) / 0.18);
+  }
+  .surface-premium::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    padding: 1px;
+    background: linear-gradient(
+      135deg,
+      rgb(var(--orion-pri) / 0.3) 0%,
+      rgb(var(--orion-border) / 0.06) 30%,
+      rgb(var(--orion-border) / 0.04) 70%,
+      rgb(var(--orion-acc) / 0.22) 100%
+    );
+    -webkit-mask:
+      linear-gradient(#fff 0 0) content-box,
+      linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    pointer-events: none;
+  }
+
+  /* ── lift-spatial ─────────────────────────────────────────────────
+     Hover con profundidad espacial: traslación Y + sombra estratificada
+     + halo de color sutil. Usa la curva spring para sensación física.
+     Ideal para quick actions y cards interactivas. */
+  .lift-spatial {
+    transition:
+      transform 280ms var(--orion-ease-spring),
+      box-shadow 280ms var(--orion-ease-snap),
+      border-color 200ms var(--orion-ease-soft);
+    will-change: transform;
+  }
+  .lift-spatial:hover {
+    transform: translateY(-2px);
+    box-shadow:
+      0 10px 28px -14px rgb(0 0 0 / 0.55),
+      0 0 0 1px rgb(var(--orion-pri) / 0.2),
+      0 0 32px -8px rgb(var(--orion-pri-glow) / 0.32);
+  }
+  .lift-spatial:active {
+    transform: translateY(-1px) scale(0.995);
+    transition-duration: 90ms;
+  }
+  .hairline {
+    border-color: rgb(var(--orion-border) / 0.08);
+  }
+  .hairline-2 {
+    border-color: rgb(var(--orion-border) / 0.14);
+  }
 
   /* gradient border card — premium elevated container */
   .card-glow {
@@ -300,7 +401,9 @@
       transparent 65%,
       rgb(var(--orion-acc) / 0.18)
     );
-    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask:
+      linear-gradient(#fff 0 0) content-box,
+      linear-gradient(#fff 0 0);
     -webkit-mask-composite: xor;
     mask-composite: exclude;
     pointer-events: none;
@@ -308,11 +411,15 @@
 
   /* subtle hover lift */
   .hover-lift {
-    transition: transform 220ms var(--orion-ease), box-shadow 220ms var(--orion-ease);
+    transition:
+      transform 220ms var(--orion-ease),
+      box-shadow 220ms var(--orion-ease);
   }
   .hover-lift:hover {
     transform: translateY(-2px);
-    box-shadow: 0 12px 32px -12px rgb(0 0 0 / 0.25), 0 0 0 1px rgb(var(--orion-pri) / 0.15);
+    box-shadow:
+      0 12px 32px -12px rgb(0 0 0 / 0.25),
+      0 0 0 1px rgb(var(--orion-pri) / 0.15);
   }
 
   /* ambient glow pulse for primary elements */
@@ -339,31 +446,45 @@
     position: fixed;
     inset: 0;
     pointer-events: none;
-    z-index: 9998;          /* debajo del noise (9999), encima del resto */
+    z-index: 9998; /* debajo del noise (9999), encima del resto */
     background: repeating-linear-gradient(
       to bottom,
       rgb(255 255 255 / 0.022) 0px,
       rgb(255 255 255 / 0.022) 1px,
-      transparent             1px,
-      transparent             3px
+      transparent 1px,
+      transparent 3px
     );
     mix-blend-mode: overlay;
     animation: scanlines-flicker 8s ease-in-out infinite;
   }
   @keyframes scanlines-flicker {
-    0%, 100% { opacity: 1;    }
-    48%      { opacity: 0.85; }
-    50%      { opacity: 0.60; }
-    52%      { opacity: 0.85; }
+    0%,
+    100% {
+      opacity: 1;
+    }
+    48% {
+      opacity: 0.85;
+    }
+    50% {
+      opacity: 0.6;
+    }
+    52% {
+      opacity: 0.85;
+    }
   }
   /* opt-out: respeta a usuarios con prefers-reduced-motion */
   @media (prefers-reduced-motion: reduce) {
-    .scanlines { animation: none; }
+    .scanlines {
+      animation: none;
+    }
   }
 
   /* scrollbars */
-  .scrollbar-thin::-webkit-scrollbar           { width: 8px; height: 8px; }
-  .scrollbar-thin::-webkit-scrollbar-thumb     {
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  .scrollbar-thin::-webkit-scrollbar-thumb {
     background: rgb(var(--orion-border) / 0.12);
     border-radius: 8px;
     border: 2px solid transparent;
@@ -373,7 +494,9 @@
     background: rgb(var(--orion-border) / 0.22);
     background-clip: padding-box;
   }
-  .scrollbar-thin::-webkit-scrollbar-track     { background: transparent; }
+  .scrollbar-thin::-webkit-scrollbar-track {
+    background: transparent;
+  }
 
   /* ── Tabular numerals ─────────────────────────────────────────────
      Aplicado globalmente a .font-mono: dígitos del mismo ancho para
@@ -396,9 +519,9 @@
   .skeleton {
     background: linear-gradient(
       90deg,
-      rgb(var(--orion-elevated))     0%,
-      rgb(var(--orion-border) / 0.10) 50%,
-      rgb(var(--orion-elevated))     100%
+      rgb(var(--orion-elevated)) 0%,
+      rgb(var(--orion-border) / 0.1) 50%,
+      rgb(var(--orion-elevated)) 100%
     );
     background-size: 200% 100%;
     animation: shimmer 1.6s linear infinite;
@@ -411,18 +534,106 @@
     background-size: 22px 22px;
   }
 
+  /* ── Neural Background ──────────────────────────────────────────── */
+  /* Capa de fondo global "neural core": grilla de puntos + anillos
+     concéntricos rotando + nodos pulsantes. Vive en App.tsx detrás de
+     todo el contenido. Reactivo al tema vía --orion-pri. */
+  .nb-grid {
+    background-image: radial-gradient(rgb(var(--orion-pri) / 0.08) 1px, transparent 1px);
+    background-size: 40px 40px;
+  }
+  .nb-glow {
+    background: radial-gradient(
+      circle at 50% 45%,
+      rgb(var(--orion-pri-glow) / 0.1) 0%,
+      rgb(var(--orion-pri-glow) / 0.04) 32%,
+      transparent 70%
+    );
+  }
+  .nb-rotate-slow {
+    animation: nb-rotate 90s linear infinite;
+    transform-origin: center;
+  }
+  .nb-rotate-rev {
+    animation: nb-rotate-rev 60s linear infinite;
+    transform-origin: center;
+  }
+  .nb-node {
+    animation: nb-node-pulse 4.5s ease-in-out infinite;
+    transform-origin: center;
+  }
+  /* Líneas de "energía viajando" entre nodos. */
+  .orbit-line {
+    stroke-dasharray: 6 14;
+    animation: orbit-dash 18s linear infinite;
+  }
+
+  /* ── Máscara radial de los anillos ─────────────────────────────────
+     Los anillos son enormes (r=240-510) y al recortarse en los bordes
+     del viewport los arcos resultantes se leen como "líneas flotantes"
+     o "líneas cayendo" — la rotación de un arco aislado en los bordes
+     parece traslación vertical, no rotación.
+     Aplicamos una máscara radial: los anillos son nítidos en el centro
+     (donde el ojo anchorea la composición) y se desvanecen suavemente
+     a transparente antes de tocar los bordes del viewport. Resultado:
+     se leen como círculos girando alrededor del ojo, no como líneas
+     sueltas. */
+  .nb-rings {
+    -webkit-mask-image: radial-gradient(
+      ellipse 60% 60% at center,
+      #000 0%,
+      #000 35%,
+      rgba(0, 0, 0, 0.55) 55%,
+      rgba(0, 0, 0, 0.1) 75%,
+      transparent 100%
+    );
+    mask-image: radial-gradient(
+      ellipse 60% 60% at center,
+      #000 0%,
+      #000 35%,
+      rgba(0, 0, 0, 0.55) 55%,
+      rgba(0, 0, 0, 0.1) 75%,
+      transparent 100%
+    );
+  }
+
+  /* Intensidad ambient: la mitad de visible para vistas con texto denso. */
+  .nb-ambient .nb-grid {
+    opacity: 0.55;
+  }
+  .nb-ambient .nb-glow {
+    opacity: 0.5;
+  }
+  .nb-ambient .nb-rings {
+    opacity: 0.55;
+  }
+
   /* edge fades */
   .mask-fade-y {
-    -webkit-mask-image: linear-gradient(to bottom, transparent, #000 24px, #000 calc(100% - 24px), transparent);
-            mask-image: linear-gradient(to bottom, transparent, #000 24px, #000 calc(100% - 24px), transparent);
+    -webkit-mask-image: linear-gradient(
+      to bottom,
+      transparent,
+      #000 24px,
+      #000 calc(100% - 24px),
+      transparent
+    );
+    mask-image: linear-gradient(
+      to bottom,
+      transparent,
+      #000 24px,
+      #000 calc(100% - 24px),
+      transparent
+    );
   }
 
   /* premium chip */
   .chip {
-    display: inline-flex; align-items: center; gap: 6px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
     padding: 2px 8px;
     border-radius: 999px;
-    border: 1px solid rgb(var(--orion-border) / 0.10);
+    border: 1px solid rgb(var(--orion-border) / 0.1);
     background: rgb(var(--orion-elevated));
     font-size: 11px;
     letter-spacing: 0.04em;
@@ -431,7 +642,9 @@
 
   /* divider with label */
   .divider-label {
-    display: flex; align-items: center; gap: 10px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
     color: rgb(var(--orion-muted));
     font-size: 10px;
     letter-spacing: 0.24em;
@@ -439,7 +652,9 @@
   }
   .divider-label::before,
   .divider-label::after {
-    content: ""; flex: 1; height: 1px;
+    content: "";
+    flex: 1;
+    height: 1px;
     background: rgb(var(--orion-border) / 0.08);
   }
 }
@@ -457,12 +672,26 @@ input[type="number"] {
 }
 
 /* ── KaTeX theme integration ─────────────────────────────────────── */
-:root:not([data-theme="orion-light"]) .katex { color: rgb(var(--orion-text)); }
-:root[data-theme="orion-light"] .katex { color: rgb(var(--orion-text)); }
-.katex-display { overflow-x: auto; overflow-y: hidden; padding: 0.3rem 0; }
-.katex-display > .katex { white-space: nowrap; }
-.katex .msupsub { font-size: 0.95em; }
-.inline-katex { display: inline; }
+:root:not([data-theme="orion-light"]) .katex {
+  color: rgb(var(--orion-text));
+}
+:root[data-theme="orion-light"] .katex {
+  color: rgb(var(--orion-text));
+}
+.katex-display {
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 0.3rem 0;
+}
+.katex-display > .katex {
+  white-space: nowrap;
+}
+.katex .msupsub {
+  font-size: 0.95em;
+}
+.inline-katex {
+  display: inline;
+}
 
 /* ═══════════════════════════════════════════════════════════════════════
    Icon hover micro-animations — activado por `.group:hover` del botón.
@@ -476,13 +705,25 @@ input[type="number"] {
   transform-origin: center;
 }
 
-@keyframes orion-spin-cw  { to { transform: rotate( 360deg); } }
-@keyframes orion-spin-ccw { to { transform: rotate(-360deg); } }
+@keyframes orion-spin-cw {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes orion-spin-ccw {
+  to {
+    transform: rotate(-360deg);
+  }
+}
 
 /* ── telemetry — pulso recorre la onda ───────────────────────────────── */
 @keyframes orion-pulse-sweep {
-  from { stroke-dashoffset:  46; }
-  to   { stroke-dashoffset: -46; }
+  from {
+    stroke-dashoffset: 46;
+  }
+  to {
+    stroke-dashoffset: -46;
+  }
 }
 .group:hover svg[data-icon="telemetry"] [data-part="wave"] {
   stroke-dasharray: 6 40;
@@ -491,21 +732,37 @@ input[type="number"] {
 
 /* ── chat — 3 puntos en cascada ──────────────────────────────────────── */
 @keyframes orion-chat-dot {
-  0%, 70%, 100% { opacity: 0.3; transform: translateY(0); }
-  35%           { opacity: 1;   transform: translateY(-1px); }
+  0%,
+  70%,
+  100% {
+    opacity: 0.3;
+    transform: translateY(0);
+  }
+  35% {
+    opacity: 1;
+    transform: translateY(-1px);
+  }
 }
 .group:hover svg[data-icon="chat"] [data-part^="dot-"] {
   transform-box: fill-box;
   transform-origin: center;
   animation: orion-chat-dot 1.2s ease-in-out infinite;
 }
-.group:hover svg[data-icon="chat"] [data-part="dot-2"] { animation-delay: 0.15s; }
-.group:hover svg[data-icon="chat"] [data-part="dot-3"] { animation-delay: 0.30s; }
+.group:hover svg[data-icon="chat"] [data-part="dot-2"] {
+  animation-delay: 0.15s;
+}
+.group:hover svg[data-icon="chat"] [data-part="dot-3"] {
+  animation-delay: 0.3s;
+}
 
 /* ── notes — guiones fluyen como texto escribiéndose ─────────────────── */
 @keyframes orion-notes-write {
-  from { stroke-dashoffset:   0; }
-  to   { stroke-dashoffset: -12; }
+  from {
+    stroke-dashoffset: 0;
+  }
+  to {
+    stroke-dashoffset: -12;
+  }
 }
 .group:hover svg[data-icon="notes"] [data-part="lines"] {
   stroke-dasharray: 6 6;
@@ -514,26 +771,51 @@ input[type="number"] {
 
 /* ── memory — escritura en cascada (highlight + descanso) ────────────── */
 @keyframes orion-memory-write {
-  0%, 80%, 100% { opacity: 0.35; }
-  20%, 40%      { opacity: 1;    }
+  0%,
+  80%,
+  100% {
+    opacity: 0.35;
+  }
+  20%,
+  40% {
+    opacity: 1;
+  }
 }
-.group:hover svg[data-icon="memory"] [data-part="layer-1"] { animation: orion-memory-write 1.6s ease-in-out infinite;        }
-.group:hover svg[data-icon="memory"] [data-part="layer-2"] { animation: orion-memory-write 1.6s ease-in-out infinite 0.20s; }
-.group:hover svg[data-icon="memory"] [data-part="layer-3"] { animation: orion-memory-write 1.6s ease-in-out infinite 0.40s; }
+.group:hover svg[data-icon="memory"] [data-part="layer-1"] {
+  animation: orion-memory-write 1.6s ease-in-out infinite;
+}
+.group:hover svg[data-icon="memory"] [data-part="layer-2"] {
+  animation: orion-memory-write 1.6s ease-in-out infinite 0.2s;
+}
+.group:hover svg[data-icon="memory"] [data-part="layer-3"] {
+  animation: orion-memory-write 1.6s ease-in-out infinite 0.4s;
+}
 
 /* ── history — manecillas rebobinan alrededor del centro del reloj ───── */
 .group:hover svg[data-icon="history"] [data-part="hands"] {
   transform-box: view-box;
-  transform-origin: center;     /* = (12,12), centro del viewBox 24×24 */
+  transform-origin: center; /* = (12,12), centro del viewBox 24×24 */
   animation: orion-spin-ccw 2.4s linear infinite;
 }
 
 /* ── agents — núcleo late (heartbeat: rápido in, lento out) ──────────── */
 @keyframes orion-agents-beat {
-  0%   { transform: scale(1);    opacity: 1;    }
-  18%  { transform: scale(0.5);  opacity: 0.35; }
-  60%  { transform: scale(1.08); opacity: 1;    }
-  100% { transform: scale(1);    opacity: 1;    }
+  0% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  18% {
+    transform: scale(0.5);
+    opacity: 0.35;
+  }
+  60% {
+    transform: scale(1.08);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
 }
 .group:hover svg[data-icon="agents"] [data-part="core"] {
   transform-box: fill-box;
@@ -543,9 +825,17 @@ input[type="number"] {
 
 /* ── iot — el tejado escanea como un radar ───────────────────────────── */
 @keyframes orion-iot-scan {
-  0%   { stroke-dashoffset:  24; opacity: 0.55; }
-  50%  { opacity: 1; }
-  100% { stroke-dashoffset: -24; opacity: 0.55; }
+  0% {
+    stroke-dashoffset: 24;
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    stroke-dashoffset: -24;
+    opacity: 0.55;
+  }
 }
 .group:hover svg[data-icon="iot"] [data-part="roof"] {
   stroke-dasharray: 5 22;
@@ -554,8 +844,12 @@ input[type="number"] {
 
 /* ── plug — corriente fluyendo por el cable (guiones suben) ──────────── */
 @keyframes orion-plug-flow {
-  from { stroke-dashoffset:  0; }
-  to   { stroke-dashoffset: -8; }
+  from {
+    stroke-dashoffset: 0;
+  }
+  to {
+    stroke-dashoffset: -8;
+  }
 }
 .group:hover svg[data-icon="plug"] [data-part="cord"] {
   stroke-dasharray: 2 2;
@@ -564,8 +858,13 @@ input[type="number"] {
 
 /* ── sparkles — estrella centellea, rayos rotan ──────────────────────── */
 @keyframes orion-twinkle {
-  0%, 100% { transform: scale(1)   rotate(0);     }
-  50%      { transform: scale(1.3) rotate(45deg); }
+  0%,
+  100% {
+    transform: scale(1) rotate(0);
+  }
+  50% {
+    transform: scale(1.3) rotate(45deg);
+  }
 }
 .group:hover svg[data-icon="sparkles"] [data-part="star"] {
   transform-box: fill-box;
@@ -581,14 +880,25 @@ input[type="number"] {
 
 /* ── bell — campana repica colgada desde la corona ───────────────────── */
 @keyframes orion-bell-ring {
-  0%, 100% { transform: rotate(0);       }
-  15%      { transform: rotate(-12deg);  }
-  30%      { transform: rotate(9deg);    }
-  45%      { transform: rotate(-6deg);   }
-  60%      { transform: rotate(3deg);    }
+  0%,
+  100% {
+    transform: rotate(0);
+  }
+  15% {
+    transform: rotate(-12deg);
+  }
+  30% {
+    transform: rotate(9deg);
+  }
+  45% {
+    transform: rotate(-6deg);
+  }
+  60% {
+    transform: rotate(3deg);
+  }
 }
 .group:hover svg[data-icon="bell"] {
-  transform-origin: 50% 16%;     /* pivota desde la corona, no el centro */
+  transform-origin: 50% 16%; /* pivota desde la corona, no el centro */
   animation: orion-bell-ring 1.2s ease-in-out infinite;
 }
 
@@ -602,25 +912,63 @@ input[type="number"] {
   animation: orion-spin-cw 4s linear infinite;
 }
 
+/* ── Neural Background keyframes ──────────────────────────────────── */
+@keyframes nb-rotate {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes nb-rotate-rev {
+  to {
+    transform: rotate(-360deg);
+  }
+}
+@keyframes nb-node-pulse {
+  0%,
+  100% {
+    opacity: 0.3;
+    filter: drop-shadow(0 0 0 transparent);
+  }
+  50% {
+    opacity: 1;
+    filter: drop-shadow(0 0 6px rgb(var(--orion-pri-glow)));
+  }
+}
+@keyframes orbit-dash {
+  to {
+    stroke-dashoffset: -200;
+  }
+}
+
 /* ══════════════════════════════════════════════════════════════════════
    EyeCore — el "ojo" cinemático que vive en Inicio y de fondo en el
    resto de vistas. Variables CSS scoped a `.ec-canvas` para no tocar
    los tokens globales de Orion.
    ══════════════════════════════════════════════════════════════════════ */
 .ec-canvas {
-  --ec-neon-main:     #00f0ff;
-  --ec-neon-second:   #0055ff;
-  --ec-neon-glow:     rgba(0, 240, 255, 0.6);
-  --ec-spin-outer:    30s;
-  --ec-spin-mid:      15s;
-  --ec-spin-inner:    8s;
-  --ec-core-pulse:    3s;
-  --ec-dilation:      1;
+  --ec-neon-main: #00f0ff;
+  --ec-neon-second: #0055ff;
+  --ec-neon-glow: rgba(0, 240, 255, 0.6);
+  --ec-spin-outer: 30s;
+  --ec-spin-mid: 15s;
+  --ec-spin-inner: 8s;
+  --ec-core-pulse: 3s;
+  --ec-dilation: 1;
+  /* Respiración global: el ojo entero late ~6s (oxigenación). Se puede
+     anular por estado o por .ec-paused/.ec-frozen. */
+  --ec-breath: 6s;
 
   position: relative;
   display: block;
-  filter: drop-shadow(0 0 30px rgba(0, 102, 255, 0.15));
-  transition: filter 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  /* Glow estratificado: halo cercano + halo medio + halo ambiental.
+     Da profundidad cromática sin caer en el cliché "neón plano". */
+  filter: drop-shadow(0 0 14px rgba(0, 240, 255, 0.18))
+    drop-shadow(0 0 36px rgba(0, 102, 255, 0.14)) drop-shadow(0 0 72px rgba(0, 102, 255, 0.06));
+  transition: filter 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+  /* Respiración sutil: 1.5% de escala con ease "spring" tipo visionOS. */
+  animation: ec-breath var(--ec-breath) cubic-bezier(0.32, 0.72, 0, 1) infinite;
+  transform-origin: center;
+  will-change: transform, filter;
 }
 
 /* ── fondo gigante recortado a la derecha (para vistas != home) ────── */
@@ -636,31 +984,43 @@ input[type="number"] {
   opacity: 0.13;
   z-index: 0;
   pointer-events: none;
+  /* En modo background el ojo NO respira ni late: estamos a 13 % de
+     opacidad y clipeado al borde derecho — cualquier movimiento se lee
+     como "el ojo se desplaza", no como respiración. */
+  animation: none;
 }
-.ec-canvas.ec-bg.ec-state-error { opacity: 0.32; }
+/* En background ocultamos elementos que sin contexto se leen sueltos:
+   los ticks HUD cardinales (los "+") y las partículas de datos. */
+.ec-canvas.ec-bg .ec-hud-ticks,
+.ec-canvas.ec-bg .ec-particle {
+  display: none;
+}
+.ec-canvas.ec-bg.ec-state-error {
+  opacity: 0.32;
+}
 
 /* ── ESTADOS ───────────────────────────────────────────────────────── */
 
 /* Escuchando — cian más vivo, pulso de iris un poco más rápido. */
 .ec-canvas.ec-state-listening {
-  --ec-neon-main:   #7EE7FF;
+  --ec-neon-main: #7ee7ff;
   --ec-neon-second: #00f0ff;
-  --ec-neon-glow:   rgba(126, 231, 255, 0.7);
-  --ec-core-pulse:  1.8s;
-  --ec-dilation:    1.1;
+  --ec-neon-glow: rgba(126, 231, 255, 0.7);
+  --ec-core-pulse: 1.8s;
+  --ec-dilation: 1.1;
   filter: drop-shadow(0 0 36px rgba(126, 231, 255, 0.35));
 }
 
 /* Pensando — magenta intenso, giro vertiginoso, iris contraído. */
 .ec-canvas.ec-state-thinking {
-  --ec-neon-main:   #ff0055;
+  --ec-neon-main: #ff0055;
   --ec-neon-second: #7700ff;
-  --ec-neon-glow:   rgba(255, 0, 85, 0.6);
-  --ec-spin-outer:  0.8s;
-  --ec-spin-mid:    0.5s;
-  --ec-spin-inner:  0.3s;
-  --ec-core-pulse:  1.2s;
-  --ec-dilation:    0.6;
+  --ec-neon-glow: rgba(255, 0, 85, 0.6);
+  --ec-spin-outer: 0.8s;
+  --ec-spin-mid: 0.5s;
+  --ec-spin-inner: 0.3s;
+  --ec-core-pulse: 1.2s;
+  --ec-dilation: 0.6;
   filter: drop-shadow(0 0 50px rgba(255, 0, 85, 0.4));
 }
 /* bloqueo central — el ojo no se mueve mientras piensa */
@@ -671,14 +1031,14 @@ input[type="number"] {
 
 /* Hablando — verde-cian, dilatado, destellos blancos de voz. */
 .ec-canvas.ec-state-responding {
-  --ec-neon-main:   #00ffaa;
+  --ec-neon-main: #00ffaa;
   --ec-neon-second: #0088ff;
-  --ec-neon-glow:   rgba(0, 255, 170, 0.6);
-  --ec-spin-outer:  20s;
-  --ec-spin-mid:    10s;
-  --ec-spin-inner:  5s;
-  --ec-core-pulse:  1.5s;
-  --ec-dilation:    1.3;
+  --ec-neon-glow: rgba(0, 255, 170, 0.6);
+  --ec-spin-outer: 20s;
+  --ec-spin-mid: 10s;
+  --ec-spin-inner: 5s;
+  --ec-core-pulse: 1.5s;
+  --ec-dilation: 1.3;
   filter: drop-shadow(0 0 40px rgba(0, 255, 170, 0.3));
 }
 .ec-canvas.ec-state-responding .ec-voice-target {
@@ -687,18 +1047,22 @@ input[type="number"] {
 
 /* Error — rojo crítico, símbolo de alerta gigante. */
 .ec-canvas.ec-state-error {
-  --ec-neon-main:   #ff0011;
+  --ec-neon-main: #ff0011;
   --ec-neon-second: #ff5500;
-  --ec-neon-glow:   rgba(255, 0, 17, 0.8);
-  --ec-spin-outer:  50s;
-  --ec-spin-mid:    30s;
-  --ec-spin-inner:  20s;
-  --ec-core-pulse:  0.4s;
-  --ec-dilation:    1.1;
+  --ec-neon-glow: rgba(255, 0, 17, 0.8);
+  --ec-spin-outer: 50s;
+  --ec-spin-mid: 30s;
+  --ec-spin-inner: 20s;
+  --ec-core-pulse: 0.4s;
+  --ec-dilation: 1.1;
   filter: drop-shadow(0 0 50px rgba(255, 0, 17, 0.5));
 }
-.ec-canvas.ec-state-error .ec-glass-reflection { opacity: 0; }
-.ec-canvas.ec-state-error .ec-dark-overlay     { opacity: 0.8; }
+.ec-canvas.ec-state-error .ec-glass-reflection {
+  opacity: 0;
+}
+.ec-canvas.ec-state-error .ec-dark-overlay {
+  opacity: 0.8;
+}
 .ec-canvas.ec-state-error .ec-error-symbol-group {
   opacity: 1;
   visibility: visible;
@@ -706,31 +1070,87 @@ input[type="number"] {
 }
 
 /* ── Pulsos de eventos ─────────────────────────────────────────────── */
-/* Cada anillo nace en el iris (r=60) y se expande hasta el borde del
-   ojo (r=180) mientras se desvanece. Una sola pasada, ~1.2s. La capa
-   .ec-pulses está clipeada al socket, así nunca se sale del círculo. */
+/* Cada evento dispara TRES anillos concéntricos con delay escalonado:
+   se ve una onda triple que crece desde el iris (r=60) hasta el borde
+   del ojo (r=190). Stroke grueso al inicio que se afina al expandirse
+   y un drop-shadow en el pico hace que destaquen sobre el BackgroundEye
+   (que está al 13% de opacidad). La capa .ec-pulses está clipeada al
+   socket, así nunca se sale del círculo. */
 @keyframes ec-pulse-wave {
-  0%   { r: 60;  opacity: 0;    stroke-width: 3; }
-  15%  {         opacity: 0.42;                    }
-  100% { r: 180; opacity: 0;    stroke-width: 0.5; }
+  0% {
+    r: 60;
+    opacity: 0;
+    stroke-width: 4;
+  }
+  10% {
+    opacity: 0.95;
+  }
+  60% {
+    opacity: 0.55;
+    stroke-width: 2.5;
+  }
+  100% {
+    r: 190;
+    opacity: 0;
+    stroke-width: 0.5;
+  }
 }
 .ec-canvas .ec-pulse-ring {
   animation: ec-pulse-wave 1200ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
   mix-blend-mode: screen;
+  filter: drop-shadow(0 0 6px currentColor);
 }
-.ec-canvas .ec-pulse-sensor { stroke: #7EE7FF; }
-.ec-canvas .ec-pulse-notif  { stroke: #A78BFA; }
-.ec-canvas .ec-pulse-tool   { stroke: #F472B6; }
-.ec-canvas .ec-pulse-error  { stroke: #FF3344; }
+/* Los tres anillos del mismo pulso arrancan escalonados para que
+   se vea una onda, no un solo trazo. */
+.ec-canvas .ec-pulse-ring-1 {
+  animation-delay: 0ms;
+}
+.ec-canvas .ec-pulse-ring-2 {
+  animation-delay: 150ms;
+  opacity: 0;
+}
+.ec-canvas .ec-pulse-ring-3 {
+  animation-delay: 300ms;
+  opacity: 0;
+}
+/* `currentColor` para que drop-shadow use el stroke. */
+.ec-canvas .ec-pulse-sensor {
+  stroke: #7ee7ff;
+  color: #7ee7ff;
+}
+.ec-canvas .ec-pulse-notif {
+  stroke: #a78bfa;
+  color: #a78bfa;
+}
+.ec-canvas .ec-pulse-tool {
+  stroke: #f472b6;
+  color: #f472b6;
+}
+.ec-canvas .ec-pulse-error {
+  stroke: #ff3344;
+  color: #ff3344;
+}
 /* Cuando el ojo está congelado o el componente paused, los pulsos no
    tienen sentido: cortamos su animación. */
 .ec-canvas.ec-frozen .ec-pulse-ring,
-.ec-canvas.ec-paused .ec-pulse-ring { animation: none; opacity: 0; }
+.ec-canvas.ec-paused .ec-pulse-ring {
+  animation: none;
+  opacity: 0;
+}
 
 /* ── Anillos ───────────────────────────────────────────────────────── */
-.ec-canvas .ec-spin-cw      { transform-origin: 200px 200px; animation: ec-spin        linear infinite var(--ec-spin-outer); }
-.ec-canvas .ec-spin-cw-fast { transform-origin: 200px 200px; animation: ec-spin        linear infinite var(--ec-spin-mid);   }
-.ec-canvas .ec-spin-ccw     { transform-origin: 200px 200px; animation: ec-spin-rev    linear infinite var(--ec-spin-inner); }
+.ec-canvas .ec-spin-cw {
+  transform-origin: 200px 200px;
+  animation: ec-spin linear infinite var(--ec-spin-outer);
+}
+.ec-canvas .ec-spin-cw-fast {
+  transform-origin: 200px 200px;
+  animation: ec-spin linear infinite var(--ec-spin-mid);
+}
+.ec-canvas .ec-spin-ccw {
+  transform-origin: 200px 200px;
+  animation: ec-spin-rev linear infinite var(--ec-spin-inner);
+}
 
 /* ── Iris pulse ────────────────────────────────────────────────────── */
 .ec-canvas .ec-pulse-dilate {
@@ -747,8 +1167,12 @@ input[type="number"] {
 
 /* ── Reflejos de vidrio y transiciones suaves ──────────────────────── */
 .ec-canvas .ec-glass-reflection,
-.ec-canvas .ec-dark-overlay { transition: opacity 0.3s ease; }
-.ec-canvas .ec-voice-target { transition: filter 0.3s ease; }
+.ec-canvas .ec-dark-overlay {
+  transition: opacity 0.3s ease;
+}
+.ec-canvas .ec-voice-target {
+  transition: filter 0.3s ease;
+}
 
 /* ── Símbolo de error (oculto por defecto) ─────────────────────────── */
 .ec-canvas .ec-error-symbol-group {
@@ -762,11 +1186,20 @@ input[type="number"] {
 /* ══════════════════════════════════════════════════════════════════════
    Keyframes del ojo
    ══════════════════════════════════════════════════════════════════════ */
-@keyframes ec-spin     { 100% { transform: rotate(360deg);  } }
-@keyframes ec-spin-rev { 100% { transform: rotate(-360deg); } }
+@keyframes ec-spin {
+  100% {
+    transform: rotate(360deg);
+  }
+}
+@keyframes ec-spin-rev {
+  100% {
+    transform: rotate(-360deg);
+  }
+}
 
 @keyframes ec-pulse-dilate {
-  0%, 100% {
+  0%,
+  100% {
     transform: scale(var(--ec-dilation));
     filter: drop-shadow(0 0 12px var(--ec-neon-main));
   }
@@ -777,24 +1210,68 @@ input[type="number"] {
 }
 
 @keyframes ec-robotic-look {
-  0%, 15%   { transform: translate(0, 0); }
-  17%, 25%  { transform: translate(22px, -14px); }
-  27%, 30%  { transform: translate(26px, 0); }
-  32%, 45%  { transform: translate(-19px, -11px); }
-  47%, 65%  { transform: translate(0, 0); }
-  67%, 75%  { transform: translate(-16px, 21px); }
-  77%, 85%  { transform: translate(13px, 24px); }
-  87%, 100% { transform: translate(0, 0); }
+  0%,
+  15% {
+    transform: translate(0, 0);
+  }
+  17%,
+  25% {
+    transform: translate(22px, -14px);
+  }
+  27%,
+  30% {
+    transform: translate(26px, 0);
+  }
+  32%,
+  45% {
+    transform: translate(-19px, -11px);
+  }
+  47%,
+  65% {
+    transform: translate(0, 0);
+  }
+  67%,
+  75% {
+    transform: translate(-16px, 21px);
+  }
+  77%,
+  85% {
+    transform: translate(13px, 24px);
+  }
+  87%,
+  100% {
+    transform: translate(0, 0);
+  }
 }
 
 @keyframes ec-voice-flashes {
-  0%, 100%               { filter: drop-shadow(0 0 10px var(--ec-neon-glow)); }
-  5%, 15%, 25%, 40%, 60%, 80% { filter: drop-shadow(0 0 25px #ffffff); opacity: 1; }
-  10%, 20%, 30%, 50%, 70%, 90% { filter: drop-shadow(0 0 5px var(--ec-neon-glow)); opacity: 0.8; }
+  0%,
+  100% {
+    filter: drop-shadow(0 0 10px var(--ec-neon-glow));
+  }
+  5%,
+  15%,
+  25%,
+  40%,
+  60%,
+  80% {
+    filter: drop-shadow(0 0 25px #ffffff);
+    opacity: 1;
+  }
+  10%,
+  20%,
+  30%,
+  50%,
+  70%,
+  90% {
+    filter: drop-shadow(0 0 5px var(--ec-neon-glow));
+    opacity: 0.8;
+  }
 }
 
 @keyframes ec-error-pulse {
-  0%, 100% {
+  0%,
+  100% {
     opacity: 0.8;
     filter: drop-shadow(0 0 15px var(--ec-neon-main));
   }
@@ -804,27 +1281,113 @@ input[type="number"] {
   }
 }
 
+/* ── Respiración global ──────────────────────────────────────────────
+   Escala muy sutil del ojo entero (~1.5%) con curva suave. La
+   sensación es la de un ser vivo respirando — no un latido. */
+@keyframes ec-breath {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.015);
+  }
+}
+
+/* ── Filamentos del iris ─────────────────────────────────────────────
+   Los filamentos giran en sentido contrario al spin externo más rápido
+   para crear sensación de profundidad paralax. El opacity flicker
+   simula actividad neuronal. */
+.ec-canvas .ec-iris-filaments-spin {
+  transform-origin: 200px 200px;
+  animation:
+    ec-spin-rev linear infinite calc(var(--ec-spin-inner) * 1.4),
+    ec-iris-flicker 2.4s ease-in-out infinite;
+}
+@keyframes ec-iris-flicker {
+  0%,
+  100% {
+    opacity: 0.85;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+/* ── Partículas de datos ─────────────────────────────────────────────
+   8 motas que orbitan con paths individuales suaves. Cada partícula
+   tiene un delay y duración propios (seteados inline) para que el
+   movimiento no quede sincronizado. */
+.ec-canvas .ec-particle {
+  transform-origin: 200px 200px;
+  animation-name: ec-particle-orbit;
+  animation-timing-function: cubic-bezier(0.4, 0, 0.6, 1);
+  animation-iteration-count: infinite;
+  opacity: 0.7;
+  filter: drop-shadow(0 0 3px var(--ec-neon-main));
+  mix-blend-mode: screen;
+}
+@keyframes ec-particle-orbit {
+  0% {
+    transform: translate(0, 0) scale(1);
+    opacity: 0;
+  }
+  15% {
+    opacity: 0.9;
+  }
+  50% {
+    transform: translate(-8px, -6px) scale(1.25);
+    opacity: 0.7;
+  }
+  85% {
+    opacity: 0.4;
+  }
+  100% {
+    transform: translate(0, 0) scale(1);
+    opacity: 0;
+  }
+}
+
+/* En estados activos las partículas se intensifican. */
+.ec-canvas.ec-state-listening .ec-particle,
+.ec-canvas.ec-state-responding .ec-particle {
+  opacity: 1;
+}
+.ec-canvas.ec-state-thinking .ec-particle {
+  animation-duration: 2s !important;
+  opacity: 1;
+}
+.ec-canvas.ec-state-error .ec-particle {
+  display: none;
+}
+
 /* ══════════════════════════════════════════════════════════════════════
    FROZEN — "Sin conexión": el ojo se queda quieto y la paleta se
    apaga a un azul sobrio. Aplica tanto al centerpiece de Inicio como
    al BackgroundEye.
    ══════════════════════════════════════════════════════════════════════ */
 .ec-canvas.ec-frozen {
-  --ec-neon-main:   #5C7A99;
-  --ec-neon-second: #2A3A52;
-  --ec-neon-glow:   rgba(92, 122, 153, 0.28);
+  --ec-neon-main: #5c7a99;
+  --ec-neon-second: #2a3a52;
+  --ec-neon-glow: rgba(92, 122, 153, 0.28);
   filter: drop-shadow(0 0 14px rgba(92, 122, 153, 0.18));
 }
-.ec-canvas.ec-frozen.ec-bg { opacity: 0.10; }
+.ec-canvas.ec-frozen.ec-bg {
+  opacity: 0.1;
+}
 
-/* paralizamos TODO movimiento: anillos, iris, mirada, voz, error */
+/* paralizamos TODO movimiento: anillos, iris, mirada, voz, error,
+   filamentos, partículas, respiración */
+.ec-canvas.ec-frozen,
 .ec-canvas.ec-frozen .ec-tracking-group,
 .ec-canvas.ec-frozen .ec-pulse-dilate,
 .ec-canvas.ec-frozen .ec-spin-cw,
 .ec-canvas.ec-frozen .ec-spin-cw-fast,
 .ec-canvas.ec-frozen .ec-spin-ccw,
 .ec-canvas.ec-frozen .ec-voice-target,
-.ec-canvas.ec-frozen .ec-error-symbol-group {
+.ec-canvas.ec-frozen .ec-error-symbol-group,
+.ec-canvas.ec-frozen .ec-iris-filaments-spin,
+.ec-canvas.ec-frozen .ec-particle {
   animation: none !important;
   transform: none !important;
 }
@@ -838,13 +1401,16 @@ input[type="number"] {
    en el mini-ojo del top-bar: no se mueve, pero el color sigue
    reflejando el estado real de Orion.
    ══════════════════════════════════════════════════════════════════════ */
+.ec-canvas.ec-paused,
 .ec-canvas.ec-paused .ec-tracking-group,
 .ec-canvas.ec-paused .ec-pulse-dilate,
 .ec-canvas.ec-paused .ec-spin-cw,
 .ec-canvas.ec-paused .ec-spin-cw-fast,
 .ec-canvas.ec-paused .ec-spin-ccw,
 .ec-canvas.ec-paused .ec-voice-target,
-.ec-canvas.ec-paused .ec-error-symbol-group {
+.ec-canvas.ec-paused .ec-error-symbol-group,
+.ec-canvas.ec-paused .ec-iris-filaments-spin,
+.ec-canvas.ec-paused .ec-particle {
   animation: none !important;
   transform: none !important;
 }

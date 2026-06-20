@@ -22,12 +22,42 @@ import { Icon, type IconName } from "@/ui/Icon";
 import { Badge, Button, Empty, SectionHeader, Surface } from "@/ui/primitives";
 
 const CATEGORIES: { id: MemoryCategory; label: string; description: string; icon: IconName }[] = [
-  { id: "identity",      label: "Identidad",    description: "Nombre, ciudad, trabajo, lo esencial",     icon: "shield"   },
-  { id: "preferences",   label: "Preferencias", description: "Gustos, hobbies, ritmos diarios",          icon: "sparkles" },
-  { id: "projects",      label: "Proyectos",    description: "Cosas en las que estás trabajando ahora",  icon: "cpu"      },
-  { id: "relationships", label: "Relaciones",   description: "Familia, amistades, compañeros",           icon: "chat"     },
-  { id: "wishes",        label: "Deseos",       description: "Planes, ambiciones, qué viene después",    icon: "bolt"     },
-  { id: "notes",         label: "Notas",        description: "Hábitos, ideas, cualquier otra cosa",      icon: "notes"    },
+  {
+    id: "identity",
+    label: "Identidad",
+    description: "Nombre, ciudad, trabajo, lo esencial",
+    icon: "shield",
+  },
+  {
+    id: "preferences",
+    label: "Preferencias",
+    description: "Gustos, hobbies, ritmos diarios",
+    icon: "sparkles",
+  },
+  {
+    id: "projects",
+    label: "Proyectos",
+    description: "Cosas en las que estás trabajando ahora",
+    icon: "cpu",
+  },
+  {
+    id: "relationships",
+    label: "Relaciones",
+    description: "Familia, amistades, compañeros",
+    icon: "chat",
+  },
+  {
+    id: "wishes",
+    label: "Deseos",
+    description: "Planes, ambiciones, qué viene después",
+    icon: "bolt",
+  },
+  {
+    id: "notes",
+    label: "Notas",
+    description: "Hábitos, ideas, cualquier otra cosa",
+    icon: "notes",
+  },
 ];
 
 // Claves típicas por categoría — chips clickeables que rellenan el
@@ -35,58 +65,67 @@ const CATEGORIES: { id: MemoryCategory; label: string; description: string; icon
 // de memoria.
 const SUGGESTED_KEYS: Record<MemoryCategory, { key: string; label: string; example: string }[]> = {
   identity: [
-    { key: "nombre",       label: "Nombre",       example: "Zahir" },
-    { key: "edad",         label: "Edad",         example: "32"    },
-    { key: "ciudad",       label: "Ciudad",       example: "Lima"  },
-    { key: "trabajo",      label: "Trabajo",      example: "Ingeniero de software" },
-    { key: "idioma",       label: "Idioma",       example: "Español" },
-    { key: "cumpleanos",   label: "Cumpleaños",   example: "1992-03-14" },
+    { key: "nombre", label: "Nombre", example: "Zahir" },
+    { key: "edad", label: "Edad", example: "32" },
+    { key: "ciudad", label: "Ciudad", example: "Lima" },
+    { key: "trabajo", label: "Trabajo", example: "Ingeniero de software" },
+    { key: "idioma", label: "Idioma", example: "Español" },
+    { key: "cumpleanos", label: "Cumpleaños", example: "1992-03-14" },
   ],
   preferences: [
     { key: "comida_favorita", label: "Comida favorita", example: "Pizza" },
-    { key: "musica",          label: "Música",          example: "Synthwave, jazz" },
-    { key: "deporte",         label: "Deporte",         example: "Tenis" },
-    { key: "color_favorito",  label: "Color favorito",  example: "Azul" },
+    { key: "musica", label: "Música", example: "Synthwave, jazz" },
+    { key: "deporte", label: "Deporte", example: "Tenis" },
+    { key: "color_favorito", label: "Color favorito", example: "Azul" },
     { key: "horario_trabajo", label: "Horario trabajo", example: "9 a 18" },
   ],
   projects: [
     { key: "principal", label: "Principal", example: "O.R.I.O.N — sistema operativo asistido" },
-    { key: "side",      label: "Side",      example: "Blog técnico" },
+    { key: "side", label: "Side", example: "Blog técnico" },
   ],
   relationships: [
-    { key: "pareja",     label: "Pareja",     example: "" },
+    { key: "pareja", label: "Pareja", example: "" },
     { key: "mejor_amigo", label: "Mejor amigo", example: "" },
-    { key: "mascota",    label: "Mascota",    example: "" },
+    { key: "mascota", label: "Mascota", example: "" },
   ],
   wishes: [
     { key: "viaje", label: "Viaje pendiente", example: "Japón" },
     { key: "meta_anio", label: "Meta del año", example: "Publicar Orion en GitHub" },
   ],
-  notes: [
-    { key: "habito", label: "Hábito", example: "Meditar 10 min al levantarme" },
-  ],
+  notes: [{ key: "habito", label: "Hábito", example: "Meditar 10 min al levantarme" }],
 };
 
 const EMPTY_MEM: MemoryShape = {
-  identity: {}, preferences: {}, projects: {},
-  relationships: {}, wishes: {}, notes: {},
+  identity: {},
+  preferences: {},
+  projects: {},
+  relationships: {},
+  wishes: {},
+  notes: {},
 };
 
 export function MemoryPanel() {
   const rev = useOrionStore((s) => s.rev.memory);
-  const [mem,   setMem]   = useState<MemoryShape>(EMPTY_MEM);
-  const [tab,   setTab]   = useState<MemoryCategory>("identity");
+  const [mem, setMem] = useState<MemoryShape>(EMPTY_MEM);
+  const [tab, setTab] = useState<MemoryCategory>("identity");
   const [newKey, setNewKey] = useState("");
   const [newVal, setNewVal] = useState("");
-  const [query, setQuery]   = useState("");
+  const [query, setQuery] = useState("");
   const valRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     let alive = true;
-    api.getMemory()
-      .then((m) => { if (alive) setMem(m); })
-      .catch((e) => { if (alive) toast.error("No pude leer memoria", String(e)); });
-    return () => { alive = false; };
+    api
+      .getMemory()
+      .then((m) => {
+        if (alive) setMem(m);
+      })
+      .catch((e) => {
+        if (alive) toast.error("No pude leer memoria", String(e));
+      });
+    return () => {
+      alive = false;
+    };
   }, [rev]);
 
   const entries = useMemo(
@@ -124,8 +163,11 @@ export function MemoryPanel() {
   async function save(category: MemoryCategory, key: string, value: string) {
     const v = value.trim();
     if (!v) return;
-    try { await api.putMemory(category, key, v); }
-    catch (e) { toast.error("No se pudo guardar", String(e)); }
+    try {
+      await api.putMemory(category, key, v);
+    } catch (e) {
+      toast.error("No se pudo guardar", String(e));
+    }
   }
   async function addNew() {
     const k = newKey.trim().replace(/\s+/g, "_").toLowerCase();
@@ -133,22 +175,27 @@ export function MemoryPanel() {
     if (!k || !v) return;
     try {
       await api.putMemory(tab, k, v);
-      setNewKey(""); setNewVal("");
+      setNewKey("");
+      setNewVal("");
       toast.success("Memoria guardada", `${tab} / ${k}`);
-    } catch (e) { toast.error("No se pudo guardar", String(e)); }
+    } catch (e) {
+      toast.error("No se pudo guardar", String(e));
+    }
   }
   async function remove(category: MemoryCategory, key: string) {
     const ok = await toast.confirm({
-      title:        "¿Borrar entrada?",
-      detail:       `${category} / ${key}`,
+      title: "¿Borrar entrada?",
+      detail: `${category} / ${key}`,
       confirmLabel: "Borrar",
-      danger:       true,
+      danger: true,
     });
     if (!ok) return;
     try {
       await api.deleteMemory(category, key);
       toast.success("Entrada borrada");
-    } catch (e) { toast.error("No se pudo borrar", String(e)); }
+    } catch (e) {
+      toast.error("No se pudo borrar", String(e));
+    }
   }
   function fillFromSuggestion(key: string, example: string) {
     setNewKey(key);
@@ -171,8 +218,11 @@ export function MemoryPanel() {
       {/* ── Search bar — busca en TODAS las categorías ───────────── */}
       <div className="px-6 pt-4">
         <div className="relative">
-          <Icon name="search" size={14}
-                className="absolute left-3 top-1/2 -translate-y-1/2 text-text-dim pointer-events-none" />
+          <Icon
+            name="search"
+            size={14}
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-text-dim pointer-events-none"
+          />
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
@@ -213,8 +263,16 @@ export function MemoryPanel() {
                   ].join(" ")}
                 >
                   <div className="flex items-center justify-between mb-1">
-                    <Icon name={c.icon} size={14} className={isActive ? "text-pri" : "text-text-dim"} />
-                    <span className={`text-[10px] font-mono tabular-nums ${isActive ? "text-pri" : "text-muted"}`}>{n}</span>
+                    <Icon
+                      name={c.icon}
+                      size={14}
+                      className={isActive ? "text-pri" : "text-text-dim"}
+                    />
+                    <span
+                      className={`text-[10px] font-mono tabular-nums ${isActive ? "text-pri" : "text-muted"}`}
+                    >
+                      {n}
+                    </span>
                   </div>
                   <div className="text-xs font-medium tracking-tight">{c.label}</div>
                 </button>
@@ -240,10 +298,7 @@ export function MemoryPanel() {
               hint="Pulsa una sugerencia abajo o pídeselo a Orion durante la charla."
             />
             {unusedSuggestions.length > 0 && (
-              <SuggestionChips
-                items={unusedSuggestions}
-                onPick={fillFromSuggestion}
-              />
+              <SuggestionChips items={unusedSuggestions} onPick={fillFromSuggestion} />
             )}
           </div>
         ) : (
@@ -251,9 +306,13 @@ export function MemoryPanel() {
             <div className="flex flex-col gap-2">
               {entries.map((e, i) => (
                 <Row
-                  key={e.key} entryKey={e.key} value={String(e.value ?? "")}
-                  updated={e.updated} delay={i * 25}
-                  onSave={(v) => save(tab, e.key, v)} onDelete={() => remove(tab, e.key)}
+                  key={e.key}
+                  entryKey={e.key}
+                  value={String(e.value ?? "")}
+                  updated={e.updated}
+                  delay={i * 25}
+                  onSave={(v) => save(tab, e.key, v)}
+                  onDelete={() => remove(tab, e.key)}
                 />
               ))}
             </div>
@@ -286,7 +345,9 @@ export function MemoryPanel() {
             type="text"
             value={newVal}
             onChange={(e) => setNewVal(e.target.value)}
-            onKeyDown={(e) => { if (e.key === "Enter") addNew(); }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") addNew();
+            }}
             placeholder={`valor (categoría: ${active.label.toLowerCase()})`}
             className={[
               "flex-1 rounded-md border px-3 h-9 text-sm placeholder-muted",
@@ -295,7 +356,9 @@ export function MemoryPanel() {
             ].join(" ")}
           />
           <Button
-            variant="primary" size="md" icon="plus"
+            variant="primary"
+            size="md"
+            icon="plus"
             onClick={addNew}
             disabled={!newKey.trim() || !newVal.trim()}
           >
@@ -309,7 +372,8 @@ export function MemoryPanel() {
 
 /* ─── Chips de sugerencia ──────────────────────────────────────────── */
 function SuggestionChips({
-  items, onPick,
+  items,
+  onPick,
 }: {
   items: { key: string; label: string; example: string }[];
   onPick: (key: string, example: string) => void;
@@ -336,7 +400,9 @@ function SuggestionChips({
 
 /* ─── Resultados de búsqueda global ────────────────────────────────── */
 function GlobalResults({
-  hits, onSave, onDelete,
+  hits,
+  onSave,
+  onDelete,
 }: {
   hits: { cat: MemoryCategory; key: string; value: string; updated?: string }[];
   onSave: (cat: MemoryCategory, key: string, v: string) => void;
@@ -361,8 +427,10 @@ function GlobalResults({
             delay={i * 20}
             badge={
               catInfo && (
-                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px]
-                                 uppercase tracking-[0.18em] text-pri/80 bg-pri/10 border border-pri/20 font-mono">
+                <span
+                  className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px]
+                                 uppercase tracking-[0.18em] text-pri/80 bg-pri/10 border border-pri/20 font-mono"
+                >
                   <Icon name={catInfo.icon} size={9} />
                   {catInfo.label}
                 </span>
@@ -379,15 +447,27 @@ function GlobalResults({
 
 /* ─── Row (entry editable) ─────────────────────────────────────────── */
 function Row({
-  entryKey, value, updated, delay, badge, onSave, onDelete,
+  entryKey,
+  value,
+  updated,
+  delay,
+  badge,
+  onSave,
+  onDelete,
 }: {
-  entryKey: string; value: string; updated?: string; delay?: number;
+  entryKey: string;
+  value: string;
+  updated?: string;
+  delay?: number;
   badge?: React.ReactNode;
-  onSave: (v: string) => void; onDelete: () => void;
+  onSave: (v: string) => void;
+  onDelete: () => void;
 }) {
   const [editing, setEditing] = useState(false);
-  const [draft,   setDraft]   = useState(value);
-  useEffect(() => { setDraft(value); }, [value]);
+  const [draft, setDraft] = useState(value);
+  useEffect(() => {
+    setDraft(value);
+  }, [value]);
 
   return (
     <Surface
@@ -397,9 +477,7 @@ function Row({
     >
       <div className="flex items-center justify-between gap-3">
         <div className="shrink-0 flex items-center gap-2 max-w-[34%]">
-          <code className="text-xs font-mono text-acc/90 tracking-tight truncate">
-            {entryKey}
-          </code>
+          <code className="text-xs font-mono text-acc/90 tracking-tight truncate">{entryKey}</code>
           {badge}
         </div>
         {editing ? (
@@ -407,10 +485,19 @@ function Row({
             value={draft}
             autoFocus
             onChange={(e) => setDraft(e.target.value)}
-            onBlur={() => { onSave(draft); setEditing(false); }}
+            onBlur={() => {
+              onSave(draft);
+              setEditing(false);
+            }}
             onKeyDown={(e) => {
-              if (e.key === "Enter")  { onSave(draft); setEditing(false); }
-              if (e.key === "Escape") { setDraft(value); setEditing(false); }
+              if (e.key === "Enter") {
+                onSave(draft);
+                setEditing(false);
+              }
+              if (e.key === "Escape") {
+                setDraft(value);
+                setEditing(false);
+              }
             }}
             className="flex-1 bg-surface border border-pri/40 rounded px-2 py-1 text-sm focus:outline-none"
           />

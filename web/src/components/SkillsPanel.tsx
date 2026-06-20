@@ -12,15 +12,21 @@
 
 import { useEffect, useMemo, useState } from "react";
 
-import { api, type CliInfo, type SkillDetail, type SkillRegistryItem, type SkillSummary } from "@/api/rest";
+import {
+  api,
+  type CliInfo,
+  type SkillDetail,
+  type SkillRegistryItem,
+  type SkillSummary,
+} from "@/api/rest";
 import { Icon } from "@/ui/Icon";
 import { Badge, Button, Empty, SectionHeader, Surface } from "@/ui/primitives";
 
 export function SkillsPanel() {
-  const [skills,  setSkills]  = useState<SkillSummary[]>([]);
+  const [skills, setSkills] = useState<SkillSummary[]>([]);
   const [loading, setLoading] = useState(false);
-  const [error,   setError]   = useState<string | null>(null);
-  const [openId,  setOpenId]  = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [openId, setOpenId] = useState<string | null>(null);
   const [browserOpen, setBrowserOpen] = useState(false);
 
   async function refresh() {
@@ -48,7 +54,9 @@ export function SkillsPanel() {
     }
   }
 
-  useEffect(() => { void refresh(); }, []);
+  useEffect(() => {
+    void refresh();
+  }, []);
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
@@ -58,7 +66,9 @@ export function SkillsPanel() {
         hint="Recetas en formato SKILL.md que el LLM lee como contexto extra. No son MCP — no corren procesos."
         action={
           <div className="flex items-center gap-2">
-            <Badge tone="info" dot>{skills.length} cargadas</Badge>
+            <Badge tone="info" dot>
+              {skills.length} cargadas
+            </Badge>
             <Button variant="ghost" size="sm" icon="memory" onClick={reload} disabled={loading}>
               Recargar
             </Button>
@@ -71,8 +81,10 @@ export function SkillsPanel() {
 
       <div className="flex-1 overflow-y-auto scrollbar-thin px-6 py-4">
         {error && (
-          <div className="mb-3 flex items-start gap-2 p-3 rounded-md
-                          border border-danger/30 bg-danger/10 text-xs text-danger">
+          <div
+            className="mb-3 flex items-start gap-2 p-3 rounded-md
+                          border border-danger/30 bg-danger/10 text-xs text-danger"
+          >
             <Icon name="alert" size={14} className="mt-0.5 shrink-0" />
             <span>{error}</span>
           </div>
@@ -102,14 +114,14 @@ export function SkillsPanel() {
         </div>
       </div>
 
-      {openId && (
-        <SkillDrawer id={openId} onClose={() => setOpenId(null)} />
-      )}
+      {openId && <SkillDrawer id={openId} onClose={() => setOpenId(null)} />}
       {browserOpen && (
         <ClawHubBrowser
           installed={new Set(skills.map((s) => s.id))}
           onClose={() => setBrowserOpen(false)}
-          onInstalled={() => { void refresh(); }}
+          onInstalled={() => {
+            void refresh();
+          }}
         />
       )}
     </div>
@@ -123,19 +135,27 @@ export function SkillsPanel() {
  *   - Si está instalado (vía tools/ o PATH) → badge "Listo".
  */
 function RequiredBinsCard({
-  frontmatter, skillId,
-}: { frontmatter: Record<string, unknown>; skillId: string }) {
+  frontmatter,
+  skillId,
+}: {
+  frontmatter: Record<string, unknown>;
+  skillId: string;
+}) {
   const bins = useMemo(() => extractRequiredBins(frontmatter), [frontmatter]);
   const [catalog, setCatalog] = useState<CliInfo[]>([]);
-  const [busy,    setBusy]    = useState<string | null>(null);
-  const [error,   setError]   = useState<string | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   async function refresh() {
     try {
       setCatalog(await api.listCli());
-    } catch (e) { setError(String(e)); }
+    } catch (e) {
+      setError(String(e));
+    }
   }
-  useEffect(() => { void refresh(); /* eslint-disable-next-line */ }, [skillId]);
+  useEffect(() => {
+    void refresh();
+  }, [skillId]);
 
   if (bins.length === 0) {
     return (
@@ -144,8 +164,8 @@ function RequiredBinsCard({
           Sin dependencias externas
         </div>
         <p className="text-[11px] leading-relaxed text-text-dim">
-          Esta skill no declara binarios requeridos. Debería andar al instalarse,
-          asumiendo que las tools nativas de ORION (shell, files, web) cubren lo que pide.
+          Esta skill no declara binarios requeridos. Debería andar al instalarse, asumiendo que las
+          tools nativas de ORION (shell, files, web) cubren lo que pide.
         </p>
       </Surface>
     );
@@ -169,8 +189,8 @@ function RequiredBinsCard({
         Binarios requeridos
       </div>
       <p className="text-[11px] leading-relaxed text-text-dim mb-3">
-        Esta skill llama a CLIs externas. Las que ORION sabe instalar van con un botón;
-        las que no, tenés que bajarlas a mano (link al repo).
+        Esta skill llama a CLIs externas. Las que ORION sabe instalar van con un botón; las que no,
+        tenés que bajarlas a mano (link al repo).
       </p>
       {error && (
         <div className="mb-2 p-2 rounded-md border border-danger/30 bg-danger/10 text-[11px] text-danger">
@@ -183,16 +203,25 @@ function RequiredBinsCard({
           const knownInstaller = !!entry;
           const installed = entry?.installed ?? false;
           return (
-            <li key={bin} className="flex items-center justify-between gap-3 p-2 rounded-md
-                                     border border-white/[0.06] bg-bg/40">
+            <li
+              key={bin}
+              className="flex items-center justify-between gap-3 p-2 rounded-md
+                                     border border-white/[0.06] bg-bg/40"
+            >
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
                   <code className="text-sm font-mono text-text">{bin}</code>
-                  {installed
-                    ? <Badge tone="success" dot>Listo</Badge>
-                    : knownInstaller
-                      ? <Badge tone="warn" dot>Falta</Badge>
-                      : <Badge tone="neutral">Manual</Badge>}
+                  {installed ? (
+                    <Badge tone="success" dot>
+                      Listo
+                    </Badge>
+                  ) : knownInstaller ? (
+                    <Badge tone="warn" dot>
+                      Falta
+                    </Badge>
+                  ) : (
+                    <Badge tone="neutral">Manual</Badge>
+                  )}
                 </div>
                 {entry && (
                   <div className="text-[10px] text-muted truncate">
@@ -240,7 +269,11 @@ function extractRequiredBins(frontmatter: Record<string, unknown>): string[] {
   // Espejo del parser Python core.cli_installer.required_bins. Tolerante.
   let meta = frontmatter["metadata"];
   if (typeof meta === "string") {
-    try { meta = JSON.parse(meta); } catch { return []; }
+    try {
+      meta = JSON.parse(meta);
+    } catch {
+      return [];
+    }
   }
   if (!meta || typeof meta !== "object") return [];
   const m = meta as Record<string, unknown>;
@@ -269,58 +302,65 @@ function GogOauthCard() {
         </Button>
       </div>
       <p className="text-[11px] leading-relaxed text-text-dim">
-        Aunque tengas el binario instalado, hasta que no configures OAuth en Google Cloud
-        Console y corras <code>gog auth add</code>, la skill no puede leer ni enviar nada.
-        Es una sola vez.
+        Aunque tengas el binario instalado, hasta que no configures OAuth en Google Cloud Console y
+        corras <code>gog auth add</code>, la skill no puede leer ni enviar nada. Es una sola vez.
       </p>
-      {open && <div className="mt-3"><GogOauthSteps /></div>}
+      {open && (
+        <div className="mt-3">
+          <GogOauthSteps />
+        </div>
+      )}
     </Surface>
   );
 }
 
 function GogOauthSteps() {
   return (
-    <div className="text-[11px] leading-relaxed text-text-dim space-y-2 p-3 rounded-lg
-                    border border-white/[0.06] bg-bg/40">
+    <div
+      className="text-[11px] leading-relaxed text-text-dim space-y-2 p-3 rounded-lg
+                    border border-white/[0.06] bg-bg/40"
+    >
       <p className="text-text">
         Esto te lleva ~10 min. Hacelo <strong>una sola vez</strong>:
       </p>
       <ol className="list-decimal pl-4 space-y-1.5">
         <li>
           Andá a{" "}
-          <a className="text-pri hover:underline"
-             href="https://console.cloud.google.com/" target="_blank" rel="noopener noreferrer">
+          <a
+            className="text-pri hover:underline"
+            href="https://console.cloud.google.com/"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
             Google Cloud Console
-          </a>
-          {" "}y creá (o seleccioná) un proyecto.
+          </a>{" "}
+          y creá (o seleccioná) un proyecto.
         </li>
-        <li>
-          Activá las APIs que vas a usar: Gmail, Calendar, Drive, Docs, Sheets, Contacts.
-        </li>
+        <li>Activá las APIs que vas a usar: Gmail, Calendar, Drive, Docs, Sheets, Contacts.</li>
         <li>
           En <em>OAuth consent screen</em> → tipo "External" → agregá tu email como test user.
         </li>
         <li>
-          En <em>Credentials</em> → "Create Credentials" → "OAuth client ID" → tipo
-          "Desktop app" → descargá el <code>client_secret.json</code>.
+          En <em>Credentials</em> → "Create Credentials" → "OAuth client ID" → tipo "Desktop app" →
+          descargá el <code>client_secret.json</code>.
         </li>
         <li>
           Abrí una PowerShell y corré (cambiando la ruta):
           <pre className="mt-1 p-2 rounded bg-bg/60 border border-white/[0.06] text-[10px] font-mono whitespace-pre-wrap">
-{`gog auth credentials C:\\ruta\\al\\client_secret.json
+            {`gog auth credentials C:\\ruta\\al\\client_secret.json
 gog auth add tu-email@gmail.com --services gmail,calendar,drive,docs,sheets
 gog auth list`}
           </pre>
         </li>
         <li>
-          Verificá con: <code>gog gmail search "newer_than:1d" --max 3</code>.
-          Si lista emails, está listo.
+          Verificá con: <code>gog gmail search "newer_than:1d" --max 3</code>. Si lista emails, está
+          listo.
         </li>
       </ol>
       <p className="text-muted text-[10px] mt-2">
         ORION inyecta <code>tools/gog/</code> en el PATH del subprocess. Si <code>gog</code>
-        no responde en tu PowerShell pero sí en una tarea de ORION, es porque tu shell no tiene
-        la carpeta en el PATH — eso es normal, no es un bug.
+        no responde en tu PowerShell pero sí en una tarea de ORION, es porque tu shell no tiene la
+        carpeta en el PATH — eso es normal, no es un bug.
       </p>
     </div>
   );
@@ -328,16 +368,18 @@ gog auth list`}
 
 /** Drawer para explorar el repo OpenClaw y descargar skills al disco. */
 function ClawHubBrowser({
-  installed, onClose, onInstalled,
+  installed,
+  onClose,
+  onInstalled,
 }: {
-  installed:   Set<string>;
-  onClose:     () => void;
+  installed: Set<string>;
+  onClose: () => void;
   onInstalled: () => void;
 }) {
-  const [q,        setQ]        = useState("");
-  const [items,    setItems]    = useState<SkillRegistryItem[]>([]);
-  const [loading,  setLoading]  = useState(false);
-  const [error,    setError]    = useState<string | null>(null);
+  const [q, setQ] = useState("");
+  const [items, setItems] = useState<SkillRegistryItem[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [installing, setInstalling] = useState<string | null>(null);
   const [installed2, setInstalled2] = useState<Set<string>>(new Set());
 
@@ -354,7 +396,12 @@ function ClawHubBrowser({
     }
   }
 
-  useEffect(() => { void search(); /* primera carga */ /* eslint-disable-next-line */ }, []);
+  useEffect(() => {
+    void search(); /* primera carga — solo al montar */
+    // `search` se recrea en cada render. Acá solo queremos disparar la
+    // búsqueda inicial; las subsiguientes salen del onClick del input.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function install(id: string) {
     setInstalling(id);
@@ -364,7 +411,9 @@ function ClawHubBrowser({
         setInstalled2((s) => new Set([...s, id]));
         onInstalled();
       } else {
-        setError(`Skill '${id}' descargada (${r.files.length} archivos) pero no se cargó. Revisá si tiene SKILL.md.`);
+        setError(
+          `Skill '${id}' descargada (${r.files.length} archivos) pero no se cargó. Revisá si tiene SKILL.md.`,
+        );
       }
     } catch (e) {
       setError(String(e));
@@ -386,7 +435,9 @@ function ClawHubBrowser({
         <header className="flex items-center justify-between px-5 h-14 border-b border-white/[0.06]">
           <div className="flex items-center gap-2 min-w-0">
             <span className="text-[10px] uppercase tracking-[0.18em] text-muted">ClawHub</span>
-            <span className="text-sm font-medium text-text truncate">Skills disponibles en OpenClaw</span>
+            <span className="text-sm font-medium text-text truncate">
+              Skills disponibles en OpenClaw
+            </span>
           </div>
           <button
             onClick={onClose}
@@ -404,7 +455,9 @@ function ClawHubBrowser({
               type="text"
               value={q}
               onChange={(e) => setQ(e.target.value)}
-              onKeyDown={(e) => { if (e.key === "Enter") search(); }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") search();
+              }}
               placeholder="Filtrar por nombre (ej: github, notion, gh-issues)…"
               className="flex-1 px-3 h-9 text-sm rounded-md bg-elevated border border-white/[0.08]
                          focus:outline-none focus:border-pri/40 placeholder-muted"
@@ -414,7 +467,8 @@ function ClawHubBrowser({
             </Button>
           </div>
           <p className="mt-2 text-[10px] text-muted">
-            Las skills se descargan de github.com/openclaw/openclaw → tu carpeta <code>skills/</code>.
+            Las skills se descargan de github.com/openclaw/openclaw → tu carpeta{" "}
+            <code>skills/</code>.
           </p>
         </div>
 
@@ -440,7 +494,7 @@ function ClawHubBrowser({
           <ul className="divide-y divide-white/[0.04]">
             {items.map((it) => {
               const isInstalled = installed.has(it.id) || installed2.has(it.id);
-              const isBusy      = installing === it.id;
+              const isBusy = installing === it.id;
               return (
                 <li key={it.id} className="flex items-center justify-between gap-3 py-2.5">
                   <div className="min-w-0 flex-1">
@@ -473,7 +527,8 @@ function ClawHubBrowser({
         </div>
 
         <footer className="px-5 h-12 border-t border-white/[0.06] flex items-center text-[10px] text-muted">
-          {items.length > 0 && `${items.length} skill${items.length === 1 ? "" : "s"} en el registry`}
+          {items.length > 0 &&
+            `${items.length} skill${items.length === 1 ? "" : "s"} en el registry`}
         </footer>
       </aside>
     </div>
@@ -499,14 +554,13 @@ function Help() {
         <div className="px-3 pb-3 text-[11px] leading-relaxed text-text-dim space-y-2 border-t border-white/[0.06]">
           <p>
             <strong className="text-text">MCP</strong> son procesos vivos que exponen
-            <em> tools nuevas</em> vía JSON-RPC (ej: <code>github__create_issue</code>).
-            Aportan funcionalidad ejecutable.
+            <em> tools nuevas</em> vía JSON-RPC (ej: <code>github__create_issue</code>). Aportan
+            funcionalidad ejecutable.
           </p>
           <p>
             <strong className="text-text">Skills</strong> son markdown que enseña al LLM
-            <em> cómo combinar las tools que ya tiene</em> (shell, files, web). No
-            corren nada — son contexto extra en el system prompt cuando el Director
-            decide invocarlas.
+            <em> cómo combinar las tools que ya tiene</em> (shell, files, web). No corren nada — son
+            contexto extra en el system prompt cuando el Director decide invocarlas.
           </p>
           <p>
             Una skill mide ~5–50 KB. El backend corta a <code>max_inject_chars</code>
@@ -519,8 +573,14 @@ function Help() {
 }
 
 function SkillCard({
-  skill, onOpen, delay,
-}: { skill: SkillSummary; onOpen: () => void; delay?: number }) {
+  skill,
+  onOpen,
+  delay,
+}: {
+  skill: SkillSummary;
+  onOpen: () => void;
+  delay?: number;
+}) {
   return (
     <button
       onClick={onOpen}
@@ -531,14 +591,10 @@ function SkillCard({
     >
       <header className="flex items-start justify-between gap-3 mb-2">
         <div className="min-w-0 flex-1">
-          <h4 className="text-[15px] font-medium text-text leading-tight truncate">
-            {skill.name}
-          </h4>
+          <h4 className="text-[15px] font-medium text-text leading-tight truncate">{skill.name}</h4>
           <code className="text-[10px] font-mono text-muted">{skill.id}</code>
         </div>
-        {skill.user_invocable && (
-          <Badge tone="accent">user</Badge>
-        )}
+        {skill.user_invocable && <Badge tone="accent">user</Badge>}
       </header>
 
       <p className="text-xs leading-relaxed text-text-dim line-clamp-3 mb-3">
@@ -557,15 +613,25 @@ function SkillCard({
 }
 
 function SkillDrawer({ id, onClose }: { id: string; onClose: () => void }) {
-  const [data,  setData]  = useState<SkillDetail | null>(null);
+  const [data, setData] = useState<SkillDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let alive = true;
-    api.getSkill(id)
-      .then((d) => { if (alive) { setData(d); setError(null); } })
-      .catch((e) => { if (alive) setError(String(e)); });
-    return () => { alive = false; };
+    api
+      .getSkill(id)
+      .then((d) => {
+        if (alive) {
+          setData(d);
+          setError(null);
+        }
+      })
+      .catch((e) => {
+        if (alive) setError(String(e));
+      });
+    return () => {
+      alive = false;
+    };
   }, [id]);
 
   return (
@@ -595,8 +661,10 @@ function SkillDrawer({ id, onClose }: { id: string; onClose: () => void }) {
 
         <div className="flex-1 overflow-y-auto scrollbar-thin px-5 py-4">
           {error && (
-            <div className="mb-3 p-3 rounded-md border border-danger/30 bg-danger/10
-                            text-xs text-danger">
+            <div
+              className="mb-3 p-3 rounded-md border border-danger/30 bg-danger/10
+                            text-xs text-danger"
+            >
               {error}
             </div>
           )}
@@ -612,26 +680,35 @@ function SkillDrawer({ id, onClose }: { id: string; onClose: () => void }) {
                 </div>
                 <p className="text-xs leading-relaxed text-text-dim">{data.description}</p>
                 <div className="mt-3 grid grid-cols-2 gap-3 text-[10px] uppercase tracking-[0.14em] text-muted">
-                  <span>{data.char_count.toLocaleString()} chars · corte a {data.max_inject.toLocaleString()}</span>
-                  <span className="text-right truncate" title={data.path}>{data.path.split(/[\\/]/).slice(-3).join("/")}</span>
+                  <span>
+                    {data.char_count.toLocaleString()} chars · corte a{" "}
+                    {data.max_inject.toLocaleString()}
+                  </span>
+                  <span className="text-right truncate" title={data.path}>
+                    {data.path.split(/[\\/]/).slice(-3).join("/")}
+                  </span>
                 </div>
               </Surface>
 
               <div className="text-[10px] uppercase tracking-[0.18em] text-muted mb-2">
                 Frontmatter
               </div>
-              <pre className="rounded-lg border border-white/[0.06] bg-bg/60 p-3 mb-4
+              <pre
+                className="rounded-lg border border-white/[0.06] bg-bg/60 p-3 mb-4
                               text-[11px] leading-relaxed font-mono text-text
-                              max-h-40 overflow-auto scrollbar-thin">
+                              max-h-40 overflow-auto scrollbar-thin"
+              >
                 <code>{JSON.stringify(data.frontmatter, null, 2)}</code>
               </pre>
 
               <div className="text-[10px] uppercase tracking-[0.18em] text-muted mb-2">
                 Cuerpo (markdown)
               </div>
-              <pre className="rounded-lg border border-white/[0.06] bg-bg/60 p-3
+              <pre
+                className="rounded-lg border border-white/[0.06] bg-bg/60 p-3
                               text-[11px] leading-relaxed font-mono text-text
-                              whitespace-pre-wrap break-words">
+                              whitespace-pre-wrap break-words"
+              >
                 <code>{data.body}</code>
               </pre>
             </>

@@ -33,7 +33,7 @@ import re
 import time
 from pathlib import Path
 from typing import Any
-
+import contextlib
 
 # ── Mapeo SPICE → librería Proteus ─────────────────────────────────────
 #
@@ -64,9 +64,9 @@ _CANVAS_MARGINS_DEFAULT = {"top": 180, "left": 175, "right": 30, "bottom": 50}
 # Posición del panel lateral (DEVICES / INSTRUMENTS / TERMINALS).
 # Coordenadas relativas al rect de la ventana de Proteus 8 Pro.
 _PANEL = {
-    "x_offset_left": 80,    # centro horizontal de la lista
-    "y_start":       270,   # centro vertical de la PRIMERA fila
-    "row_height":    19,    # alto típico de cada fila
+    "x_offset_left": 80,  # centro horizontal de la lista
+    "y_start": 270,  # centro vertical de la PRIMERA fila
+    "row_height": 19,  # alto típico de cada fila
 }
 
 # Sidebar izquierda (columna de modos). El icono de "selection" está
@@ -74,23 +74,23 @@ _PANEL = {
 # "virtual_instruments" más abajo. Coordenadas validadas con
 # screenshots del usuario en Proteus 8 Pro maximizado.
 _SIDEBAR = {
-    "x":           18,    # x absoluto desde el borde izquierdo de la ventana
-    "y_first":     156,   # y del primer icono (selection)
-    "icon_height": 30,    # alto típico de cada icono
+    "x": 18,  # x absoluto desde el borde izquierdo de la ventana
+    "y_first": 156,  # y del primer icono (selection)
+    "icon_height": 30,  # alto típico de cada icono
     "modes": {
-        "selection":           0,
-        "component":           1,
-        "junction_dot":        2,
-        "wire_label":          3,
-        "text_script":         4,
-        "buses":               5,
-        "subcircuits":         6,
-        "terminals":           7,
-        "device_pins":         8,
-        "graph":               9,
-        "tape_recorder":       10,
-        "generator":           11,
-        "probe":               12,
+        "selection": 0,
+        "component": 1,
+        "junction_dot": 2,
+        "wire_label": 3,
+        "text_script": 4,
+        "buses": 5,
+        "subcircuits": 6,
+        "terminals": 7,
+        "device_pins": 8,
+        "graph": 9,
+        "tape_recorder": 10,
+        "generator": 11,
+        "probe": 12,
         "virtual_instruments": 13,
     },
 }
@@ -98,37 +98,44 @@ _SIDEBAR = {
 # Mapeo: tipo lógico (del JSON de Gemini) → idx en el panel TERMINALS.
 # El idx es la fila 0-based dentro del panel cuando estás en Terminals Mode.
 _TERMINAL_PANEL_IDX = {
-    "default":  0,
-    "input":    1,  "in":       1,
-    "output":   2,  "out":      2,
-    "bidir":    3,
-    "power":    4,  "vcc":      4, "vdd": 4,
-    "ground":   5,  "gnd":      5,
-    "chassis":  6,
-    "dynamic":  7,
-    "bus":      8,
-    "nc":       9,
+    "default": 0,
+    "input": 1,
+    "in": 1,
+    "output": 2,
+    "out": 2,
+    "bidir": 3,
+    "power": 4,
+    "vcc": 4,
+    "vdd": 4,
+    "ground": 5,
+    "gnd": 5,
+    "chassis": 6,
+    "dynamic": 7,
+    "bus": 8,
+    "nc": 9,
 }
 
 # Mapeo: tipo lógico → idx en el panel INSTRUMENTS.
 _INSTRUMENT_PANEL_IDX = {
-    "oscilloscope":     0,
-    "logic_analyser":   1, "logic_analyzer": 1,
-    "counter_timer":    2,
+    "oscilloscope": 0,
+    "logic_analyser": 1,
+    "logic_analyzer": 1,
+    "counter_timer": 2,
     "virtual_terminal": 3,
-    "spi_debugger":     4,
-    "i2c_debugger":     5,
+    "spi_debugger": 4,
+    "i2c_debugger": 5,
     "signal_generator": 6,
-    "pattern_generator":7,
-    "dc_voltmeter":     8,
-    "dc_ammeter":       9,
-    "ac_voltmeter":     10,
-    "ac_ammeter":       11,
-    "wattmeter":        12,
+    "pattern_generator": 7,
+    "dc_voltmeter": 8,
+    "dc_ammeter": 9,
+    "ac_voltmeter": 10,
+    "ac_ammeter": 11,
+    "wattmeter": 12,
 }
 
 
 # ── Parser SPICE (fallback si no hay JSON sidecar) ─────────────────────
+
 
 def _parse_cir(cir_path: Path) -> list[dict[str, Any]]:
     """Extrae refdes + nombre de librería Proteus por línea SPICE."""
@@ -146,20 +153,21 @@ def _parse_cir(cir_path: Path) -> list[dict[str, Any]]:
             continue
 
         last = tokens[-1] if len(tokens) > 1 else ""
-        looks_like_model = (
-            bool(re.match(r"^[A-Za-z][\w-]*$", last))
-            and last.upper() not in ("DC", "AC")
+        looks_like_model = bool(re.match(r"^[A-Za-z][\w-]*$", last)) and last.upper() not in (
+            "DC",
+            "AC",
         )
         proteus_name = (
-            last if looks_like_model and kind in ("D", "Q", "M", "X")
-            else _PROTEUS_LIBNAME[kind]
+            last if looks_like_model and kind in ("D", "Q", "M", "X") else _PROTEUS_LIBNAME[kind]
         )
 
-        components.append({
-            "refdes":   refdes,
-            "kind":     kind,
-            "lib_name": proteus_name,
-        })
+        components.append(
+            {
+                "refdes": refdes,
+                "kind": kind,
+                "lib_name": proteus_name,
+            }
+        )
     return components
 
 
@@ -183,59 +191,53 @@ def _read_circuit_sidecar(cir_path: Path) -> dict[str, Any] | None:
 # y transistores donde el modelo importa.
 _GEMINI_TO_PROTEUS: dict[str, tuple[str, str, bool]] = {
     # ── Pasivos ─────────────────────────────────────────────
-    "resistor":            ("R",   "RES",          False),
-    "potentiometer":       ("RV",  "POT-LIN",      False),
-    "ldr":                 ("LDR", "LDR",          False),
-    "thermistor":          ("TH",  "NTC",          False),
-    "capacitor":           ("C",   "CAP",          False),
-    "capacitor_polarized": ("C",   "CAP-ELEC",     False),
-    "capacitor_electrolytic": ("C","CAP-ELEC",     False),
-    "inductor":            ("L",   "INDUCTOR",     False),
-    "transformer":         ("TR",  "TRAN-2P3S",    False),
-    "crystal":             ("X",   "CRYSTAL",      False),
-
+    "resistor": ("R", "RES", False),
+    "potentiometer": ("RV", "POT-LIN", False),
+    "ldr": ("LDR", "LDR", False),
+    "thermistor": ("TH", "NTC", False),
+    "capacitor": ("C", "CAP", False),
+    "capacitor_polarized": ("C", "CAP-ELEC", False),
+    "capacitor_electrolytic": ("C", "CAP-ELEC", False),
+    "inductor": ("L", "INDUCTOR", False),
+    "transformer": ("TR", "TRAN-2P3S", False),
+    "crystal": ("X", "CRYSTAL", False),
     # ── Diodos ──────────────────────────────────────────────
-    "diode":               ("D",   "1N4148",       True),
-    "diode_zener":         ("D",   "1N4733A",      True),
-    "diode_rectifier":     ("D",   "1N4007",       True),
-    "diode_schottky":      ("D",   "1N5817",       True),
-    "led":                 ("D",   "LED-RED",      False),
-    "bridge_rectifier":    ("BR",  "BRIDGE",       False),
-
+    "diode": ("D", "1N4148", True),
+    "diode_zener": ("D", "1N4733A", True),
+    "diode_rectifier": ("D", "1N4007", True),
+    "diode_schottky": ("D", "1N5817", True),
+    "led": ("D", "LED-RED", False),
+    "bridge_rectifier": ("BR", "BRIDGE", False),
     # ── Transistores ────────────────────────────────────────
-    "bjt_npn":             ("Q",   "2N3904",       True),
-    "bjt_pnp":             ("Q",   "2N3906",       True),
-    "nmos":                ("M",   "IRF540",       True),
-    "pmos":                ("M",   "IRF9540",      True),
-
+    "bjt_npn": ("Q", "2N3904", True),
+    "bjt_pnp": ("Q", "2N3906", True),
+    "nmos": ("M", "IRF540", True),
+    "pmos": ("M", "IRF9540", True),
     # ── ICs ─────────────────────────────────────────────────
-    "opamp":               ("U",   "LM358",        False),
-    "timer_555":           ("U",   "NE555",        False),
-    "regulator_7805":      ("U",   "7805",         False),
-    "regulator_7812":      ("U",   "7812",         False),
-    "regulator_7905":      ("U",   "7905",         False),
-    "regulator_lm317":     ("U",   "LM317",        False),
-
+    "opamp": ("U", "LM358", False),
+    "timer_555": ("U", "NE555", False),
+    "regulator_7805": ("U", "7805", False),
+    "regulator_7812": ("U", "7812", False),
+    "regulator_7905": ("U", "7905", False),
+    "regulator_lm317": ("U", "LM317", False),
     # ── Fuentes ─────────────────────────────────────────────
-    "vsource":             ("V",   "VSOURCE",      False),
-    "vsource_dc":          ("V",   "VSOURCE",      False),
-    "vsource_ac":          ("V",   "VSINE",        False),
-    "vsine":               ("V",   "VSINE",        False),
-    "isource":             ("I",   "CSOURCE",      False),
-    "isource_dc":          ("I",   "CSOURCE",      False),
-
+    "vsource": ("V", "VSOURCE", False),
+    "vsource_dc": ("V", "VSOURCE", False),
+    "vsource_ac": ("V", "VSINE", False),
+    "vsine": ("V", "VSINE", False),
+    "isource": ("I", "CSOURCE", False),
+    "isource_dc": ("I", "CSOURCE", False),
     # ── Switches y entrada ──────────────────────────────────
-    "switch":              ("S",   "SW-SPST",      False),
-    "switch_spdt":         ("S",   "SW-SPDT",      False),
-    "button":              ("SW",  "BUTTON",       False),
-    "relay":               ("RL",  "G2RL-1",       False),
-
+    "switch": ("S", "SW-SPST", False),
+    "switch_spdt": ("S", "SW-SPDT", False),
+    "button": ("SW", "BUTTON", False),
+    "relay": ("RL", "G2RL-1", False),
     # ── Salida / actuadores ─────────────────────────────────
-    "buzzer":              ("BUZ", "BUZZER",       False),
-    "speaker":             ("LS",  "SPEAKER",      False),
-    "motor_dc":            ("M",   "MOTOR-DC",     False),
-    "microphone":          ("MIC", "MIC",          False),
-    "seven_segment":       ("DSP", "7SEG-COM-CAT", False),
+    "buzzer": ("BUZ", "BUZZER", False),
+    "speaker": ("LS", "SPEAKER", False),
+    "motor_dc": ("M", "MOTOR-DC", False),
+    "microphone": ("MIC", "MIC", False),
+    "seven_segment": ("DSP", "7SEG-COM-CAT", False),
 }
 
 
@@ -257,7 +259,11 @@ def _components_from_circuit(circuit: dict[str, Any]) -> list[dict[str, Any]]:
             continue
         kind, default_lib, use_value = entry
 
-        lib = value if (use_value and value and re.match(r"^[A-Za-z0-9][\w-]*$", value)) else default_lib
+        lib = (
+            value
+            if (use_value and value and re.match(r"^[A-Za-z0-9][\w-]*$", value))
+            else default_lib
+        )
 
         counters[kind] = counters.get(kind, 0) + 1
         refdes = c.get("id") or f"{kind}{counters[kind]}"
@@ -267,9 +273,11 @@ def _components_from_circuit(circuit: dict[str, Any]) -> list[dict[str, Any]]:
 
 # ── pyautogui + window detection ───────────────────────────────────────
 
+
 def _require_pyautogui():
     try:
         import pyautogui
+
         pyautogui.FAILSAFE = True
         pyautogui.PAUSE = 0.05
         return pyautogui
@@ -359,6 +367,7 @@ def _grid_positions(
 
 
 # ── Sub-rutinas atómicas ───────────────────────────────────────────────
+
 
 def _add_one_via_pick(pyautogui_, lib_name: str, *, settle: float = 0.9) -> None:
     """Añade un componente al panel DEVICES vía el dialog Pick Devices.
@@ -456,6 +465,7 @@ def _switch_mode(
 
 # ── Helpers de planificación ───────────────────────────────────────────
 
+
 def _dedupe_libs(components: list[dict[str, Any]]) -> tuple[list[str], list[int]]:
     """Devuelve ``(unique_libs, comp_to_panel_idx)``.
 
@@ -476,6 +486,7 @@ def _dedupe_libs(components: list[dict[str, Any]]) -> tuple[list[str], list[int]
 
 
 # ── Handler público ────────────────────────────────────────────────────
+
 
 def proteus_autodraw(parameters: dict, player=None, **_kwargs) -> str:
     """Handler invocable como tool y por el endpoint REST.
@@ -498,7 +509,7 @@ def proteus_autodraw(parameters: dict, player=None, **_kwargs) -> str:
     circuit_json = _read_circuit_sidecar(cir_path)
     if circuit_json:
         components = _components_from_circuit(circuit_json)
-        terminals  = list(circuit_json.get("terminals") or [])
+        terminals = list(circuit_json.get("terminals") or [])
         instruments = list(circuit_json.get("instruments") or [])
         source = f"JSON sidecar ({len(terminals)} terminales, {len(instruments)} instrumentos)"
     else:
@@ -519,7 +530,11 @@ def proteus_autodraw(parameters: dict, player=None, **_kwargs) -> str:
     settle = float(parameters.get("settle") or 0.9)
     place_in_canvas = bool(parameters.get("place_in_canvas", True))
     cols = int(parameters.get("cols") or 3)
-    margins = parameters.get("canvas_margins") if isinstance(parameters.get("canvas_margins"), dict) else None
+    margins = (
+        parameters.get("canvas_margins")
+        if isinstance(parameters.get("canvas_margins"), dict)
+        else None
+    )
 
     log = (
         f"[proteus_autodraw] {len(components)} comp + {len(terminals)} term + "
@@ -527,10 +542,8 @@ def proteus_autodraw(parameters: dict, player=None, **_kwargs) -> str:
     )
     print(log)
     if player and hasattr(player, "write_log"):
-        try:
+        with contextlib.suppress(Exception):
             player.write_log(log)
-        except Exception:
-            pass
 
     # Countdown
     for i in range(countdown, 0, -1):
@@ -548,12 +561,15 @@ def proteus_autodraw(parameters: dict, player=None, **_kwargs) -> str:
             print("[proteus_autodraw] ventana no localizada → solo añadir")
 
     # Total de items que van al canvas, para calcular grilla unificada
-    total_to_place = (len(components) if place_in_canvas else 0) \
-                   + (len(terminals)   if place_in_canvas and window_rect else 0) \
-                   + (len(instruments) if place_in_canvas and window_rect else 0)
+    total_to_place = (
+        (len(components) if place_in_canvas else 0)
+        + (len(terminals) if place_in_canvas and window_rect else 0)
+        + (len(instruments) if place_in_canvas and window_rect else 0)
+    )
     positions: list[tuple[int, int]] = (
         _grid_positions(canvas_rect, total_to_place, cols=cols)
-        if (place_in_canvas and canvas_rect and total_to_place > 0) else []
+        if (place_in_canvas and canvas_rect and total_to_place > 0)
+        else []
     )
 
     # ── Fase 1: añadir libs únicas al panel DEVICES ───────────────────
@@ -618,7 +634,9 @@ def proteus_autodraw(parameters: dict, player=None, **_kwargs) -> str:
                         pos_cursor += 1
                         continue
                     panel_xy = _panel_position(window_rect, panel_idx)
-                    canvas_xy = positions[pos_cursor] if pos_cursor < len(positions) else positions[-1]
+                    canvas_xy = (
+                        positions[pos_cursor] if pos_cursor < len(positions) else positions[-1]
+                    )
                     pos_cursor += 1
                     try:
                         _place_one(pyautogui_, panel_xy, canvas_xy, settle=settle)
@@ -647,7 +665,9 @@ def proteus_autodraw(parameters: dict, player=None, **_kwargs) -> str:
                         pos_cursor += 1
                         continue
                     panel_xy = _panel_position(window_rect, panel_idx)
-                    canvas_xy = positions[pos_cursor] if pos_cursor < len(positions) else positions[-1]
+                    canvas_xy = (
+                        positions[pos_cursor] if pos_cursor < len(positions) else positions[-1]
+                    )
                     pos_cursor += 1
                     try:
                         _place_one(pyautogui_, panel_xy, canvas_xy, settle=settle)

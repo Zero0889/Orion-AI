@@ -23,6 +23,10 @@
 
 import { Fragment, useMemo, useState } from "react";
 import katex from "katex";
+// CSS de KaTeX se carga aquí (y NO en main.tsx) para que Vite lo
+// emita en el chunk lazy de markdown — el ~25 kB de katex.min.css
+// sólo viaja al cliente cuando ChatPanel monta Markdown.
+import "katex/dist/katex.min.css";
 
 interface Props {
   /** Cuerpo markdown a renderizar. */
@@ -140,9 +144,7 @@ function splitBlocks(src: string): Block[] {
     if (/^\$\$/.test(line) || /^\\\[/.test(line)) {
       const isBracket = /^\\\[/.test(line);
       const closePat = isBracket ? /^\\\]\s*$/ : /^\$\$\s*$/;
-      const singleRe = isBracket
-        ? /^\\\[(.+?)\\\]\s*$/
-        : /^\$\$(.+?)\$\$\s*$/;
+      const singleRe = isBracket ? /^\\\[(.+?)\\\]\s*$/ : /^\$\$(.+?)\$\$\s*$/;
 
       // single-line
       const single = singleRe.exec(line);
@@ -189,11 +191,17 @@ function renderBlock(b: Block) {
   switch (b.kind) {
     case "heading": {
       const cls =
-        b.level === 1 ? "text-xl font-semibold mt-2 mb-1 text-text"
-        : b.level === 2 ? "text-lg font-semibold mt-2 mb-1 text-text"
-        : "text-base font-semibold mt-1 text-text";
-      const H = (`h${b.level}` as unknown) as "h1";
-      return <H className={cls}><Inline text={b.text} /></H>;
+        b.level === 1
+          ? "text-xl font-semibold mt-2 mb-1 text-text"
+          : b.level === 2
+            ? "text-lg font-semibold mt-2 mb-1 text-text"
+            : "text-base font-semibold mt-1 text-text";
+      const H = `h${b.level}` as unknown as "h1";
+      return (
+        <H className={cls}>
+          <Inline text={b.text} />
+        </H>
+      );
     }
     case "hr":
       return <hr className="border-white/[0.08]" />;
@@ -207,7 +215,9 @@ function renderBlock(b: Block) {
       return (
         <ul className="list-disc list-outside pl-5 space-y-1">
           {b.items.map((it, j) => (
-            <li key={j}><Inline text={it} /></li>
+            <li key={j}>
+              <Inline text={it} />
+            </li>
           ))}
         </ul>
       );
@@ -215,7 +225,9 @@ function renderBlock(b: Block) {
       return (
         <ol className="list-decimal list-outside pl-5 space-y-1">
           {b.items.map((it, j) => (
-            <li key={j}><Inline text={it} /></li>
+            <li key={j}>
+              <Inline text={it} />
+            </li>
           ))}
         </ol>
       );
@@ -225,7 +237,9 @@ function renderBlock(b: Block) {
       return <CodeBlock lang={b.lang} body={b.body} />;
     case "p":
       return (
-        <p className="whitespace-pre-wrap"><Inline text={b.text} /></p>
+        <p className="whitespace-pre-wrap">
+          <Inline text={b.text} />
+        </p>
       );
   }
 }
@@ -247,26 +261,43 @@ function Inline({ text }: { text: string }) {
 function renderInline(nodes: Inline[]): React.ReactNode {
   return nodes.map((n, i) => {
     switch (n.t) {
-      case "text":   return <Fragment key={i}>{n.v}</Fragment>;
-      case "bold":   return <strong key={i} className="font-semibold text-text">{renderInline(n.v)}</strong>;
-      case "italic": return <em key={i} className="italic">{renderInline(n.v)}</em>;
-      case "code":   return (
-        <code key={i} className="px-1.5 py-0.5 rounded bg-white/[0.06] text-[13px] font-mono text-acc">
-          {n.v}
-        </code>
-      );
-      case "math":   return <KatexSpan key={i} body={n.v} />;
-      case "link":   return (
-        <a
-          key={i}
-          href={n.href}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-pri underline underline-offset-2 decoration-pri/40 hover:decoration-pri"
-        >
-          {renderInline(n.v)}
-        </a>
-      );
+      case "text":
+        return <Fragment key={i}>{n.v}</Fragment>;
+      case "bold":
+        return (
+          <strong key={i} className="font-semibold text-text">
+            {renderInline(n.v)}
+          </strong>
+        );
+      case "italic":
+        return (
+          <em key={i} className="italic">
+            {renderInline(n.v)}
+          </em>
+        );
+      case "code":
+        return (
+          <code
+            key={i}
+            className="px-1.5 py-0.5 rounded bg-white/[0.06] text-[13px] font-mono text-acc"
+          >
+            {n.v}
+          </code>
+        );
+      case "math":
+        return <KatexSpan key={i} body={n.v} />;
+      case "link":
+        return (
+          <a
+            key={i}
+            href={n.href}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-pri underline underline-offset-2 decoration-pri/40 hover:decoration-pri"
+          >
+            {renderInline(n.v)}
+          </a>
+        );
     }
   });
 }

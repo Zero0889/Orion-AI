@@ -1,30 +1,26 @@
-#youtube_video.py
-import json
+# youtube_video.py
 import re
-import sys
-import time
 import subprocess
-import shutil
-from pathlib import Path
 from datetime import datetime
+from pathlib import Path
 from urllib.parse import quote_plus
-
-import pyautogui
-import numpy as np
 
 try:
     import requests
+
     _REQUESTS_OK = True
 except ImportError:
     _REQUESTS_OK = False
 
 try:
     from youtube_transcript_api import YouTubeTranscriptApi
+
     _TRANSCRIPT_OK = True
 except ImportError:
     _TRANSCRIPT_OK = False
 
-from config import get_os, is_windows, is_mac, is_linux, get_api_key
+from config import is_linux, is_mac, is_windows
+import contextlib
 
 HEADERS = {
     "User-Agent": (
@@ -38,8 +34,6 @@ HEADERS = {
 _YT_VIDEO_FILTER = "EgIQAQ%3D%3D"
 
 
-
-
 def _open_url(url: str) -> None:
     try:
         if is_mac():
@@ -51,19 +45,18 @@ def _open_url(url: str) -> None:
     except Exception as e:
         print(f"[YouTube] ⚠️ open_url falló: {e}")
 
+
 def _scrape_first_video_url(query: str) -> str | None:
 
     if not _REQUESTS_OK:
         return None
 
     search_url = (
-        f"https://www.youtube.com/results"
-        f"?search_query={quote_plus(query)}"
-        f"&sp={_YT_VIDEO_FILTER}"
+        f"https://www.youtube.com/results?search_query={quote_plus(query)}&sp={_YT_VIDEO_FILTER}"
     )
 
     try:
-        r    = requests.get(search_url, headers=HEADERS, timeout=10)
+        r = requests.get(search_url, headers=HEADERS, timeout=10)
         html = r.text
 
         video_ids = re.findall(r'"videoId":"([A-Za-z0-9_-]{11})"', html)
@@ -74,7 +67,7 @@ def _scrape_first_video_url(query: str) -> str | None:
                 continue
             seen.add(vid)
 
-            if f'/shorts/{vid}' in html:
+            if f"/shorts/{vid}" in html:
                 continue
             return f"https://www.youtube.com/watch?v={vid}"
 
@@ -83,10 +76,9 @@ def _scrape_first_video_url(query: str) -> str | None:
 
     return None
 
+
 def _extract_video_id(url: str) -> str | None:
-    match = re.search(
-        r"(?:v=|\/v\/|youtu\.be\/|\/embed\/|\/shorts\/)([A-Za-z0-9_-]{11})", url
-    )
+    match = re.search(r"(?:v=|\/v\/|youtu\.be\/|\/embed\/|\/shorts\/)([A-Za-z0-9_-]{11})", url)
     return match.group(1) if match else None
 
 
@@ -116,14 +108,12 @@ def _get_transcript(video_id: str) -> str | None:
         return None
     try:
         transcript_list = YouTubeTranscriptApi.list_transcripts(video_id)
-        transcript      = None
+        transcript = None
 
         lang_priority = ["es", "en", "de", "fr", "it", "pt", "ru", "ja", "ko", "ar", "zh"]
 
-        try:
+        with contextlib.suppress(Exception):
             transcript = transcript_list.find_manually_created_transcript(lang_priority)
-        except Exception:
-            pass
 
         if transcript is None:
             try:
@@ -155,21 +145,21 @@ def _summarize_with_gemini(transcript: str, video_url: str) -> str:
             "Structure: one general summary sentence, then 3 to 5 key points. "
             "Be direct. Address the user as 'señor'. "
             "Always respond in Spanish."
-        )
+        ),
     )
 
     max_chars = 80000
     truncated = transcript[:max_chars] + ("..." if len(transcript) > max_chars else "")
-    response  = model.generate_content(
+    response = model.generate_content(
         f"Please summarize this YouTube video transcript:\n\n{truncated}"
     )
     return response.text.strip()
 
 
 def _save_summary(content: str, video_url: str) -> str:
-    ts       = datetime.now().strftime("%Y%m%d_%H%M%S")
+    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
     filename = f"youtube_summary_{ts}.txt"
-    desktop  = Path.home() / "Desktop"
+    desktop = Path.home() / "Desktop"
     desktop.mkdir(parents=True, exist_ok=True)
     filepath = desktop / filename
 
@@ -200,16 +190,16 @@ def _scrape_video_info(video_id: str) -> dict:
         return {}
     url = f"https://www.youtube.com/watch?v={video_id}"
     try:
-        r    = requests.get(url, headers=HEADERS, timeout=12)
+        r = requests.get(url, headers=HEADERS, timeout=12)
         html = r.text
         info = {}
 
         for key, pattern in [
-            ("title",    r'"title":\{"runs":\[\{"text":"([^"]+)"'),
-            ("channel",  r'"ownerChannelName":"([^"]+)"'),
-            ("views",    r'"viewCount":"(\d+)"'),
+            ("title", r'"title":\{"runs":\[\{"text":"([^"]+)"'),
+            ("channel", r'"ownerChannelName":"([^"]+)"'),
+            ("views", r'"viewCount":"(\d+)"'),
             ("duration", r'"lengthSeconds":"(\d+)"'),
-            ("likes",    r'"label":"([0-9,]+ likes)"'),
+            ("likes", r'"label":"([0-9,]+ likes)"'),
         ]:
             match = re.search(pattern, html)
             if match:
@@ -233,10 +223,10 @@ def _scrape_trending(region: str = "ES", max_results: int = 8) -> list[dict]:
         return []
     url = f"https://www.youtube.com/feed/trending?gl={region.upper()}"
     try:
-        r    = requests.get(url, headers=HEADERS, timeout=12)
+        r = requests.get(url, headers=HEADERS, timeout=12)
         html = r.text
 
-        titles   = re.findall(r'"title":\{"runs":\[\{"text":"([^"]+)"\}\]', html)
+        titles = re.findall(r'"title":\{"runs":\[\{"text":"([^"]+)"\}\]', html)
         channels = re.findall(r'"ownerText":\{"runs":\[\{"text":"([^"]+)"', html)
 
         results, seen = [], set()
@@ -253,6 +243,7 @@ def _scrape_trending(region: str = "ES", max_results: int = 8) -> list[dict]:
     except Exception as e:
         print(f"[YouTube] ⚠️ El scrape de tendencias falló: {e}")
         return []
+
 
 def _handle_play(parameters: dict, player) -> str:
     query = parameters.get("query", "").strip()
@@ -271,11 +262,9 @@ def _handle_play(parameters: dict, player) -> str:
         _open_url(video_url)
         return f"Reproduciendo: {query}"
 
-    print(f"[YouTube] ⚠️ El scrape falló, abriendo la página de búsqueda filtrada")
+    print("[YouTube] ⚠️ El scrape falló, abriendo la página de búsqueda filtrada")
     fallback_url = (
-        f"https://www.youtube.com/results"
-        f"?search_query={quote_plus(query)}"
-        f"&sp={_YT_VIDEO_FILTER}"
+        f"https://www.youtube.com/results?search_query={quote_plus(query)}&sp={_YT_VIDEO_FILTER}"
     )
     _open_url(fallback_url)
     return f"Búsqueda de YouTube abierta para: {query} (selección manual requerida)"
@@ -283,7 +272,9 @@ def _handle_play(parameters: dict, player) -> str:
 
 def _handle_summarize(parameters: dict, player, speak) -> str:
     if not _TRANSCRIPT_OK:
-        return "youtube-transcript-api no está instalado. Ejecuta: pip install youtube-transcript-api"
+        return (
+            "youtube-transcript-api no está instalado. Ejecuta: pip install youtube-transcript-api"
+        )
 
     url = _ask_for_url("Por favor, pegue la URL del video de YouTube:")
     if not url:
@@ -341,11 +332,11 @@ def _handle_get_info(parameters: dict, player, speak) -> str:
         return "No pude obtener la información del video, señor."
 
     LABELS = {
-        "title":    "Título",
-        "channel":  "Canal",
-        "views":    "Vistas",
+        "title": "Título",
+        "channel": "Canal",
+        "views": "Vistas",
         "duration": "Duración",
-        "likes":    "Me gusta",
+        "likes": "Me gusta",
     }
     lines = [
         f"{LABELS.get(key, key.capitalize())}: {info[key]}"
@@ -370,12 +361,12 @@ def _handle_trending(parameters: dict, player, speak) -> str:
     if not trending:
         return f"No pude obtener los videos en tendencia para la región {region}, señor."
 
-    lines  = [f"Top de videos en tendencia en {region}:"]
+    lines = [f"Top de videos en tendencia en {region}:"]
     lines += [f"{v['rank']}. {v['title']} — {v['channel']}" for v in trending]
     result = "\n".join(lines)
 
     if speak:
-        top3   = trending[:3]
+        top3 = trending[:3]
         spoken = "Estos son los principales videos en tendencia, señor. " + ". ".join(
             f"Número {v['rank']}: {v['title']} de {v['channel']}" for v in top3
         )
@@ -383,16 +374,17 @@ def _handle_trending(parameters: dict, player, speak) -> str:
 
     return result
 
+
 _ACTION_MAP = {
-    "play":      _handle_play,
+    "play": _handle_play,
     "summarize": _handle_summarize,
-    "get_info":  _handle_get_info,
-    "trending":  _handle_trending,
+    "get_info": _handle_get_info,
+    "trending": _handle_trending,
 }
 
 
 def youtube_video(
-    parameters:     dict,
+    parameters: dict,
     response=None,
     player=None,
     session_memory=None,

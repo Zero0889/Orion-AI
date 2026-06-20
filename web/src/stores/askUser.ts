@@ -17,14 +17,14 @@
 import { create } from "zustand";
 
 export interface AskOption {
-  label:        string;
+  label: string;
   description?: string;
 }
 
 export interface PendingQuestion {
   questionId: string;
-  question:   string;
-  options:    AskOption[];
+  question: string;
+  options: AskOption[];
   allowOther: boolean;
   /** ts en ms cuando llegó — útil para mostrar "hace X segundos" */
   receivedAt: number;
@@ -39,5 +39,5 @@ interface AskUserState {
 export const useAskUserStore = create<AskUserState>((set) => ({
   pending: null,
   setPending: (q) => set({ pending: q }),
-  clear:      ()  => set({ pending: null }),
+  clear: () => set({ pending: null }),
 }));

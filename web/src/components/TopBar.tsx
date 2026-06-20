@@ -17,27 +17,27 @@ import { Icon } from "@/ui/Icon";
 import { Button, Kbd } from "@/ui/primitives";
 
 const VIEW_TITLE: Record<View, { eyebrow: string; title: string }> = {
-  home:      { eyebrow: "Espacio",      title: "Inicio" },
-  chat:      { eyebrow: "Espacio",      title: "Conversación" },
-  notes:     { eyebrow: "Conocimiento", title: "Notas rápidas" },
-  memory:    { eyebrow: "Conocimiento", title: "Memoria" },
-  history:   { eyebrow: "Conocimiento", title: "Historial" },
-  telemetry: { eyebrow: "Sistema",      title: "Telemetría" },
-  agents:    { eyebrow: "Sistema",      title: "Agentes autónomos" },
-  iot:       { eyebrow: "Sistema",      title: "IoT" },
-  mcp:       { eyebrow: "Sistema",      title: "Servidores MCP" },
-  skills:    { eyebrow: "Sistema",      title: "Skills" },
-  notifications: { eyebrow: "Sistema",  title: "Notificaciones" },
-  circuit:   { eyebrow: "Herramientas", title: "Circuitos" },
-  settings:  { eyebrow: "Sistema",      title: "Ajustes" },
+  home: { eyebrow: "Espacio", title: "Inicio" },
+  chat: { eyebrow: "Espacio", title: "Conversación" },
+  notes: { eyebrow: "Conocimiento", title: "Notas rápidas" },
+  memory: { eyebrow: "Conocimiento", title: "Memoria" },
+  history: { eyebrow: "Conocimiento", title: "Historial" },
+  telemetry: { eyebrow: "Sistema", title: "Telemetría" },
+  agents: { eyebrow: "Sistema", title: "Agentes autónomos" },
+  iot: { eyebrow: "Sistema", title: "IoT" },
+  mcp: { eyebrow: "Sistema", title: "Servidores MCP" },
+  skills: { eyebrow: "Sistema", title: "Skills" },
+  notifications: { eyebrow: "Sistema", title: "Notificaciones" },
+  circuit: { eyebrow: "Herramientas", title: "Circuitos" },
+  settings: { eyebrow: "Sistema", title: "Ajustes" },
 };
 
 interface Props {
-  version:        string;
-  collapsed:      boolean;
-  onToggleRail:   () => void;
-  onToggleMute:   () => void;
-  onInterrupt:    () => void;
+  version: string;
+  collapsed: boolean;
+  onToggleRail: () => void;
+  onToggleMute: () => void;
+  onInterrupt: () => void;
 }
 
 /**
@@ -45,28 +45,28 @@ interface Props {
  * tool/agent reusan "thinking" — mismo magenta.
  */
 function deriveEyeState({
-  state, tool, agentRunning,
+  state,
+  tool,
+  agentRunning,
 }: {
   state: string;
   tool: boolean;
   agentRunning: boolean;
 }): EyeState {
-  if (tool || agentRunning)   return "thinking";
+  if (tool || agentRunning) return "thinking";
   if (state === "ESCUCHANDO") return "listening";
-  if (state === "PENSANDO")   return "thinking";
-  if (state === "HABLANDO")   return "speaking";
+  if (state === "PENSANDO") return "thinking";
+  if (state === "HABLANDO") return "speaking";
   return "idle";
 }
 
-export function TopBar({
-  version, collapsed, onToggleRail, onToggleMute, onInterrupt,
-}: Props) {
-  const view      = useViewStore((s) => s.view);
-  const muted     = useOrionStore((s) => s.muted);
+export function TopBar({ version, collapsed, onToggleRail, onToggleMute, onInterrupt }: Props) {
+  const view = useViewStore((s) => s.view);
+  const muted = useOrionStore((s) => s.muted);
   const connected = useOrionStore((s) => s.connected);
-  const state     = useOrionStore((s) => s.state);
-  const tool      = useInteractionStore((s) => s.tool);
-  const agent     = useInteractionStore((s) => s.agent);
+  const state = useOrionStore((s) => s.state);
+  const tool = useInteractionStore((s) => s.tool);
+  const agent = useInteractionStore((s) => s.agent);
   const openPalette = useCommandPalette((s) => s.toggle);
   const { eyebrow, title } = VIEW_TITLE[view];
 
@@ -81,8 +81,10 @@ export function TopBar({
   const eyeFrozen = !connected || muted;
 
   return (
-    <header className="relative h-14 flex items-center gap-3 px-4 border-b border-white/[0.06]
-                          bg-gradient-to-r from-bg/80 via-bg/60 to-bg/80 backdrop-blur-md chrome-edge-bottom">
+    <header
+      className="relative h-14 flex items-center gap-3 px-3 border-b border-white/[0.06]
+                          bg-gradient-to-r from-bg/80 via-bg/60 to-bg/80 backdrop-blur-md chrome-edge-bottom"
+    >
       {/* rail toggle */}
       <button
         onClick={onToggleRail}
@@ -114,7 +116,7 @@ export function TopBar({
         <Kbd>⌘K</Kbd>
       </button>
 
-      {/* global voice controls */}
+      {/* voice controls */}
       <Button
         size="icon"
         variant={muted ? "danger" : "ghost"}
@@ -123,12 +125,7 @@ export function TopBar({
       >
         <Icon name={muted ? "mic-off" : "mic"} size={16} />
       </Button>
-      <Button
-        size="icon"
-        variant="ghost"
-        onClick={onInterrupt}
-        title="Interrumpir"
-      >
+      <Button size="icon" variant="ghost" onClick={onInterrupt} title="Interrumpir">
         <Icon name="stop" size={16} />
       </Button>
 
@@ -140,18 +137,17 @@ export function TopBar({
           el estado real de Orion (idle / escuchando / pensando /
           hablando / error). Sin conexión vira a azul sobrio. */}
       <div title={`Orion: ${state}`} className="grid place-items-center">
-        <EyeCore
-          size={34}
-          state={eyeState}
-          paused={!eyeFrozen}
-          frozen={eyeFrozen}
-        />
+        <EyeCore size={34} state={eyeState} paused={!eyeFrozen} frozen={eyeFrozen} />
       </div>
 
       {/* version + connection chip + repo link */}
-      <div className="hidden lg:flex items-center gap-1 h-8 pl-2.5 pr-1 rounded-md
-                      border border-white/[0.06] bg-elevated/60 text-[10px] uppercase tracking-[0.16em]">
-        <span className={`h-1.5 w-1.5 rounded-full ${connected ? "bg-ok shadow-[0_0_8px_rgb(var(--orion-ok))]" : "bg-muted"}`} />
+      <div
+        className="hidden lg:flex items-center gap-1 h-8 pl-2.5 pr-1 rounded-md
+                      border border-white/[0.06] bg-elevated/60 text-[10px] uppercase tracking-[0.16em]"
+      >
+        <span
+          className={`h-1.5 w-1.5 rounded-full ${connected ? "bg-ok shadow-[0_0_8px_rgb(var(--orion-ok))]" : "bg-muted"}`}
+        />
         <span className="text-text-dim numeric">v{version || "…"}</span>
         <span className="mx-1 h-3 w-px bg-white/[0.08]" aria-hidden="true" />
         <a

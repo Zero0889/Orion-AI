@@ -1,0 +1,67 @@
+# Pre-commit hooks de O.R.I.O.N
+# Instalación:
+#     pip install pre-commit
+#     pre-commit install
+#
+# Para correr en TODO el repo (no solo lo staged):
+#     pre-commit run --all-files
+#
+# Para saltarse hooks en un commit puntual (NO recomendado):
+#     git commit --no-verify  ← solo en emergencias
+
+default_language_version:
+  python: python3.11
+
+repos:
+  # ── Higiene básica ─────────────────────────────────────────────────
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+        exclude: '\.md$'   # los .md a veces usan dos espacios para <br>
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-toml
+      - id: check-json
+        exclude: '^(config/.*\.bak\.json|tools/.*)$'
+      - id: check-added-large-files
+        args: ["--maxkb=1024"]
+      - id: check-merge-conflict
+      - id: mixed-line-ending
+        args: ["--fix=lf"]
+      - id: detect-private-key
+
+  # ── Python: ruff lint + format ─────────────────────────────────────
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.8.4
+    hooks:
+      - id: ruff
+        args: ["--fix"]
+      - id: ruff-format
+
+  # ── Secret scanning (gitleaks) ─────────────────────────────────────
+  # Detecta API keys, OAuth tokens, claves privadas, etc. antes del commit.
+  # Si te marca un falso positivo, agregalo a .gitleaks.toml con allowlist.
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.21.2
+    hooks:
+      - id: gitleaks
+
+  # ── Frontend: prettier + eslint ────────────────────────────────────
+  # Solo corre sobre archivos dentro de web/ para evitar tocar JSON de
+  # config Python o archivos de Arduino.
+  - repo: https://github.com/pre-commit/mirrors-prettier
+    rev: v4.0.0-alpha.8
+    hooks:
+      - id: prettier
+        files: ^web/.*\.(ts|tsx|js|jsx|json|css|md)$
+        exclude: ^web/(node_modules|dist|public)/
+
+  - repo: local
+    hooks:
+      - id: eslint
+        name: eslint (web)
+        entry: bash -c 'cd web && npx --no-install eslint --max-warnings=0 "src/**/*.{ts,tsx}"'
+        language: system
+        files: ^web/src/.*\.(ts|tsx)$
+        pass_filenames: false

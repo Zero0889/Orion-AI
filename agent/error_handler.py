@@ -1,17 +1,13 @@
 import json
 import re
-import sys
-from pathlib import Path
 from enum import Enum
-
-from config import get_api_key
 
 
 class ErrorDecision(Enum):
-    RETRY       = "retry"      
-    SKIP        = "skip"       
-    REPLAN      = "replan"     
-    ABORT       = "abort"    
+    RETRY = "retry"
+    SKIP = "skip"
+    REPLAN = "replan"
+    ABORT = "abort"
 
 
 ERROR_ANALYST_PROMPT = """You are the error recovery module of O.R.I.O.N AI assistant.
@@ -41,12 +37,7 @@ Return ONLY valid JSON:
 """
 
 
-def analyze_error(
-    step: dict,
-    error: str,
-    attempt: int = 1,
-    max_attempts: int = 2
-) -> dict:
+def analyze_error(step: dict, error: str, attempt: int = 1, max_attempts: int = 2) -> dict:
     """
     Analyzes a failed step and returns a recovery decision.
 
@@ -70,23 +61,20 @@ def analyze_error(
     if attempt >= max_attempts:
         print(f"[ErrorHandler] ⚠️ Max attempts reached for step {step.get('step')} — forcing replan")
         return {
-            "decision":      ErrorDecision.REPLAN,
-            "reason":        f"Failed {attempt} times: {error[:100]}",
+            "decision": ErrorDecision.REPLAN,
+            "reason": f"Failed {attempt} times: {error[:100]}",
             "fix_suggestion": "Try a completely different approach or tool",
-            "max_retries":   0,
-            "user_message":  "Intentando un enfoque diferente, señor."
+            "max_retries": 0,
+            "user_message": "Intentando un enfoque diferente, señor.",
         }
 
-    model = gemini.model(
-        "gemini-2.5-flash-lite",
-        system_instruction=ERROR_ANALYST_PROMPT
-    )
+    model = gemini.model("gemini-2.5-flash-lite", system_instruction=ERROR_ANALYST_PROMPT)
 
     prompt = f"""Failed step:
-Tool: {step.get('tool')}
-Description: {step.get('description')}
-Parameters: {json.dumps(step.get('parameters', {}), indent=2)}
-Critical: {step.get('critical', False)}
+Tool: {step.get("tool")}
+Description: {step.get("description")}
+Parameters: {json.dumps(step.get("parameters", {}), indent=2)}
+Critical: {step.get("critical", False)}
 
 Error:
 {error[:500]}
@@ -95,23 +83,24 @@ Attempt number: {attempt}"""
 
     try:
         response = model.generate_content(prompt)
-        text     = response.text.strip()
-        text     = re.sub(r"```(?:json)?", "", text).strip().rstrip("`").strip()
+        text = response.text.strip()
+        text = re.sub(r"```(?:json)?", "", text).strip().rstrip("`").strip()
 
         result = json.loads(text)
         decision_str = result.get("decision", "replan").lower()
         decision_map = {
-            "retry":  ErrorDecision.RETRY,
-            "skip":   ErrorDecision.SKIP,
+            "retry": ErrorDecision.RETRY,
+            "skip": ErrorDecision.SKIP,
             "replan": ErrorDecision.REPLAN,
-            "abort":  ErrorDecision.ABORT,
+            "abort": ErrorDecision.ABORT,
         }
         result["decision"] = decision_map.get(decision_str, ErrorDecision.REPLAN)
 
-
         if step.get("critical") and result["decision"] == ErrorDecision.SKIP:
-            result["decision"]     = ErrorDecision.REPLAN
-            result["user_message"] = "Este paso es crítico — buscando un enfoque alternativo, señor."
+            result["decision"] = ErrorDecision.REPLAN
+            result["user_message"] = (
+                "Este paso es crítico — buscando un enfoque alternativo, señor."
+            )
 
         print(f"[ErrorHandler] Decision: {result['decision'].value} — {result.get('reason', '')}")
         return result
@@ -119,11 +108,11 @@ Attempt number: {attempt}"""
     except (json.JSONDecodeError, ValueError, RuntimeError) as e:
         print(f"[ErrorHandler] ⚠️ Analysis failed: {e} — defaulting to replan")
         return {
-            "decision":       ErrorDecision.REPLAN,
-            "reason":         str(e),
+            "decision": ErrorDecision.REPLAN,
+            "reason": str(e),
             "fix_suggestion": "Try alternative approach",
-            "max_retries":    1,
-            "user_message":   "Hubo un inconveniente, ajustando el enfoque, señor."
+            "max_retries": 1,
+            "user_message": "Hubo un inconveniente, ajustando el enfoque, señor.",
         }
 
 
@@ -141,9 +130,9 @@ def generate_fix(step: dict, error: str, fix_suggestion: str) -> dict:
     prompt = f"""A task step failed. Generate a replacement step.
 
 Original step:
-Tool: {step.get('tool')}
-Description: {step.get('description')}
-Parameters: {json.dumps(step.get('parameters', {}), indent=2)}
+Tool: {step.get("tool")}
+Description: {step.get("description")}
+Parameters: {json.dumps(step.get("parameters", {}), indent=2)}
 
 Error: {error[:300]}
 Fix suggestion: {fix_suggestion}
@@ -157,26 +146,26 @@ Return ONLY the Python code, no explanation."""
         code = re.sub(r"```(?:python)?", "", code).strip().rstrip("`").strip()
 
         return {
-            "step":        step.get("step"),
-            "tool":        "code_helper",
+            "step": step.get("step"),
+            "tool": "code_helper",
             "description": f"Auto-fix for: {step.get('description')}",
             "parameters": {
-                "action":      "run",
+                "action": "run",
                 "description": fix_suggestion,
-                "code":        code,
-                "language":    "python"
+                "code": code,
+                "language": "python",
             },
             "depends_on": step.get("depends_on", []),
-            "critical":   step.get("critical", False)
+            "critical": step.get("critical", False),
         }
 
     except (ValueError, RuntimeError) as e:
         print(f"[ErrorHandler] ⚠️ Fix generation failed: {e}")
         return {
-            "step":        step.get("step"),
-            "tool":        "generated_code",
+            "step": step.get("step"),
+            "tool": "generated_code",
             "description": f"Fallback for: {step.get('description')}",
-            "parameters":  {"description": step.get("description", "")},
-            "depends_on":  step.get("depends_on", []),
-            "critical":    step.get("critical", False)
+            "parameters": {"description": step.get("description", "")},
+            "depends_on": step.get("depends_on", []),
+            "critical": step.get("critical", False),
         }

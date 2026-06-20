@@ -1,0 +1,177 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "orion"
+version = "0.1.0"
+description = "O.R.I.O.N — Operador de Redes Inteligentes y Optimización Neural"
+readme = "readme.md"
+requires-python = ">=3.11,<3.13"
+license = { text = "CC-BY-NC-4.0" }
+authors = [{ name = "Zahir" }]
+dynamic = ["dependencies", "optional-dependencies"]
+
+[tool.setuptools.dynamic]
+dependencies = { file = ["requirements.txt"] }
+optional-dependencies = { dev = { file = ["requirements-dev.txt"] } }
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["actions*", "agent*", "core*", "config*", "memory*", "plugins*", "server*", "utils*"]
+exclude = ["tests*", "web*", "tools*", "arduino*", "wokwi*", "packaging*", "scripts*", "src-tauri*", "docs*", "uploads*", "logs*", "skills*"]
+
+# ─────────────────────────────────────────────────────────────────────────
+# Ruff — lint + format. Reemplaza black/isort/flake8.
+# ─────────────────────────────────────────────────────────────────────────
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+extend-exclude = [
+    ".venv",
+    "__pycache__",
+    "build",
+    "dist",
+    "web/node_modules",
+    "web/dist",
+    "src-tauri/target",
+    "tools",
+    "uploads",
+    "logs",
+]
+
+[tool.ruff.lint]
+# Set inicial conservador: errores reales + bugbear + simplificaciones
+# obvias + pyupgrade. Cuando el repo se estabilice activar más.
+select = [
+    "E",   # pycodestyle errors
+    "F",   # pyflakes (unused imports, undefined names)
+    "W",   # pycodestyle warnings
+    "I",   # isort (orden de imports)
+    "B",   # flake8-bugbear (bugs comunes)
+    "UP",  # pyupgrade (sintaxis moderna)
+    "SIM", # flake8-simplify
+    "C4",  # comprensiones limpias
+    "PIE", # misc
+    "RUF", # ruff-specific
+]
+ignore = [
+    "E501",   # line-too-long (delegamos al formatter)
+    "B008",   # FastAPI usa Depends(...) en defaults — patrón legítimo
+    "SIM108", # ternarios no siempre son más claros
+    "SIM117", # nested with es a veces más legible
+    "RUF012", # mutable class defaults (Pydantic usa este patrón)
+    "UP007",  # Optional[X] → X | None: el repo aún tiene mezcla, no bloqueo
+
+    # ── Ratchet items: ignorar HOY para que CI sea verde, ir activando
+    # cuando se haga cleanup del módulo correspondiente. NO agregar nada
+    # nuevo sin discutirlo.
+    "E402",   # imports tardíos: legítimos en módulos con guards de OS/feature
+    "E741",   # nombres ambiguos (l) — 6 casos en game_updater/proteus_autodraw, rename oportunista
+    "SIM112", # env var lowercase — convención interna del proyecto
+    "RUF001", # caracteres unicode "ambiguos" en strings — los guiones ── son intencionales
+    "RUF002", # idem en docstrings
+    "RUF003", # idem en comentarios
+    "RUF013", # implicit-optional (`x: int = None`) — fix al tipar cada módulo
+
+    # Stylistic remanente — casos puntuales sin impacto, fix oportunista
+    "RUF005", # `[*a, b]` vs `a + [b]` — equivalente
+    "PIE810", # `s.startswith(x) or s.startswith(y)` vs tupla
+    "B007",   # var de loop no usada (a veces es por claridad: `for _, v in ...`)
+    "B027",   # método vacío en ABC sin @abstractmethod (lifecycle hooks legítimos)
+    "B905",   # `zip()` sin `strict=` (Py3.10+ feature, no urgente)
+    "SIM102", # if anidado vs combinado
+    "SIM103", # `return bool(x)` vs `return x`
+    "SIM115", # archivo abierto sin context-manager (1 caso en run_debug.py)
+    "RUF015", # slice [0] vs next(iter()) — equivalente
+    "RUF043", # pytest.raises pattern sin raw (1 caso en tests)
+    "RUF059", # `a, b = f()` con `b` no usado (a veces intencional para clarity)
+    "C416",   # comprensión innecesaria (1 caso)
+    "I001",   # imports unsorted dentro de funciones (los top-level ya están bien)
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["B", "SIM", "F401", "F841"]  # tests pueden ser desordenados
+"main.py"  = ["E402"]                       # los hacks de PATH/UTF-8 fuerzan imports tardíos
+"**/__init__.py" = ["F401"]                 # re-exports OK
+
+[tool.ruff.lint.isort]
+known-first-party = ["actions", "agent", "core", "config", "memory", "plugins", "server", "utils"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "lf"
+
+# ─────────────────────────────────────────────────────────────────────────
+# Mypy — type-checking gradual. NO --strict global (el repo no está listo).
+# Estricto solo para módulos nuevos (ver overrides).
+# ─────────────────────────────────────────────────────────────────────────
+[tool.mypy]
+python_version = "3.11"
+warn_unused_configs = true
+warn_redundant_casts = true
+warn_unused_ignores = false
+ignore_missing_imports = true   # muchas deps de Windows no tienen stubs
+no_implicit_optional = true
+check_untyped_defs = false      # bajar gradualmente
+disallow_untyped_defs = false
+exclude = [
+    "^\\.venv/",
+    "^build/",
+    "^dist/",
+    "^web/",
+    "^src-tauri/",
+    "^tools/",
+    "^tests/",
+    "^packaging/",
+]
+
+# Módulos críticos: type-check más estricto que el resto, pero todavía sin
+# exigir anotaciones en cada función (el repo no está anotado). Lo que SÍ
+# falla: tipos incorrectos donde ya hay anotaciones. Cuando un módulo
+# quede 100% anotado, mover a la lista "fully_typed" de abajo.
+[[tool.mypy.overrides]]
+module = [
+    "core.logger",
+    "core.tool_registry",
+    "core.llm.base",
+    "server.app",
+    "server.event_bus",
+    "server.sharing",
+    "server.telemetry",
+]
+check_untyped_defs = true
+warn_return_any = false
+disallow_untyped_defs = false   # subir a true cuando cada módulo esté anotado
+
+# Cuando un módulo esté 100% type-annotated, moverlo acá para que mypy
+# bloquee cualquier regresión.
+# [[tool.mypy.overrides]]
+# module = ["core.logger"]
+# disallow_untyped_defs = true
+# warn_return_any = true
+
+# ─────────────────────────────────────────────────────────────────────────
+# Pytest
+# ─────────────────────────────────────────────────────────────────────────
+[tool.pytest.ini_options]
+minversion = "7.0"
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = [
+    "-ra",
+    "--strict-markers",
+    "--strict-config",
+    "-p", "no:cacheprovider",
+]
+filterwarnings = [
+    "ignore::DeprecationWarning:google.*",
+    "ignore::DeprecationWarning:pkg_resources.*",
+]
+markers = [
+    "slow: tests que tardan (>1s) — se saltean con -m 'not slow'",
+    "integration: tests que tocan red/disco real",
+]

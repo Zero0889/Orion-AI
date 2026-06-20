@@ -38,11 +38,10 @@ import subprocess
 import threading
 import time
 from dataclasses import dataclass, field
-from datetime import datetime
 from pathlib import Path
-from typing import Optional
 
 from core.logger import get_logger
+import contextlib
 
 log = get_logger("gog_auth")
 
@@ -54,6 +53,7 @@ DEFAULT_SERVICES = ["gmail", "classroom", "sheets", "drive", "docs", "slides", "
 
 def _gog_exe() -> Path:
     from config import IOT_CONFIG_PATH
+
     return IOT_CONFIG_PATH.parent.parent / "tools" / "gog" / "gog.exe"
 
 
@@ -66,8 +66,12 @@ def _run_gog_json(args: list[str], timeout: int = 15) -> dict:
     cmd = [str(gog), *args, "--json", "--no-input"]
     try:
         proc = subprocess.run(
-            cmd, capture_output=True, text=True, timeout=timeout,
-            encoding="utf-8", errors="replace",
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+            encoding="utf-8",
+            errors="replace",
         )
     except subprocess.TimeoutExpired as e:
         raise RuntimeError(f"gog timeout ({timeout}s)") from e
@@ -91,13 +95,15 @@ def list_accounts() -> list[dict]:
     for a in accs:
         if not isinstance(a, dict):
             continue
-        out.append({
-            "email":      a.get("email") or "",
-            "services":   list(a.get("services") or []),
-            "scopes":     list(a.get("scopes") or []),
-            "client":     a.get("client") or "default",
-            "created_at": a.get("created_at") or "",
-        })
+        out.append(
+            {
+                "email": a.get("email") or "",
+                "services": list(a.get("services") or []),
+                "scopes": list(a.get("scopes") or []),
+                "client": a.get("client") or "default",
+                "created_at": a.get("created_at") or "",
+            }
+        )
     return out
 
 
@@ -112,12 +118,14 @@ def list_services() -> list[dict]:
     for s in svcs:
         if not isinstance(s, dict):
             continue
-        out.append({
-            "service": s.get("service") or "",
-            "scopes":  list(s.get("scopes") or []),
-            "apis":    list(s.get("apis") or []),
-            "user":    bool(s.get("user", True)),
-        })
+        out.append(
+            {
+                "service": s.get("service") or "",
+                "scopes": list(s.get("scopes") or []),
+                "apis": list(s.get("apis") or []),
+                "user": bool(s.get("user", True)),
+            }
+        )
     return out
 
 
@@ -133,7 +141,12 @@ def account_has_services(email: str, required: list[str]) -> dict:
         accs = list_accounts()
     except Exception as e:
         log.warning("list_accounts falló: %s", e)
-        return {"satisfied": False, "missing": list(required), "account_exists": False, "error": str(e)}
+        return {
+            "satisfied": False,
+            "missing": list(required),
+            "account_exists": False,
+            "error": str(e),
+        }
     account = next((a for a in accs if (a.get("email") or "").lower() == target), None)
     if not account:
         return {"satisfied": False, "missing": list(required), "account_exists": False}
@@ -149,18 +162,18 @@ def account_has_services(email: str, required: list[str]) -> dict:
 # ── Flow asíncrono de gog auth add ─────────────────────────────────────
 @dataclass
 class AuthFlow:
-    account:    str
-    services:   list[str]
-    status:     str            # "running" | "success" | "error" | "cancelled"
+    account: str
+    services: list[str]
+    status: str  # "running" | "success" | "error" | "cancelled"
     started_at: float
-    finished_at: Optional[float] = None
-    auth_url:   Optional[str] = None
-    message:    Optional[str] = None
-    process:    Optional[subprocess.Popen] = field(default=None, repr=False)
+    finished_at: float | None = None
+    auth_url: str | None = None
+    message: str | None = None
+    process: subprocess.Popen | None = field(default=None, repr=False)
 
 
 _flow_lock = threading.Lock()
-_current_flow: Optional[AuthFlow] = None
+_current_flow: AuthFlow | None = None
 
 
 # Regex para extraer la URL OAuth de la salida de gog. gog escribe algo
@@ -175,18 +188,17 @@ def get_flow_status() -> dict:
         if f is None:
             return {"status": "idle"}
         return {
-            "status":      f.status,
-            "account":     f.account,
-            "services":    list(f.services),
-            "started_at":  f.started_at,
+            "status": f.status,
+            "account": f.account,
+            "services": list(f.services),
+            "started_at": f.started_at,
             "finished_at": f.finished_at,
-            "auth_url":    f.auth_url,
-            "message":     f.message,
+            "auth_url": f.auth_url,
+            "message": f.message,
         }
 
 
-def start_auth(account: str, services: Optional[list[str]] = None,
-               force_consent: bool = True) -> dict:
+def start_auth(account: str, services: list[str] | None = None, force_consent: bool = True) -> dict:
     """Arranca el flow de autorización. Spawnea ``gog auth add``,
     devuelve el snapshot inicial. El thread monitor se encarga de
     actualizar el estado cuando termine."""
@@ -207,8 +219,12 @@ def start_auth(account: str, services: Optional[list[str]] = None,
             raise RuntimeError(f"gog no encontrado en {gog}")
 
         cmd = [
-            str(gog), "auth", "add", account,
-            "--services", ",".join(services),
+            str(gog),
+            "auth",
+            "add",
+            account,
+            "--services",
+            ",".join(services),
             "--no-input",
         ]
         if force_consent:
@@ -225,7 +241,7 @@ def start_auth(account: str, services: Optional[list[str]] = None,
                 bufsize=1,  # line-buffered
             )
         except Exception as e:
-            raise RuntimeError(f"no se pudo arrancar gog: {e}")
+            raise RuntimeError(f"no se pudo arrancar gog: {e}") from e
 
         _current_flow = AuthFlow(
             account=account,
@@ -269,10 +285,8 @@ def _monitor_flow(flow: AuthFlow) -> None:
             flow.status = "error"
             flow.message = "timeout (10 min)"
             flow.finished_at = time.time()
-        try:
+        with contextlib.suppress(Exception):
             proc.kill()
-        except Exception:
-            pass
         return
     except Exception as e:
         log.exception("monitor crasheó")
@@ -301,20 +315,18 @@ def cancel_flow() -> dict:
         f = _current_flow
         if f is None or f.status != "running" or f.process is None:
             return get_flow_status()
-        try:
+        with contextlib.suppress(Exception):
             f.process.kill()
-        except Exception:
-            pass
         f.status = "cancelled"
         f.message = "Cancelado por el usuario"
         f.finished_at = time.time()
         return {
-            "status":      f.status,
-            "account":     f.account,
-            "services":    list(f.services),
-            "started_at":  f.started_at,
+            "status": f.status,
+            "account": f.account,
+            "services": list(f.services),
+            "started_at": f.started_at,
             "finished_at": f.finished_at,
-            "message":     f.message,
+            "message": f.message,
         }
 
 

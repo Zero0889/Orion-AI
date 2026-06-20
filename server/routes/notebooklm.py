@@ -25,6 +25,7 @@ from typing import Any
 from fastapi import APIRouter, HTTPException
 
 from core.logger import get_logger
+import contextlib
 
 log = get_logger("server.routes.notebooklm")
 router = APIRouter()
@@ -36,11 +37,11 @@ router = APIRouter()
 
 _state_lock = threading.Lock()
 _state: dict[str, Any] = {
-    "status":       "idle",   # idle | running | success | failed
-    "message":      "",
-    "started_at":   0.0,
-    "finished_at":  0.0,
-    "_proc":        None,     # subprocess.Popen | None — no se serializa
+    "status": "idle",  # idle | running | success | failed
+    "message": "",
+    "started_at": 0.0,
+    "finished_at": 0.0,
+    "_proc": None,  # subprocess.Popen | None — no se serializa
 }
 
 
@@ -48,13 +49,14 @@ def _public_state() -> dict[str, Any]:
     """Snapshot sin el handler del proc (no se serializa por JSON)."""
     with _state_lock:
         return {
-            "status":      _state["status"],
-            "message":     _state["message"],
-            "started_at":  _state["started_at"],
+            "status": _state["status"],
+            "message": _state["message"],
+            "started_at": _state["started_at"],
             "finished_at": _state["finished_at"],
-            "elapsed":     (
+            "elapsed": (
                 (_state["finished_at"] or time.time()) - _state["started_at"]
-                if _state["started_at"] else 0.0
+                if _state["started_at"]
+                else 0.0
             ),
         }
 
@@ -63,6 +65,7 @@ def _has_session() -> bool:
     """True si existe el storage_state.json de notebooklm-py."""
     try:
         from notebooklm.paths import get_storage_path
+
         return get_storage_path().exists()
     except Exception:
         return False
@@ -75,7 +78,7 @@ def _notebooklm_cli_path() -> Path | None:
     project_root = Path(__file__).resolve().parents[2]
     candidates = [
         project_root / ".venv" / "Scripts" / "notebooklm.exe",
-        project_root / ".venv" / "bin"     / "notebooklm",
+        project_root / ".venv" / "bin" / "notebooklm",
     ]
     for c in candidates:
         if c.exists():
@@ -89,39 +92,37 @@ def _monitor_login(proc: subprocess.Popen) -> None:
     """Espera al subprocess y actualiza el state al terminar.
     Corre en thread daemon."""
     try:
-        proc.wait(timeout=600)   # 10 min máximo de paciencia
+        proc.wait(timeout=600)  # 10 min máximo de paciencia
         rc = proc.returncode
         with _state_lock:
-            _state["_proc"]       = None
+            _state["_proc"] = None
             _state["finished_at"] = time.time()
             if rc == 0 and _has_session():
-                _state["status"]  = "success"
+                _state["status"] = "success"
                 _state["message"] = "Sesión guardada correctamente."
             elif rc == 0:
-                _state["status"]  = "failed"
+                _state["status"] = "failed"
                 _state["message"] = "El CLI terminó OK pero no encontré la sesión guardada."
             else:
                 # Lee stderr para mensaje útil
                 err = ""
-                try:
+                with contextlib.suppress(Exception):
                     err = (proc.stderr.read() or "")[:200] if proc.stderr else ""
-                except Exception:
-                    pass
-                _state["status"]  = "failed"
+                _state["status"] = "failed"
                 _state["message"] = f"Login falló (exit {rc}). {err}".strip()
     except subprocess.TimeoutExpired:
-        try: proc.kill()
-        except Exception: pass
+        with contextlib.suppress(Exception):
+            proc.kill()
         with _state_lock:
-            _state["_proc"]       = None
-            _state["status"]      = "failed"
-            _state["message"]     = "Timeout: el login tardó más de 10 minutos."
+            _state["_proc"] = None
+            _state["status"] = "failed"
+            _state["message"] = "Timeout: el login tardó más de 10 minutos."
             _state["finished_at"] = time.time()
     except Exception as e:
         with _state_lock:
-            _state["_proc"]       = None
-            _state["status"]      = "failed"
-            _state["message"]     = f"Error inesperado: {e}"
+            _state["_proc"] = None
+            _state["status"] = "failed"
+            _state["message"] = f"Error inesperado: {e}"
             _state["finished_at"] = time.time()
 
 
@@ -133,10 +134,10 @@ def get_status() -> dict[str, Any]:
     """Estado completo: instalación, sesión, y último intento de login."""
     cli = _notebooklm_cli_path()
     return {
-        "installed":         cli is not None,
-        "cli_path":          str(cli) if cli else None,
-        "has_session":       _has_session(),
-        "login":             _public_state(),
+        "installed": cli is not None,
+        "cli_path": str(cli) if cli else None,
+        "has_session": _has_session(),
+        "login": _public_state(),
     }
 
 
@@ -152,7 +153,7 @@ def start_login() -> dict[str, Any]:
             status_code=500,
             detail=(
                 "notebooklm CLI no encontrado. Instalá con: "
-                ".venv\\Scripts\\pip.exe install \"notebooklm-py[browser]\""
+                '.venv\\Scripts\\pip.exe install "notebooklm-py[browser]"'
             ),
         )
 
@@ -168,10 +169,8 @@ def start_login() -> dict[str, Any]:
             # tenga su propia ventana de consola y Chromium pueda
             # abrirse sin que el cierre del padre lo arrastre.
             creationflags = 0
-            try:
+            with contextlib.suppress(AttributeError):  # Linux/Mac no tienen este flag
                 creationflags = subprocess.CREATE_NEW_PROCESS_GROUP  # type: ignore[attr-defined]
-            except AttributeError:
-                pass   # Linux/Mac
 
             proc = subprocess.Popen(
                 [str(cli), "login"],
@@ -182,16 +181,18 @@ def start_login() -> dict[str, Any]:
         except OSError as e:
             raise HTTPException(500, f"No pude lanzar el CLI: {e}") from e
 
-        _state["status"]      = "running"
-        _state["message"]     = "Esperando que termines de iniciar sesión en Chromium…"
-        _state["started_at"]  = time.time()
+        _state["status"] = "running"
+        _state["message"] = "Esperando que termines de iniciar sesión en Chromium…"
+        _state["started_at"] = time.time()
         _state["finished_at"] = 0.0
-        _state["_proc"]       = proc
+        _state["_proc"] = proc
 
     log.info("NotebookLM login iniciado (PID %s)", proc.pid)
     threading.Thread(
-        target=_monitor_login, args=(proc,),
-        daemon=True, name="NotebookLMLoginMonitor",
+        target=_monitor_login,
+        args=(proc,),
+        daemon=True,
+        name="NotebookLMLoginMonitor",
     ).start()
 
     return {"ok": True, "pid": proc.pid, "message": "Login iniciado."}
@@ -208,8 +209,8 @@ def cancel_login() -> dict[str, Any]:
             proc.kill()
         except Exception as e:
             log.warning("Kill del login falló: %s", e)
-        _state["status"]      = "failed"
-        _state["message"]     = "Cancelado por el usuario."
+        _state["status"] = "failed"
+        _state["message"] = "Cancelado por el usuario."
         _state["finished_at"] = time.time()
-        _state["_proc"]       = None
+        _state["_proc"] = None
     return {"ok": True, "message": "Login cancelado."}

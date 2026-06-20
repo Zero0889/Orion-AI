@@ -20,7 +20,9 @@ import { GogScopeGuard } from "@/components/GogScopeGuard";
 import { useDeviceConfig, type DeviceConfig, type LocalDevice } from "@/hooks/useDeviceConfig";
 import { useSensorHistory } from "@/hooks/useSensorHistory";
 import {
-  formatSensorValue, getSensorPersonality, rangePercent,
+  formatSensorValue,
+  getSensorPersonality,
+  rangePercent,
   type SensorPersonality,
 } from "@/lib/sensorPersonality";
 import { useOrionStore } from "@/stores/orion";
@@ -28,26 +30,26 @@ import { Icon } from "@/ui/Icon";
 import { Badge, Button, Empty, SectionHeader, Surface, Switch } from "@/ui/primitives";
 
 const QUICK_COLORS: { name: string; hex: string }[] = [
-  { name: "rojo",     hex: "#EF4444" },
-  { name: "naranja",  hex: "#F59E0B" },
-  { name: "verde",    hex: "#22C55E" },
-  { name: "cian",     hex: "#7EE7FF" },
-  { name: "azul",     hex: "#6D7CFF" },
-  { name: "morado",   hex: "#A78BFA" },
-  { name: "rosa",     hex: "#F472B6" },
-  { name: "blanco",   hex: "#F5F7FA" },
+  { name: "rojo", hex: "#EF4444" },
+  { name: "naranja", hex: "#F59E0B" },
+  { name: "verde", hex: "#22C55E" },
+  { name: "cian", hex: "#7EE7FF" },
+  { name: "azul", hex: "#6D7CFF" },
+  { name: "morado", hex: "#A78BFA" },
+  { name: "rosa", hex: "#F472B6" },
+  { name: "blanco", hex: "#F5F7FA" },
 ];
 
 export function IoTPanel() {
-  const rev         = useOrionStore((s) => s.rev.iot);
+  const rev = useOrionStore((s) => s.rev.iot);
   const sensorsLive = useOrionStore((s) => s.iotSensors);
-  const cfg         = useDeviceConfig();
+  const cfg = useDeviceConfig();
 
   const [backendDevices, setBackendDevices] = useState<IoTDevice[]>([]);
-  const [scenes,  setScenes]  = useState<IoTScene[]>([]);
+  const [scenes, setScenes] = useState<IoTScene[]>([]);
   const [sensors, setSensors] = useState<Record<string, IoTSensor>>({});
-  const [error,   setError]   = useState<string | null>(null);
-  const [paused,  setPaused]  = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
+  const [paused, setPaused] = useState<boolean>(false);
   const [pausing, setPausing] = useState<boolean>(false);
 
   // modal
@@ -61,11 +63,18 @@ export function IoTPanel() {
     Promise.all([api.iotDevices(), api.iotScenes(), api.iotSensors(), api.iotPausedStatus()])
       .then(([d, s, se, p]) => {
         if (!alive) return;
-        setBackendDevices(d); setScenes(s); setSensors(se);
-        setPaused(p.paused); setError(null);
+        setBackendDevices(d);
+        setScenes(s);
+        setSensors(se);
+        setPaused(p.paused);
+        setError(null);
       })
-      .catch((e) => { if (alive) setError(String(e)); });
-    return () => { alive = false; };
+      .catch((e) => {
+        if (alive) setError(String(e));
+      });
+    return () => {
+      alive = false;
+    };
   }, [rev, refreshTick]);
 
   async function togglePause() {
@@ -93,23 +102,39 @@ export function IoTPanel() {
     deviceId: string,
     body: { action: string; value?: number; color?: string; duration?: number },
   ) {
-    try { await api.iotAction(deviceId, body); }
-    catch (e) { setError(String(e)); }
+    try {
+      await api.iotAction(deviceId, body);
+    } catch (e) {
+      setError(String(e));
+    }
   }
   async function runScene(sceneId: string) {
-    try { await api.iotRunScene(sceneId); }
-    catch (e) { setError(String(e)); }
+    try {
+      await api.iotRunScene(sceneId);
+    } catch (e) {
+      setError(String(e));
+    }
   }
 
   const allSensors = useMemo(() => {
     const merged: Record<string, { value: string; ts?: number }> = {};
-    Object.entries(sensors).forEach(([k, v]) => { merged[k] = { value: v.value }; });
-    Object.entries(sensorsLive).forEach(([k, v]) => { merged[k] = v; });
+    Object.entries(sensors).forEach(([k, v]) => {
+      merged[k] = { value: v.value };
+    });
+    Object.entries(sensorsLive).forEach(([k, v]) => {
+      merged[k] = v;
+    });
     return merged;
   }, [sensors, sensorsLive]);
 
-  function openCreate()   { setEditing(undefined); setModalOpen(true); }
-  function openEdit(d: IoTDevice | LocalDevice) { setEditing(d); setModalOpen(true); }
+  function openCreate() {
+    setEditing(undefined);
+    setModalOpen(true);
+  }
+  function openEdit(d: IoTDevice | LocalDevice) {
+    setEditing(d);
+    setModalOpen(true);
+  }
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
@@ -132,9 +157,11 @@ export function IoTPanel() {
               icon={paused ? "play" : "close"}
               onClick={togglePause}
               disabled={pausing}
-              title={paused
-                ? "Reconectar transports (COM + MQTT)"
-                : "Cortar conexión: cierra COM y broker hasta que reactives"}
+              title={
+                paused
+                  ? "Reconectar transports (COM + MQTT)"
+                  : "Cortar conexión: cierra COM y broker hasta que reactives"
+              }
             >
               {paused ? "Reactivar sensores" : "Apagar sensores"}
             </Button>
@@ -156,29 +183,31 @@ export function IoTPanel() {
         {/* devices */}
         <section className="p-6">
           <Subhead title="Dispositivos" count={devices.length} />
-          {devices.length === 0
-            ? (
-              <Empty
-                icon="iot"
-                title="Sin dispositivos"
-                hint="Crea tu primero dispositivo local con el botón Nuevo, o configura el backend para listarlos."
-                action={<Button variant="primary" size="sm" icon="plus" onClick={openCreate}>Añadir dispositivo</Button>}
-              />
-            )
-            : (
-              <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-3">
-                {devices.map((d, i) => (
-                  <DeviceCard
-                    key={d.id}
-                    dev={d}
-                    config={cfg.getConfig(d.id)}
-                    onAct={act}
-                    onEdit={() => openEdit(d)}
-                    delay={i * 40}
-                  />
-                ))}
-              </div>
-            )}
+          {devices.length === 0 ? (
+            <Empty
+              icon="iot"
+              title="Sin dispositivos"
+              hint="Crea tu primero dispositivo local con el botón Nuevo, o configura el backend para listarlos."
+              action={
+                <Button variant="primary" size="sm" icon="plus" onClick={openCreate}>
+                  Añadir dispositivo
+                </Button>
+              }
+            />
+          ) : (
+            <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-3">
+              {devices.map((d, i) => (
+                <DeviceCard
+                  key={d.id}
+                  dev={d}
+                  config={cfg.getConfig(d.id)}
+                  onAct={act}
+                  onEdit={() => openEdit(d)}
+                  delay={i * 40}
+                />
+              ))}
+            </div>
+          )}
         </section>
 
         {/* scenes */}
@@ -200,7 +229,11 @@ export function IoTPanel() {
                 >
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-medium text-text">{s.name}</span>
-                    <Icon name="play" size={14} className="text-text-dim group-hover:text-pri transition-colors" />
+                    <Icon
+                      name="play"
+                      size={14}
+                      className="text-text-dim group-hover:text-pri transition-colors"
+                    />
                   </div>
                   <div className="mt-1 text-[10px] uppercase tracking-[0.18em] text-muted">
                     {s.steps} paso{s.steps === 1 ? "" : "s"}
@@ -226,7 +259,9 @@ export function IoTPanel() {
                   style={{ animationDelay: `${i * 30}ms` }}
                 >
                   <div className="text-[10px] uppercase tracking-[0.18em] text-text-dim">{id}</div>
-                  <div className="mt-1 text-lg font-mono tabular-nums text-acc">{s.value || "—"}</div>
+                  <div className="mt-1 text-lg font-mono tabular-nums text-acc">
+                    {s.value || "—"}
+                  </div>
                 </Surface>
               ))}
             </div>
@@ -236,10 +271,7 @@ export function IoTPanel() {
         {/* google sheets sync */}
         <section className="px-6 pb-10">
           <Subhead title="Google Sheets" count={0} />
-          <GogScopeGuard
-            requires={["sheets", "drive"]}
-            title="Sheets requiere permisos de Google"
-          >
+          <GogScopeGuard requires={["sheets", "drive"]} title="Sheets requiere permisos de Google">
             <SheetsPanel />
           </GogScopeGuard>
         </section>
@@ -278,17 +310,24 @@ function Subhead({ title, count }: { title: string; count: number }) {
 // dispositivos no se rerenderean cuando llega una lectura. Sin esto, con 8
 // sensores ticking a 1Hz teníamos ~480 re-renders/min del panel entero.
 const DeviceCard = memo(function DeviceCard({
-  dev, config, onAct, onEdit, delay,
+  dev,
+  config,
+  onAct,
+  onEdit,
+  delay,
 }: {
-  dev:    IoTDevice | LocalDevice;
+  dev: IoTDevice | LocalDevice;
   config: DeviceConfig;
-  onAct:  (id: string, body: { action: string; value?: number; color?: string; duration?: number }) => void;
+  onAct: (
+    id: string,
+    body: { action: string; value?: number; color?: string; duration?: number },
+  ) => void;
   onEdit: () => void;
   delay?: number;
 }) {
   const [dim, setDim] = useState(50);
-  const [on,  setOn]  = useState<boolean | null>(null);
-  const caps   = dev.capabilities;
+  const [on, setOn] = useState<boolean | null>(null);
+  const caps = dev.capabilities;
   const isLocal = !!(dev as LocalDevice).__local;
   const isSensor = !!caps.sensor;
   const displayName = config.displayName || dev.name;
@@ -301,10 +340,10 @@ const DeviceCard = memo(function DeviceCard({
   }
 
   const chips = [
-    caps.on_off   && { tone: "info"    as const, label: "on/off" },
-    caps.dimmable && { tone: "accent"  as const, label: "dim"    },
-    caps.rgb      && { tone: "neutral" as const, label: "rgb"    },
-    caps.sensor   && { tone: "warn"    as const, label: caps.sensor },
+    caps.on_off && { tone: "info" as const, label: "on/off" },
+    caps.dimmable && { tone: "accent" as const, label: "dim" },
+    caps.rgb && { tone: "neutral" as const, label: "rgb" },
+    caps.sensor && { tone: "warn" as const, label: caps.sensor },
   ].filter(Boolean) as { tone: "info" | "accent" | "neutral" | "warn"; label: string }[];
 
   return (
@@ -344,9 +383,15 @@ const DeviceCard = memo(function DeviceCard({
           )}
           <div className="min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
-              <h4 className="text-[15px] font-medium text-text leading-tight truncate">{displayName}</h4>
-              {isLocal   && <Badge tone="accent">Local</Badge>}
-              {isSensor  && config.showGraph && <Badge tone="info" dot>Gráfico</Badge>}
+              <h4 className="text-[15px] font-medium text-text leading-tight truncate">
+                {displayName}
+              </h4>
+              {isLocal && <Badge tone="accent">Local</Badge>}
+              {isSensor && config.showGraph && (
+                <Badge tone="info" dot>
+                  Gráfico
+                </Badge>
+              )}
             </div>
             <code className="text-[10px] font-mono text-muted">{dev.transport}</code>
           </div>
@@ -362,20 +407,23 @@ const DeviceCard = memo(function DeviceCard({
           >
             <Icon name="edit" size={14} />
           </button>
-          {caps.on_off && (
-            <Switch on={on === true} onClick={toggle} />
-          )}
+          {caps.on_off && <Switch on={on === true} onClick={toggle} />}
         </div>
       </header>
 
       <div className="flex flex-wrap gap-1 mb-3">
         {chips.length === 0 && <span className="text-[10px] text-muted">—</span>}
         {chips.map((c) => (
-          <Badge key={c.label} tone={c.tone}>{c.label}</Badge>
+          <Badge key={c.label} tone={c.tone}>
+            {c.label}
+          </Badge>
         ))}
         {config.updateFreqS !== undefined && (
           <Badge tone="neutral">
-            ↻ {config.updateFreqS < 60 ? `${config.updateFreqS}s` : `${(config.updateFreqS / 60).toFixed(1)}m`}
+            ↻{" "}
+            {config.updateFreqS < 60
+              ? `${config.updateFreqS}s`
+              : `${(config.updateFreqS / 60).toFixed(1)}m`}
           </Badge>
         )}
       </div>
@@ -383,13 +431,18 @@ const DeviceCard = memo(function DeviceCard({
       {caps.dimmable && (
         <div className="flex items-center gap-3 mb-2.5">
           <input
-            type="range" min={0} max={100} value={dim}
+            type="range"
+            min={0}
+            max={100}
+            value={dim}
             onChange={(e) => setDim(Number(e.target.value))}
             onMouseUp={() => onAct(dev.id, { action: "dim", value: dim })}
             onTouchEnd={() => onAct(dev.id, { action: "dim", value: dim })}
             className="flex-1 accent-pri"
           />
-          <span className="text-xs font-mono tabular-nums w-9 text-right text-text-dim">{dim}%</span>
+          <span className="text-xs font-mono tabular-nums w-9 text-right text-text-dim">
+            {dim}%
+          </span>
         </div>
       )}
 
@@ -410,21 +463,23 @@ const DeviceCard = memo(function DeviceCard({
 
       {/* SENSOR readout + optional sparkline */}
       {isSensor && personality && (
-        <SensorReadout
-          deviceId={dev.id}
-          graph={!!config.showGraph}
-          personality={personality}
-        />
+        <SensorReadout deviceId={dev.id} graph={!!config.showGraph} personality={personality} />
       )}
     </Surface>
   );
 });
 
 /* ── SENSOR READOUT (value + optional sparkline) ─────────────────── */
-const SensorReadout = memo(function SensorReadout({ deviceId, graph, personality }: {
-  deviceId: string; graph: boolean; personality: SensorPersonality;
+const SensorReadout = memo(function SensorReadout({
+  deviceId,
+  graph,
+  personality,
+}: {
+  deviceId: string;
+  graph: boolean;
+  personality: SensorPersonality;
 }) {
-  const sample  = useOrionStore((s) => s.iotSensors[deviceId]);
+  const sample = useOrionStore((s) => s.iotSensors[deviceId]);
   const history = useSensorHistory(deviceId, 48);
 
   if (!sample && history.length === 0) {
@@ -455,9 +510,7 @@ const SensorReadout = memo(function SensorReadout({ deviceId, graph, personality
             {displayValue}
           </div>
         </div>
-        {pct !== null && (
-          <RangeBar pct={pct} color={personality.color} />
-        )}
+        {pct !== null && <RangeBar pct={pct} color={personality.color} />}
       </div>
 
       {graph && history.length >= 2 && (
@@ -511,7 +564,9 @@ const RangeBar = memo(function RangeBar({ pct, color }: { pct: number; color: st
 // `data` cambia de referencia (history es un nuevo array cada tick, así
 // que sirve como tripwire natural).
 const Sparkline = memo(function Sparkline({ data, accent }: { data: number[]; accent?: string }) {
-  const W = 260, H = 64, P = 3;
+  const W = 260,
+    H = 64,
+    P = 3;
   const id = useStableId();
   // Si llega un acento por personalidad lo usamos; si no, caemos al
   // token global --orion-acc (compatibilidad con consumidores futuros).
@@ -521,8 +576,8 @@ const Sparkline = memo(function Sparkline({ data, accent }: { data: number[]; ac
     const min = Math.min(...data);
     const max = Math.max(...data);
     const range = Math.max(max - min, 0.001);
-    const step  = (W - 2 * P) / Math.max(data.length - 1, 1);
-    const pts   = data.map((v, i) => {
+    const step = (W - 2 * P) / Math.max(data.length - 1, 1);
+    const pts = data.map((v, i) => {
       const x = P + i * step;
       const y = H - P - ((v - min) / range) * (H - 2 * P);
       return [x, y] as const;
@@ -536,11 +591,11 @@ const Sparkline = memo(function Sparkline({ data, accent }: { data: number[]; ac
     <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-16">
       <defs>
         <linearGradient id={`spark-fill-${id}`} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%"   stopColor={stroke} stopOpacity="0.36" />
+          <stop offset="0%" stopColor={stroke} stopOpacity="0.36" />
           <stop offset="100%" stopColor={stroke} stopOpacity="0" />
         </linearGradient>
         <linearGradient id={`spark-line-${id}`} x1="0" y1="0" x2="1" y2="0">
-          <stop offset="0%"   stopColor={stroke} stopOpacity="0.25" />
+          <stop offset="0%" stopColor={stroke} stopOpacity="0.25" />
           <stop offset="100%" stopColor={stroke} stopOpacity="1" />
         </linearGradient>
       </defs>
@@ -554,7 +609,9 @@ const Sparkline = memo(function Sparkline({ data, accent }: { data: number[]; ac
         strokeLinecap="round"
       />
       <circle
-        cx={tip[0]} cy={tip[1]} r="2.2"
+        cx={tip[0]}
+        cy={tip[1]}
+        r="2.2"
         fill={stroke}
         style={{ filter: `drop-shadow(0 0 4px ${stroke})` }}
       />
@@ -571,50 +628,99 @@ function SheetsPanel() {
   const [state, setState] = useState<import("@/api/rest").IoTSheetsState | null>(null);
   const [email, setEmail] = useState("");
   const [title, setTitle] = useState("");
-  const [busy,  setBusy]  = useState(false);
-  const [err,   setErr]   = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
   // tick para refrescar el "hace Xs" sin pegarle al backend
   const [, setTick] = useState(0);
 
   async function refresh() {
-    try { setState(await api.iotSheetsStatus()); }
-    catch (e) { setErr(String(e)); }
+    try {
+      setState(await api.iotSheetsStatus());
+    } catch (e) {
+      setErr(String(e));
+    }
   }
 
-  useEffect(() => { refresh(); }, []);
+  useEffect(() => {
+    refresh();
+  }, []);
   useEffect(() => {
     const id = setInterval(() => setTick((n) => n + 1), 5000);
     return () => clearInterval(id);
   }, []);
 
   async function doConnect() {
-    if (!email.trim()) { setErr("Falta el email."); return; }
-    setBusy(true); setErr(null);
+    if (!email.trim()) {
+      setErr("Falta el email.");
+      return;
+    }
+    setBusy(true);
+    setErr(null);
     try {
       const s = await api.iotSheetsConnect({
         account: email.trim(),
         title: title.trim() || undefined,
       });
       setState(s);
-      setEmail(""); setTitle("");
-    } catch (e) { setErr(String(e)); }
-    finally { setBusy(false); }
+      setEmail("");
+      setTitle("");
+    } catch (e) {
+      setErr(String(e));
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function doDisconnect() {
-    setBusy(true); setErr(null);
-    try { setState(await api.iotSheetsDisconnect()); }
-    catch (e) { setErr(String(e)); }
-    finally { setBusy(false); }
+    setBusy(true);
+    setErr(null);
+    try {
+      setState(await api.iotSheetsDisconnect());
+    } catch (e) {
+      setErr(String(e));
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function doSyncNow() {
-    setBusy(true); setErr(null);
+    setBusy(true);
+    setErr(null);
     try {
       await api.iotSheetsSyncNow();
       // El sync corre en background, esperamos un tiquito y re-fetch.
-      setTimeout(() => { refresh(); setBusy(false); }, 1500);
-    } catch (e) { setErr(String(e)); setBusy(false); }
+      setTimeout(() => {
+        refresh();
+        setBusy(false);
+      }, 1500);
+    } catch (e) {
+      setErr(String(e));
+      setBusy(false);
+    }
+  }
+
+  async function doReformat() {
+    setBusy(true);
+    setErr(null);
+    try {
+      await api.iotSheetsReformat();
+    } catch (e) {
+      setErr(String(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function saveInterval(secs: number) {
+    setBusy(true);
+    setErr(null);
+    try {
+      setState(await api.iotSheetsSetInterval(secs));
+    } catch (e) {
+      setErr(String(e));
+    } finally {
+      setBusy(false);
+    }
   }
 
   if (!state) {
@@ -626,15 +732,18 @@ function SheetsPanel() {
     return (
       <Surface level={2} className="p-4">
         <div className="flex items-start gap-3 mb-3">
-          <span className="grid place-items-center h-9 w-9 rounded-lg
-                           bg-acc/10 border border-acc/30 text-acc shrink-0">
+          <span
+            className="grid place-items-center h-9 w-9 rounded-lg
+                           bg-acc/10 border border-acc/30 text-acc shrink-0"
+          >
             <Icon name="upload" size={16} />
           </span>
           <div className="min-w-0">
             <h4 className="text-[15px] font-medium leading-tight">Sincronizar con Google Sheets</h4>
             <p className="mt-0.5 text-[12px] text-text-dim leading-snug">
-              ORION va a crear un Sheet nuevo y le pushea las lecturas cada 5 minutos.
-              Necesita que tu cuenta tenga el scope <code className="text-acc font-mono">sheets</code> autorizado en gog.
+              ORION va a crear un Sheet nuevo y le pushea las lecturas cada 5 minutos. Necesita que
+              tu cuenta tenga el scope <code className="text-acc font-mono">sheets</code> autorizado
+              en gog.
             </p>
           </div>
         </div>
@@ -670,8 +779,10 @@ function SheetsPanel() {
             </Button>
           </div>
           {err && (
-            <div className="mt-1 flex items-start gap-2 p-2 rounded-md
-                            border border-danger/30 bg-danger/10 text-xs text-danger">
+            <div
+              className="mt-1 flex items-start gap-2 p-2 rounded-md
+                            border border-danger/30 bg-danger/10 text-xs text-danger"
+            >
               <Icon name="alert" size={13} className="mt-0.5 shrink-0" />
               <span className="break-all">{err}</span>
             </div>
@@ -687,14 +798,18 @@ function SheetsPanel() {
   return (
     <Surface level={2} className="p-4">
       <div className="flex items-start gap-3">
-        <span className="grid place-items-center h-9 w-9 rounded-lg
-                         bg-ok/15 border border-ok/40 text-ok shrink-0">
+        <span
+          className="grid place-items-center h-9 w-9 rounded-lg
+                         bg-ok/15 border border-ok/40 text-ok shrink-0"
+        >
           <Icon name="check" size={16} />
         </span>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <h4 className="text-[15px] font-medium leading-tight">Sheet conectado</h4>
-            <Badge tone="info" dot>live</Badge>
+            <Badge tone="info" dot>
+              live
+            </Badge>
           </div>
           <div className="mt-0.5 text-[12px] text-text-dim font-mono break-all">
             {state.account}
@@ -705,15 +820,20 @@ function SheetsPanel() {
         </Button>
       </div>
 
-      <div className="mt-3 grid sm:grid-cols-2 gap-2">
+      <div className="mt-3 grid sm:grid-cols-3 gap-2">
         <Surface level={2} className="p-3 bg-bg/40">
           <div className="text-[10px] uppercase tracking-[0.18em] text-text-dim">Última sync</div>
           <div className="mt-0.5 text-sm tabular-nums">{ageStr}</div>
         </Surface>
         <Surface level={2} className="p-3 bg-bg/40">
-          <div className="text-[10px] uppercase tracking-[0.18em] text-text-dim">Filas pusheadas</div>
-          <div className="mt-0.5 text-sm font-mono tabular-nums">{state.last_pushed_row.toLocaleString()}</div>
+          <div className="text-[10px] uppercase tracking-[0.18em] text-text-dim">
+            Filas pusheadas
+          </div>
+          <div className="mt-0.5 text-sm font-mono tabular-nums">
+            {state.last_pushed_row.toLocaleString()}
+          </div>
         </Surface>
+        <IntervalControl value={state.sync_interval_s} disabled={busy} onSave={saveInterval} />
       </div>
 
       {state.spreadsheet_url && (
@@ -731,15 +851,27 @@ function SheetsPanel() {
         </a>
       )}
 
-      <div className="mt-3 flex justify-end">
+      <div className="mt-3 flex justify-end gap-1.5">
+        <Button
+          variant="ghost"
+          size="sm"
+          icon="edit"
+          onClick={doReformat}
+          disabled={busy}
+          title="Reaplica cabecera, freeze, formato de fechas y bandas al Sheet"
+        >
+          Reformatear
+        </Button>
         <Button variant="ghost" size="sm" icon="bolt" onClick={doSyncNow} disabled={busy}>
           {busy ? "Sincronizando…" : "Sync ahora"}
         </Button>
       </div>
 
       {state.last_error && (
-        <div className="mt-3 flex items-start gap-2 p-2 rounded-md
-                        border border-danger/30 bg-danger/10 text-xs text-danger">
+        <div
+          className="mt-3 flex items-start gap-2 p-2 rounded-md
+                        border border-danger/30 bg-danger/10 text-xs text-danger"
+        >
           <Icon name="alert" size={13} className="mt-0.5 shrink-0" />
           <span className="break-all">{state.last_error}</span>
         </div>
@@ -748,11 +880,75 @@ function SheetsPanel() {
   );
 }
 
+/* ── INTERVAL CONTROL ─────────────────────────────────────────────── */
+// Permite editar `sync_interval_s` desde la UI. Acepta 10..3600 s y
+// guarda solo cuando cambia respecto al valor del backend, para evitar
+// PUTs ruidosos cuando el usuario abre/cierra el panel.
+function IntervalControl({
+  value,
+  disabled,
+  onSave,
+}: {
+  value: number;
+  disabled: boolean;
+  onSave: (s: number) => void;
+}) {
+  const [draft, setDraft] = useState<string>(String(value));
+  useEffect(() => {
+    setDraft(String(value));
+  }, [value]);
+
+  const parsed = Number(draft);
+  const isValid = Number.isFinite(parsed) && parsed >= 10 && parsed <= 3600;
+  const dirty = isValid && parsed !== value;
+
+  function commit() {
+    if (!dirty) return;
+    onSave(Math.round(parsed));
+  }
+
+  return (
+    <Surface level={2} className="p-3 bg-bg/40">
+      <div className="text-[10px] uppercase tracking-[0.18em] text-text-dim">Sync cada</div>
+      <div className="mt-1 flex items-center gap-1.5">
+        <input
+          type="number"
+          min={10}
+          max={3600}
+          step={5}
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") commit();
+          }}
+          disabled={disabled}
+          className="w-16 px-2 py-1 rounded-md border border-white/[0.08]
+                     bg-bg/40 text-sm font-mono tabular-nums
+                     focus:outline-none focus:border-acc/60"
+        />
+        <span className="text-[11px] text-text-dim">seg</span>
+        {dirty && (
+          <button
+            onClick={commit}
+            disabled={disabled || !isValid}
+            className="ml-auto px-2 py-1 rounded-md text-[11px]
+                       border border-acc/40 bg-acc/10 text-acc
+                       hover:bg-acc/20 disabled:opacity-40 transition-colors"
+          >
+            Guardar
+          </button>
+        )}
+      </div>
+      {!isValid && <div className="mt-1 text-[10px] text-danger">10 – 3600 s</div>}
+    </Surface>
+  );
+}
+
 function formatAge(iso: string): string {
   const past = new Date(iso).getTime();
   if (isNaN(past)) return iso;
   const secs = Math.max(0, Math.floor((Date.now() - past) / 1000));
-  if (secs < 60)   return `hace ${secs}s`;
+  if (secs < 60) return `hace ${secs}s`;
   if (secs < 3600) return `hace ${Math.floor(secs / 60)} min`;
   return `hace ${Math.floor(secs / 3600)} h`;
 }
@@ -762,7 +958,7 @@ let _sparkSeq = 0;
 function useStableId(): number {
   // We don't need React.useId (TS lib level) — a module-scoped counter is fine
   // since SVG <defs> ids only need to be unique on the page at a given moment.
-  // eslint-disable-next-line react-hooks/rules-of-hooks
+
   const [id] = useState(() => ++_sparkSeq);
   return id;
 }
@@ -811,7 +1007,9 @@ function ExportMenu() {
             <Icon name="chart" size={14} className="text-acc" />
             <div className="flex-1">
               <div className="leading-tight">Excel (.xlsx)</div>
-              <div className="text-[10px] uppercase tracking-[0.18em] text-muted">una hoja por sensor</div>
+              <div className="text-[10px] uppercase tracking-[0.18em] text-muted">
+                una hoja por sensor
+              </div>
             </div>
           </a>
           <a

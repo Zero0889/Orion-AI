@@ -26,10 +26,9 @@ pueden llamar al mismo transporte en paralelo.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Callable
+from collections.abc import Callable
 
 from ..devices import Device
-
 
 SensorCallback = Callable[[str, str], None]  # (device_id, raw_value) → None
 
@@ -38,8 +37,8 @@ class Transport(ABC):
     """Interfaz que cumple cada implementación de transporte."""
 
     def __init__(self, transport_id: str, cfg: dict) -> None:
-        self.id    = transport_id
-        self.cfg   = dict(cfg)
+        self.id = transport_id
+        self.cfg = dict(cfg)
         self._sensor_listeners: dict[str, list[SensorCallback]] = {}
 
     # ── Acciones ─────────────────────────────────────────────────────────
@@ -59,7 +58,9 @@ class Transport(ABC):
 
     # ── Sensores ─────────────────────────────────────────────────────────
     def register_sensor_listener(
-        self, device_id: str, callback: SensorCallback,
+        self,
+        device_id: str,
+        callback: SensorCallback,
     ) -> None:
         """Suscribe ``callback`` a las lecturas del sensor ``device_id``."""
         self._sensor_listeners.setdefault(device_id, []).append(callback)

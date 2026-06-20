@@ -41,17 +41,18 @@ from __future__ import annotations
 import asyncio
 import threading
 import time
-from typing import Any, Callable, Optional
+from collections.abc import Callable
 
 from core.logger import get_logger
 from memory.conversations import ConversationSession, get_conversation
+import contextlib
 
 log = get_logger("event_bus")
 
 
 # Tipos auxiliares
 TextCommandCallback = Callable[[str], None]
-InterruptCallback   = Callable[[], None]
+InterruptCallback = Callable[[], None]
 
 
 # ============================================================================
@@ -77,10 +78,10 @@ class OrionEventBus:
     """
 
     OUTBOUND_QUEUE_MAX = 512
-    _instance: Optional[OrionEventBus] = None
+    _instance: OrionEventBus | None = None
 
     @classmethod
-    def get_instance(cls) -> Optional[OrionEventBus]:
+    def get_instance(cls) -> OrionEventBus | None:
         return cls._instance
 
     # ── Constructor ──────────────────────────────────────────────────────
@@ -88,22 +89,22 @@ class OrionEventBus:
         OrionEventBus._instance = self
         # Estado equivalente a OrionUI
         self._muted: bool = False
-        self._current_file: Optional[str] = None
+        self._current_file: str | None = None
         self._current_files: list[str] = []
 
-        self._on_text_command: Optional[TextCommandCallback] = None
-        self._on_interrupt:    Optional[InterruptCallback]   = None
+        self._on_text_command: TextCommandCallback | None = None
+        self._on_interrupt: InterruptCallback | None = None
 
         # Persistencia de conversaciones (movida desde MainWindow, R-01)
-        self._conversation: Optional[ConversationSession] = None
+        self._conversation: ConversationSession | None = None
 
         # Sincronización del wizard de API key (sustituye self._win._ready)
         self._api_key_ready = threading.Event()
 
         # Cola de salida fan-out → consumer async la drena en Loop A
-        self._outbound_queue: Optional[asyncio.Queue] = None
-        self._server_loop:   Optional[asyncio.AbstractEventLoop] = None  # Loop A
-        self._live_loop:     Optional[asyncio.AbstractEventLoop] = None  # Loop B
+        self._outbound_queue: asyncio.Queue | None = None
+        self._server_loop: asyncio.AbstractEventLoop | None = None  # Loop A
+        self._live_loop: asyncio.AbstractEventLoop | None = None  # Loop B
 
         # Estado de OrionLive (para el frontend)
         self._state: str = "ESCUCHANDO"
@@ -138,11 +139,11 @@ class OrionEventBus:
         self.publish("mute", {"value": self._muted})
 
     @property
-    def current_file(self) -> Optional[str]:
+    def current_file(self) -> str | None:
         return self._current_file
 
     @current_file.setter
-    def current_file(self, path: Optional[str]) -> None:
+    def current_file(self, path: str | None) -> None:
         self._current_file = path
         if path:
             self._current_files = [path]
@@ -163,19 +164,19 @@ class OrionEventBus:
             self.publish("files.attached", {"paths": list(self._current_files)})
 
     @property
-    def on_text_command(self) -> Optional[TextCommandCallback]:
+    def on_text_command(self) -> TextCommandCallback | None:
         return self._on_text_command
 
     @on_text_command.setter
-    def on_text_command(self, cb: Optional[TextCommandCallback]) -> None:
+    def on_text_command(self, cb: TextCommandCallback | None) -> None:
         self._on_text_command = cb
 
     @property
-    def on_interrupt(self) -> Optional[InterruptCallback]:
+    def on_interrupt(self) -> InterruptCallback | None:
         return self._on_interrupt
 
     @on_interrupt.setter
-    def on_interrupt(self, cb: Optional[InterruptCallback]) -> None:
+    def on_interrupt(self, cb: InterruptCallback | None) -> None:
         self._on_interrupt = cb
 
     # Métodos
@@ -212,13 +213,16 @@ class OrionEventBus:
             turn_id: identificador estable del turno (mismo en todos los chunks).
             final:   True en el último chunk para marcar el mensaje como cerrado.
         """
-        self.publish("chat.stream", {
-            "role":    role,
-            "delta":   delta,
-            "turn_id": turn_id,
-            "final":   final,
-            "ts":      time.time(),
-        })
+        self.publish(
+            "chat.stream",
+            {
+                "role": role,
+                "delta": delta,
+                "turn_id": turn_id,
+                "final": final,
+                "ts": time.time(),
+            },
+        )
 
     def persist_log_only(self, text: str) -> None:
         """Persiste un log SIN publicar al WS — útil al cerrar un turno
@@ -252,7 +256,7 @@ class OrionEventBus:
         self.publish("note.changed", {})
 
     # ── Superficie nueva (modo web) ──────────────────────────────────────
-    def publish(self, event_type: str, payload: Optional[dict] = None) -> None:
+    def publish(self, event_type: str, payload: dict | None = None) -> None:
         """Encola un evento para fan-out a todos los clientes WS.
 
         Seguro desde cualquier hilo. Si todavía no hay loop de servidor
@@ -262,11 +266,9 @@ class OrionEventBus:
         if self._outbound_queue is None or self._server_loop is None:
             return  # Fase 0: nadie escucha aún
         msg = {"type": event_type, "payload": payload or {}}
-        try:
+        # El loop puede estar cerrándose en shutdown.
+        with contextlib.suppress(RuntimeError):
             self._server_loop.call_soon_threadsafe(self._enqueue_outbound, msg)
-        except RuntimeError:
-            # El loop puede estar cerrándose en shutdown
-            pass
 
     def _enqueue_outbound(self, msg: dict) -> None:
         """Inserta en _outbound_queue con política drop-oldest."""
@@ -276,14 +278,10 @@ class OrionEventBus:
         try:
             q.put_nowait(msg)
         except asyncio.QueueFull:
-            try:
+            with contextlib.suppress(Exception):
                 q.get_nowait()  # drop oldest
-            except Exception:
-                pass
-            try:
+            with contextlib.suppress(Exception):
                 q.put_nowait(msg)
-            except Exception:
-                pass
 
     def submit_user_text(self, text: str) -> None:
         """Inyecta texto al modelo Live. Salta de Loop A → Loop B con
@@ -316,7 +314,7 @@ class OrionEventBus:
     def close_conversation(self) -> None:
         self._conversation = None
 
-    def load_conversation(self, conv_id: str) -> Optional[dict]:
+    def load_conversation(self, conv_id: str) -> dict | None:
         conv = get_conversation(conv_id)
         if not conv:
             return None

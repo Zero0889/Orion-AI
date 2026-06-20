@@ -12,8 +12,6 @@ import os
 import re
 import sys
 import threading
-import traceback
-from pathlib import Path
 from typing import Any
 
 # ── UTF-8 stdout/stderr (Windows fix) ────────────────────────────────
@@ -37,17 +35,13 @@ import sounddevice as sd
 from google import genai
 from google.genai import types
 
-from config import get_api_key, PROMPT_PATH
+from config import PROMPT_PATH, get_api_key
 from core.logger import get_logger
-from plugins.base import PluginRegistry
-from memory.memory_manager import (
-    load_memory, update_memory, format_memory_for_prompt,
-)
+from core.mcp_client import MCPManager, set_mcp_manager
 
 # Desde la Fase 7 Orion es web-only: la UI vive en web/ y el "player"
 # que reciben main.OrionLive y las acciones es el OrionEventBus
 # directamente (no hay UI Qt ni FanOut).
-
 # ── Tool registry ───────────────────────────────────────────────────────────
 # Las acciones builtin se registran en core.tools_bootstrap; sus imports
 # son lazy (dentro de cada handler) para no penalizar el arranque ni los
@@ -55,9 +49,15 @@ from memory.memory_manager import (
 # Los servidores MCP externos se conectan en OrionLive.__init__ y añaden
 # sus tools al MISMO registry — Gemini Live, executor y planner las ven
 # automáticamente.
-from core.tool_registry  import ToolDeclaration, ToolRegistry
+from core.tool_registry import ToolRegistry
 from core.tools_bootstrap import register_builtin_tools
-from core.mcp_client      import MCPManager, set_mcp_manager
+from memory.memory_manager import (
+    format_memory_for_prompt,
+    load_memory,
+    update_memory,
+)
+from plugins.base import PluginRegistry
+import contextlib
 
 register_builtin_tools()
 
@@ -71,7 +71,9 @@ log = get_logger("main")
 # nada más.
 try:
     import os as _os
+
     from core.cli_installer import extra_path_dirs as _extra_path_dirs
+
     _extras = _extra_path_dirs()
     if _extras:
         _cur = _os.environ.get("PATH", "")
@@ -83,11 +85,11 @@ except Exception as _e:
     log = get_logger("main")
     log.warning("No pude extender PATH con tools/: %s", _e)
 
-LIVE_MODEL          = "models/gemini-2.5-flash-native-audio-preview-12-2025"
-CHANNELS            = 1
-SEND_SAMPLE_RATE    = 16000
+LIVE_MODEL = "models/gemini-2.5-flash-native-audio-preview-12-2025"
+CHANNELS = 1
+SEND_SAMPLE_RATE = 16000
 RECEIVE_SAMPLE_RATE = 24000
-CHUNK_SIZE          = 1024
+CHUNK_SIZE = 1024
 
 
 def _load_system_prompt() -> str:
@@ -115,12 +117,31 @@ _CTRL_RE = re.compile(r"<ctrl\d+>", re.IGNORECASE)
 # (chasquidos, micro-ruido, etc.). Si la transcripción entera es uno de éstos,
 # se descarta.
 _TRANSCRIPT_NOISE = {
-    "noice", "noise", "[noise]", "[ruido]", "(noise)", "(ruido)",
-    "uh", "um", "uhm", "hmm", "mmh", "mm", "ah", "eh",
-    "...", "…", ".", "-",
+    "noice",
+    "noise",
+    "[noise]",
+    "[ruido]",
+    "(noise)",
+    "(ruido)",
+    "uh",
+    "um",
+    "uhm",
+    "hmm",
+    "mmh",
+    "mm",
+    "ah",
+    "eh",
+    "...",
+    "…",
+    ".",
+    "-",
 }
 # Limpieza de marcadores estilo [BLANK_AUDIO], (background noise), [música], etc.
-_BRACKET_RE = re.compile(r"[\[\(\<](?:blank[_ ]?audio|background|music|música|silencio|ruido|noise|inaudible|aplausos|applause)[^\]\)\>]*[\]\)\>]", re.IGNORECASE)
+_BRACKET_RE = re.compile(
+    r"[\[\(\<](?:blank[_ ]?audio|background|music|música|silencio|ruido|noise|inaudible|aplausos|applause)[^\]\)\>]*[\]\)\>]",
+    re.IGNORECASE,
+)
+
 
 def _first_real_exception(exc: BaseException) -> BaseException:
     """Desempaqueta ``ExceptionGroup`` para devolver la primera excepción
@@ -157,7 +178,6 @@ def _clean_transcript(text: str) -> str:
 TOOL_DECLARATIONS = ToolRegistry().to_gemini_declarations()
 
 
-
 # ============================================================================
 #  Núcleo Live de ORION
 # ============================================================================
@@ -166,15 +186,15 @@ class OrionLive:
     herramientas y sincronización con la interfaz."""
 
     def __init__(self, ui):
-        self.ui             = ui
-        self.session        = None
+        self.ui = ui
+        self.session = None
         self.audio_in_queue = None
-        self.out_queue      = None
-        self._loop          = None
-        self._is_speaking   = False
+        self.out_queue = None
+        self._loop = None
+        self._is_speaking = False
         self._speaking_lock = threading.Lock()
         self.ui.on_text_command = self._on_text_command
-        self.ui.on_interrupt    = self.interrupt
+        self.ui.on_interrupt = self.interrupt
         self._turn_done_event: asyncio.Event | None = None
         # Watchdog: marcas de tiempo para detectar cuelgues en PENSANDO.
         # Protegidas con su propio lock porque las escriben varios threads
@@ -182,6 +202,7 @@ class OrionLive:
         # y el watchdog las lee periódicamente. Sin lock, lecturas "stale"
         # mantenían PENSANDO bloqueado o saltaban estados.
         import time
+
         self._state_lock = threading.Lock()
         self._pensando_since: float | None = None
         self._last_activity_ts: float = time.time()
@@ -218,6 +239,7 @@ class OrionLive:
         # cierres normales; el handler de shutdown_orion los para antes
         # del os._exit).
         import atexit
+
         atexit.register(self._mcp_manager.stop_all)
 
         # ── ask_user: conecta el manager singleton al bus ──
@@ -226,16 +248,21 @@ class OrionLive:
         # que el frontend devuelva la respuesta via `ask_user.response`
         # (manejado en server/ws.py).
         from core.ask_user import get_ask_user
+
         def _publish_ask(qid: str, question: str, options: list, allow_other: bool) -> None:
             try:
-                self.ui.publish("ask_user.start", {
-                    "question_id": qid,
-                    "question":    question,
-                    "options":     options,
-                    "allow_other": allow_other,
-                })
+                self.ui.publish(
+                    "ask_user.start",
+                    {
+                        "question_id": qid,
+                        "question": question,
+                        "options": options,
+                        "allow_other": allow_other,
+                    },
+                )
             except Exception as e:
                 log.warning("publish ask_user.start falló: %s", e)
+
         get_ask_user().set_publisher(_publish_ask)
 
     # ── Callbacks de UI ──────────────────────────────────────────────────
@@ -249,11 +276,8 @@ class OrionLive:
             return
         try:
             asyncio.run_coroutine_threadsafe(
-                session.send_client_content(
-                    turns={"parts": [{"text": text}]},
-                    turn_complete=True
-                ),
-                loop
+                session.send_client_content(turns={"parts": [{"text": text}]}, turn_complete=True),
+                loop,
             )
         except Exception as e:
             log.warning("on_text_command falló: %s", e)
@@ -261,6 +285,7 @@ class OrionLive:
     def _ui_state(self, state: str):
         """Cambia el estado UI y mantiene el contador del watchdog."""
         import time
+
         now = time.time()
         with self._state_lock:
             self._pensando_since = now if state == "PENSANDO" else None
@@ -283,11 +308,8 @@ class OrionLive:
             return
         try:
             asyncio.run_coroutine_threadsafe(
-                session.send_client_content(
-                    turns={"parts": [{"text": text}]},
-                    turn_complete=True
-                ),
-                loop
+                session.send_client_content(turns={"parts": [{"text": text}]}, turn_complete=True),
+                loop,
             )
         except Exception as e:
             log.warning("speak falló: %s", e)
@@ -316,10 +338,8 @@ class OrionLive:
 
         # Forzar el turno como terminado
         if self._turn_done_event is not None:
-            try:
+            with contextlib.suppress(Exception):
                 self._loop.call_soon_threadsafe(self._turn_done_event.set)
-            except Exception:
-                pass
 
         self.set_speaking(False)
 
@@ -330,8 +350,14 @@ class OrionLive:
             try:
                 asyncio.run_coroutine_threadsafe(
                     session.send_client_content(
-                        turns={"parts": [{"text": "[INTERRUPCIÓN_USUARIO] El usuario te ha pedido detenerte. No continúes."}]},
-                        turn_complete=True
+                        turns={
+                            "parts": [
+                                {
+                                    "text": "[INTERRUPCIÓN_USUARIO] El usuario te ha pedido detenerte. No continúes."
+                                }
+                            ]
+                        },
+                        turn_complete=True,
                     ),
                     loop,
                 )
@@ -342,17 +368,28 @@ class OrionLive:
     def _build_config(self) -> types.LiveConnectConfig:
         from datetime import datetime
 
-        memory     = load_memory()
-        mem_str    = format_memory_for_prompt(memory)
+        memory = load_memory()
+        mem_str = format_memory_for_prompt(memory)
         sys_prompt = _load_system_prompt()
 
         # Nombres de días/meses en español para el contexto temporal
-        dias  = ["Lunes", "Martes", "Miércoles", "Jueves",
-                 "Viernes", "Sábado", "Domingo"]
-        meses = ["enero", "febrero", "marzo", "abril", "mayo", "junio",
-                 "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"]
+        dias = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"]
+        meses = [
+            "enero",
+            "febrero",
+            "marzo",
+            "abril",
+            "mayo",
+            "junio",
+            "julio",
+            "agosto",
+            "septiembre",
+            "octubre",
+            "noviembre",
+            "diciembre",
+        ]
 
-        now      = datetime.now()
+        now = datetime.now()
         time_str = (
             f"{dias[now.weekday()]}, {now.day} de {meses[now.month - 1]} de {now.year} "
             f"— {now.strftime('%H:%M')}"
@@ -373,6 +410,7 @@ class OrionLive:
         # genérica pero no los skill_ids disponibles.
         try:
             from core.skills import build_skill_catalog_prompt
+
             skills_cat = build_skill_catalog_prompt()
             if skills_cat:
                 parts.append("\n" + skills_cat)
@@ -387,15 +425,16 @@ class OrionLive:
             # Leemos del registry en vivo (no de la constante module-level)
             # porque el MCPManager pudo haber añadido tools después del
             # import. Plugins out-of-tree se concatenan aparte como antes.
-            tools=[{"function_declarations":
-                    self._tool_registry.to_gemini_declarations()
-                    + self._plugin_registry.get_tool_declarations()}],
+            tools=[
+                {
+                    "function_declarations": self._tool_registry.to_gemini_declarations()
+                    + self._plugin_registry.get_tool_declarations()
+                }
+            ],
             session_resumption=types.SessionResumptionConfig(),
             speech_config=types.SpeechConfig(
                 voice_config=types.VoiceConfig(
-                    prebuilt_voice_config=types.PrebuiltVoiceConfig(
-                        voice_name="Charon"
-                    )
+                    prebuilt_voice_config=types.PrebuiltVoiceConfig(voice_name="Charon")
                 ),
                 # CRÍTICO: sin language_code el TTS usa prosodia inglesa por
                 # default y lee español rápido y artificial. Setearlo a es-US
@@ -431,6 +470,7 @@ class OrionLive:
         # no se tropiece al leerlas en voz alta.
         def _sanitize_for_voice(text: str) -> str:
             import re as _re
+
             if not text:
                 return text
 
@@ -454,9 +494,11 @@ class OrionLive:
             #      47s3sarhgr0lurqlnmdbdu47f0, evita comerse palabras largas
             #      reales como "supercalifragilisticoexpialidocious").
             text = _re.sub(r"\b[0-9a-f]{12,}\b", "", text, flags=_re.IGNORECASE)
-            def _looks_like_id(m: "_re.Match") -> str:
+
+            def _looks_like_id(m: _re.Match) -> str:
                 s = m.group(0)
                 return "" if sum(c.isdigit() for c in s) >= 2 else s
+
             text = _re.sub(r"\b[a-z0-9]{18,}\b", _looks_like_id, text, flags=_re.IGNORECASE)
 
             # 3) Fechas ISO a algo más hablable: "2026-06-09T14:45:00Z" →
@@ -476,11 +518,12 @@ class OrionLive:
             return text.strip()
 
         def h_agent_task(parameters: dict, **_kwargs) -> str:
-            from agent.task_queue import get_queue, TaskPriority
+            from agent.task_queue import TaskPriority, get_queue
+
             priority_map = {
-                "low":    TaskPriority.LOW,
+                "low": TaskPriority.LOW,
                 "normal": TaskPriority.NORMAL,
-                "high":   TaskPriority.HIGH,
+                "high": TaskPriority.HIGH,
             }
             priority = priority_map.get(
                 (parameters.get("priority") or "normal").lower(),
@@ -489,18 +532,20 @@ class OrionLive:
             goal = parameters.get("goal", "")
 
             holder: dict[str, Any] = {
-                "result":         None,
-                "done":           threading.Event(),
-                "sync_returned":  False,
+                "result": None,
+                "done": threading.Event(),
+                "sync_returned": False,
             }
 
             def _on_done(task_id: str, result: Any) -> None:
                 holder["result"] = result
                 holder["done"].set()
-                log.info("agent_task[%s] completed (result_len=%s, sync_returned=%s)",
-                         task_id,
-                         len(result) if isinstance(result, str) else "n/a",
-                         holder["sync_returned"])
+                log.info(
+                    "agent_task[%s] completed (result_len=%s, sync_returned=%s)",
+                    task_id,
+                    len(result) if isinstance(result, str) else "n/a",
+                    holder["sync_returned"],
+                )
                 # Fallback async: solo si el handler ya retornó por timeout
                 # (Gemini ya recibió "tarea sigue corriendo" como tool_response
                 # y se cerró el turn). Inyectamos como user-turn para reactivar.
@@ -528,7 +573,9 @@ class OrionLive:
                 speak=self.speak,
                 on_complete=_on_done,
             )
-            log.info("agent_task[%s] queued, esperando hasta %ds sync…", task_id, AGENT_TASK_SYNC_TIMEOUT)
+            log.info(
+                "agent_task[%s] queued, esperando hasta %ds sync…", task_id, AGENT_TASK_SYNC_TIMEOUT
+            )
 
             # Espera bloqueante. h_agent_task corre en run_in_executor, así
             # que bloquear aquí NO bloquea el event loop de asyncio.
@@ -536,15 +583,23 @@ class OrionLive:
                 result = holder["result"]
                 if isinstance(result, str) and result.strip():
                     cleaned = _sanitize_for_voice(result)
-                    log.info("agent_task[%s] devuelto sync (%d→%d chars) a Gemini",
-                             task_id, len(result), len(cleaned))
+                    log.info(
+                        "agent_task[%s] devuelto sync (%d→%d chars) a Gemini",
+                        task_id,
+                        len(result),
+                        len(cleaned),
+                    )
                     return cleaned
                 return "La tarea terminó sin producir salida visible."
 
             # Timeout: marcamos para que el on_complete inyecte el resultado
             # cuando finalmente llegue.
             holder["sync_returned"] = True
-            log.warning("agent_task[%s] timeout sync (%ds) — fallback async", task_id, AGENT_TASK_SYNC_TIMEOUT)
+            log.warning(
+                "agent_task[%s] timeout sync (%ds) — fallback async",
+                task_id,
+                AGENT_TASK_SYNC_TIMEOUT,
+            )
             return (
                 f"La tarea está tomando más de {AGENT_TASK_SYNC_TIMEOUT} segundos. "
                 f"Sigue corriendo en background — te aviso con el resultado en cuanto termine."
@@ -556,14 +611,14 @@ class OrionLive:
             self.speak("Hasta luego.")
 
             def _shutdown():
-                import os, time
+                import os
+                import time
+
                 time.sleep(1.5)
                 # Para los subprocesses MCP antes del exit duro — os._exit
                 # bypassea atexit y dejaría huérfanos.
-                try:
+                with contextlib.suppress(Exception):
                     self._mcp_manager.stop_all()
-                except Exception:
-                    pass
                 os._exit(0)
 
             threading.Thread(target=_shutdown, daemon=True).start()
@@ -587,10 +642,13 @@ class OrionLive:
         # Notifica al frontend que hay una tool en ejecución. El bus lo
         # propaga al WS y el OrbHUD entra en modo "tool" + aparece banner.
         try:
-            self.ui.publish("tool.call.start", {
-                "name": name,
-                "args": {k: str(v)[:80] for k, v in args.items()},
-            })
+            self.ui.publish(
+                "tool.call.start",
+                {
+                    "name": name,
+                    "args": {k: str(v)[:80] for k, v in args.items()},
+                },
+            )
         except Exception as e:
             log.debug("publish tool.call.start falló: %s", e)
 
@@ -613,20 +671,20 @@ class OrionLive:
                 if not self.ui.muted:
                     self.ui.set_state("ESCUCHANDO")
                 return types.FunctionResponse(
-                    id=fc.id, name=name,
-                    response={"result": "No se proporcionó texto para la nota."}
+                    id=fc.id,
+                    name=name,
+                    response={"result": "No se proporcionó texto para la nota."},
                 )
             try:
                 from memory.quick_notes import add_note, update_note
+
                 n = add_note(text)
                 if pinned and n.get("id"):
                     update_note(n["id"], pinned=True)
                 # Refresca el panel de notas (Qt) o emite evento WS (bus).
                 # Sustituye el reach-in previo a ``_win._notes_panel`` (R-02).
-                try:
+                with contextlib.suppress(AttributeError):
                     self.ui.notes_changed()
-                except AttributeError:
-                    pass
                 self.ui.write_log(f"NOTA guardada: {text[:80]}")
                 result_msg = "Nota guardada en el panel de notas rápidas."
             except Exception as e:
@@ -634,24 +692,20 @@ class OrionLive:
                 result_msg = f"No se pudo guardar la nota: {e}"
             if not self.ui.muted:
                 self._ui_state("ESCUCHANDO")
-            return types.FunctionResponse(
-                id=fc.id, name=name,
-                response={"result": result_msg}
-            )
+            return types.FunctionResponse(id=fc.id, name=name, response={"result": result_msg})
 
         # save_memory se ejecuta de forma silenciosa (caso especial)
         if name == "save_memory":
             category = args.get("category", "notes")
-            key      = args.get("key", "")
-            value    = args.get("value", "")
+            key = args.get("key", "")
+            value = args.get("value", "")
             if key and value:
                 update_memory({category: {key: {"value": value}}})
                 log.info("Memoria guardada: %s/%s = %s", category, key, value)
             if not self.ui.muted:
                 self._ui_state("ESCUCHANDO")
             return types.FunctionResponse(
-                id=fc.id, name=name,
-                response={"result": "ok", "silent": True}
+                id=fc.id, name=name, response={"result": "ok", "silent": True}
             )
 
         # Despacho unificado: primero el ToolRegistry (builtin + Live-only
@@ -659,7 +713,7 @@ class OrionLive:
         # ejecuta en el thread pool con un timeout — el registry no maneja
         # threading, eso es responsabilidad de este caller.
         result = "Listo."
-        loop   = asyncio.get_event_loop()
+        loop = asyncio.get_event_loop()
         plugin = None
 
         registry_entry = self._tool_registry.get(name)
@@ -679,7 +733,7 @@ class OrionLive:
                         ),
                         timeout=timeout,
                     )
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     result = f"Plugin '{name}' tardó más de {timeout}s y fue cancelado."
                     log.warning("Timeout en plugin %s (%ds)", name, timeout)
                 if not result:
@@ -693,7 +747,8 @@ class OrionLive:
                         loop.run_in_executor(
                             None,
                             lambda: self._tool_registry.call_sync(
-                                name, args,
+                                name,
+                                args,
                                 player=self.ui,
                                 speak=self.speak,
                                 current_file=current_file,
@@ -701,10 +756,8 @@ class OrionLive:
                         ),
                         timeout=timeout,
                     )
-                except asyncio.TimeoutError:
-                    result = (
-                        f"La herramienta '{name}' tardó más de {timeout}s y fue cancelada."
-                    )
+                except TimeoutError:
+                    result = f"La herramienta '{name}' tardó más de {timeout}s y fue cancelada."
                     log.warning("Timeout en %s (%ds)", name, timeout)
                 if not result:
                     result = "Listo."
@@ -718,10 +771,7 @@ class OrionLive:
             self._ui_state("ESCUCHANDO")
 
         log.info("Tool result: %s → %s", name, str(result)[:80])
-        return types.FunctionResponse(
-            id=fc.id, name=name,
-            response={"result": result}
-        )
+        return types.FunctionResponse(id=fc.id, name=name, response={"result": result})
 
     # ── Loops de audio ───────────────────────────────────────────────────
     async def _send_realtime(self):
@@ -740,14 +790,10 @@ class OrionLive:
             try:
                 self.out_queue.put_nowait(payload)
             except asyncio.QueueFull:
-                try:
+                with contextlib.suppress(Exception):
                     self.out_queue.get_nowait()
-                except Exception:
-                    pass
-                try:
+                with contextlib.suppress(Exception):
                     self.out_queue.put_nowait(payload)
-                except Exception:
-                    pass
 
         def callback(indata, frames, time_info, status):
             with self._speaking_lock:
@@ -755,9 +801,7 @@ class OrionLive:
             # No enviar audio mientras ORION habla (evita feedback)
             if not orion_speaking and not self.ui.muted:
                 data = indata.tobytes()
-                loop.call_soon_threadsafe(_enqueue,
-                    {"data": data, "mime_type": "audio/pcm"}
-                )
+                loop.call_soon_threadsafe(_enqueue, {"data": data, "mime_type": "audio/pcm"})
 
         try:
             with sd.InputStream(
@@ -785,15 +829,16 @@ class OrionLive:
         # usa este id para identificar al mensaje y anexar deltas en lugar
         # de crear uno nuevo por chunk.
         import uuid as _uuid
+
         out_turn_id: str | None = None
-        in_turn_id:  str | None = None
+        in_turn_id: str | None = None
 
         try:
             while True:
                 async for response in self.session.receive():
-
                     if response.data:
                         import time
+
                         with self._state_lock:
                             self._last_activity_ts = time.time()
                         if self._turn_done_event and self._turn_done_event.is_set():
@@ -816,7 +861,9 @@ class OrionLive:
                             for part in sc.model_turn.parts or []:
                                 if hasattr(part, "text") and part.text:
                                     txt = part.text.strip()
-                                    if txt and txt.lower().startswith(("error", "cannot", "i can't")):
+                                    if txt and txt.lower().startswith(
+                                        ("error", "cannot", "i can't")
+                                    ):
                                         log.warning("Modelo respondió error: %s", txt[:120])
                                         self.ui.write_log(f"ORION: {txt}")
 
@@ -830,8 +877,10 @@ class OrionLive:
                                 # palabra-por-palabra en el chat, en sync con
                                 # el audio que está reproduciendo.
                                 self.ui.stream_chunk(
-                                    role="orion", delta=txt,
-                                    turn_id=out_turn_id, final=False,
+                                    role="orion",
+                                    delta=txt,
+                                    turn_id=out_turn_id,
+                                    final=False,
                                 )
 
                         if sc.input_transcription and sc.input_transcription.text:
@@ -841,8 +890,10 @@ class OrionLive:
                                 if in_turn_id is None:
                                     in_turn_id = _uuid.uuid4().hex[:12]
                                 self.ui.stream_chunk(
-                                    role="user", delta=txt,
-                                    turn_id=in_turn_id, final=False,
+                                    role="user",
+                                    delta=txt,
+                                    turn_id=in_turn_id,
+                                    final=False,
                                 )
 
                         if sc.turn_complete:
@@ -860,8 +911,10 @@ class OrionLive:
                             if full_in:
                                 if in_turn_id:
                                     self.ui.stream_chunk(
-                                        role="user", delta="",
-                                        turn_id=in_turn_id, final=True,
+                                        role="user",
+                                        delta="",
+                                        turn_id=in_turn_id,
+                                        final=True,
                                     )
                                 self.ui.write_log(f"Tú: {full_in}")
                             in_buf = []
@@ -871,8 +924,10 @@ class OrionLive:
                             if full_out:
                                 if out_turn_id:
                                     self.ui.stream_chunk(
-                                        role="orion", delta="",
-                                        turn_id=out_turn_id, final=True,
+                                        role="orion",
+                                        delta="",
+                                        turn_id=out_turn_id,
+                                        final=True,
                                     )
                                 self.ui.write_log(f"ORION: {full_out}")
                             out_buf = []
@@ -884,14 +939,12 @@ class OrionLive:
                             log.debug("Function call: %s", fc.name)
                             fr = await self._execute_tool(fc)
                             fn_responses.append(fr)
-                        await self.session.send_tool_response(
-                            function_responses=fn_responses
-                        )
+                        await self.session.send_tool_response(function_responses=fn_responses)
         except Exception as e:
             real = _first_real_exception(e)
             msg = str(real)[:200]
             log.error("Error en recepción de audio: %s", msg)
-            self.ui.write_log(f"SISTEMA: Error de conexión — reconectando…")
+            self.ui.write_log("SISTEMA: Error de conexión — reconectando…")
             raise
 
     async def _watchdog(self):
@@ -903,8 +956,9 @@ class OrionLive:
         rato y el turno está marcado como terminado.
         """
         import time
-        STUCK_LIMIT_S = 12.0       # PENSANDO sin audio durante 12s → desbloquear
-        SPEAKING_TIMEOUT_S = 1.5   # _is_speaking sin audio en 1.5s → resetear
+
+        STUCK_LIMIT_S = 12.0  # PENSANDO sin audio durante 12s → desbloquear
+        SPEAKING_TIMEOUT_S = 1.5  # _is_speaking sin audio en 1.5s → resetear
         # (antes 6s, demasiado lento — el usuario perdía la primera pregunta
         # post-turno porque el mic seguía bloqueado mientras ORION ya había
         # terminado de hablar).
@@ -931,17 +985,12 @@ class OrionLive:
                         log.debug("Watchdog: _is_speaking stuck, reset.")
                         self.set_speaking(False)
                         if self._turn_done_event:
-                            try:
+                            with contextlib.suppress(Exception):
                                 self._turn_done_event.set()
-                            except Exception:
-                                pass
                 # 2) Si PENSANDO se prolonga sin actividad, vuelve a ESCUCHANDO
                 if pensando_since is not None:
                     elapsed = now - pensando_since
-                    no_audio = (
-                        self.audio_in_queue is None
-                        or self.audio_in_queue.empty()
-                    )
+                    no_audio = self.audio_in_queue is None or self.audio_in_queue.empty()
                     if elapsed > STUCK_LIMIT_S and no_audio:
                         log.warning(
                             "Watchdog: PENSANDO bloqueado %.1fs → ESCUCHANDO",
@@ -976,11 +1025,8 @@ class OrionLive:
         try:
             while True:
                 try:
-                    chunk = await asyncio.wait_for(
-                        self.audio_in_queue.get(),
-                        timeout=0.1
-                    )
-                except asyncio.TimeoutError:
+                    chunk = await asyncio.wait_for(self.audio_in_queue.get(), timeout=0.1)
+                except TimeoutError:
                     # Sin chunks y el turno terminó → ORION dejó de hablar
                     if (
                         self._turn_done_event
@@ -1006,10 +1052,7 @@ class OrionLive:
     # ── Loop principal ───────────────────────────────────────────────────
     async def run(self):
         try:
-            client = genai.Client(
-                api_key=get_api_key(),
-                http_options={"api_version": "v1beta"}
-            )
+            client = genai.Client(api_key=get_api_key(), http_options={"api_version": "v1beta"})
         except RuntimeError as e:
             log.error("Error de configuración: %s", e)
             self.ui.write_log(f"ERROR DE CONFIGURACIÓN: {e}")
@@ -1030,8 +1073,8 @@ class OrionLive:
                     client.aio.live.connect(model=LIVE_MODEL, config=config) as session,
                     asyncio.TaskGroup() as tg,
                 ):
-                    self.session          = session
-                    self._loop            = asyncio.get_event_loop()
+                    self.session = session
+                    self._loop = asyncio.get_event_loop()
                     # maxsize=200: si el driver de audio se atasca, la cola
                     # crecería sin tope. 200 chunks @ 24kHz/PCM16 ≈ 8s de
                     # audio bufferizado — suficiente para sobrevivir a un
@@ -1041,8 +1084,8 @@ class OrionLive:
                     # bloquee durante una respuesta normal y dé tiempo a
                     # _play_audio a drenar. Antes era 200 + drop-oldest, lo
                     # que causaba aceleración perceptible del TTS.
-                    self.audio_in_queue   = asyncio.Queue(maxsize=1000)
-                    self.out_queue        = asyncio.Queue(maxsize=10)
+                    self.audio_in_queue = asyncio.Queue(maxsize=1000)
+                    self.out_queue = asyncio.Queue(maxsize=10)
                     self._turn_done_event = asyncio.Event()
 
                     log.info("Conectado a Gemini Live.")
@@ -1073,18 +1116,14 @@ class OrionLive:
                         "Handshake a Gemini Live timeó. "
                         "Revisa red/firewall/antivirus. Reintentando…"
                     )
-                    self.ui.write_log(
-                        "SISTEMA: Conexión a Gemini lenta o bloqueada. Reintentando…"
-                    )
+                    self.ui.write_log("SISTEMA: Conexión a Gemini lenta o bloqueada. Reintentando…")
                 elif isinstance(root, (ConnectionError, OSError)):
                     # DNS, conexión rechazada, host inalcanzable. Transient.
                     log.warning(
                         "Error de red conectando a Gemini Live: %s. Reintentando…",
                         root,
                     )
-                    self.ui.write_log(
-                        "SISTEMA: Sin conexión a Gemini. Reintentando…"
-                    )
+                    self.ui.write_log("SISTEMA: Sin conexión a Gemini. Reintentando…")
                 else:
                     # Cualquier otro error: SÍ logueamos con traza completa
                     # porque puede ser un bug real (auth, config, SDK).
@@ -1104,6 +1143,7 @@ class OrionLive:
 def _build_uvicorn_server(bus):
     """Devuelve un ``uvicorn.Server`` listo para servir el backend Orion."""
     import uvicorn
+
     from server.app import DEFAULT_HOST, DEFAULT_PORT, build_app
 
     app = build_app(bus)
@@ -1121,17 +1161,20 @@ def _build_uvicorn_server(bus):
 
 def _spawn_orion_live(bus) -> None:
     """Arranca ``OrionLive`` en un thread daemon usando el bus como player."""
+
     def runner():
         bus.wait_for_api_key()
         orion = OrionLive(bus)
 
         def _attach_live_loop():
             import time
+
             for _ in range(100):
                 if getattr(orion, "_loop", None) is not None:
                     bus.set_live_loop(orion._loop)
                     return
                 time.sleep(0.05)
+
         threading.Thread(target=_attach_live_loop, daemon=True).start()
 
         try:
@@ -1182,6 +1225,7 @@ def main() -> None:
     if not os.environ.get("ORION_NO_BROWSER"):
         try:
             import webbrowser
+
             webbrowser.open(url, new=2)
         except Exception:
             pass

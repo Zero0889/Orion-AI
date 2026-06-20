@@ -30,7 +30,8 @@ def test_main_module_does_not_import_pyqt():
     for mod in list(sys.modules):
         if mod == "main" or mod.startswith("PyQt6"):
             sys.modules.pop(mod, None)
-    import main  # noqa: F401
+    import main
+
     assert "PyQt6" not in sys.modules, (
         "main.py no debe importar PyQt6 — la UI Qt fue eliminada en Fase 7."
     )
@@ -41,14 +42,16 @@ def test_main_module_does_not_import_pyqt():
 def test_main_has_no_legacy_runners():
     """Fase 7: ya no existen _run_qt / _run_both."""
     import main
-    assert not hasattr(main, "_run_qt"),   "_run_qt debe estar eliminado"
+
+    assert not hasattr(main, "_run_qt"), "_run_qt debe estar eliminado"
     assert not hasattr(main, "_run_both"), "_run_both debe estar eliminado"
-    assert not hasattr(main, "_run_web"),  "_run_web se inlineó en main()"
+    assert not hasattr(main, "_run_web"), "_run_web se inlineó en main()"
 
 
 def test_no_get_ui_mode_anymore():
     """El helper get_ui_mode se eliminó porque ya no hay multimodo."""
     import config
+
     assert not hasattr(config, "get_ui_mode")
 
 
@@ -57,20 +60,28 @@ def test_server_imports_without_pyqt():
     for mod in list(sys.modules):
         if mod.startswith("PyQt6") or mod.startswith("server"):
             sys.modules.pop(mod, None)
-    import server.app          # noqa: F401
-    import server.event_bus    # noqa: F401
-    import server.ws           # noqa: F401
-    from server.routes import (  # noqa: F401
-        agent, conversations, files, iot, memory, notes,
+    import server.app
+    import server.event_bus
+    import server.ws
+    from server.routes import (
+        agent,
+        conversations,
+        files,
+        iot,
+        memory,
+        notes,
+    )
+    from server.routes import (
         settings as settings_route,
     )
+
     assert "PyQt6" not in sys.modules
 
 
 def test_no_fanout_module():
     """server.fanout fue eliminado en Fase 7 (ya no hace falta sin UI Qt)."""
     with pytest.raises(ImportError):
-        import server.fanout  # noqa: F401
+        import server.fanout
 
 
 # ── ORION_NO_BROWSER desactiva la apertura automática ───────────────────
@@ -80,14 +91,17 @@ def test_no_browser_env_var_skips_webbrowser_open(monkeypatch):
     Verificamos que main() respeta el flag — sin llegar a arrancar uvicorn.
     """
     import main
+
     monkeypatch.setenv("ORION_NO_BROWSER", "1")
 
     # Cortamos antes de que main() bloquee con uvicorn.serve(). Para eso
     # mockeamos _spawn_orion_live, _build_uvicorn_server y asyncio.run.
-    with patch.object(main, "_spawn_orion_live"), \
-         patch.object(main, "_build_uvicorn_server", return_value=(_DummyServer(), "h", 1)), \
-         patch.object(main.asyncio, "run"), \
-         patch("webbrowser.open") as wb:
+    with (
+        patch.object(main, "_spawn_orion_live"),
+        patch.object(main, "_build_uvicorn_server", return_value=(_DummyServer(), "h", 1)),
+        patch.object(main.asyncio, "run"),
+        patch("webbrowser.open") as wb,
+    ):
         main.main()
     wb.assert_not_called()
 
@@ -95,10 +109,13 @@ def test_no_browser_env_var_skips_webbrowser_open(monkeypatch):
 def test_browser_opens_by_default(monkeypatch):
     monkeypatch.delenv("ORION_NO_BROWSER", raising=False)
     import main
-    with patch.object(main, "_spawn_orion_live"), \
-         patch.object(main, "_build_uvicorn_server", return_value=(_DummyServer(), "h", 1)), \
-         patch.object(main.asyncio, "run"), \
-         patch("webbrowser.open") as wb:
+
+    with (
+        patch.object(main, "_spawn_orion_live"),
+        patch.object(main, "_build_uvicorn_server", return_value=(_DummyServer(), "h", 1)),
+        patch.object(main.asyncio, "run"),
+        patch("webbrowser.open") as wb,
+    ):
         main.main()
     wb.assert_called_once()
 
@@ -106,15 +123,24 @@ def test_browser_opens_by_default(monkeypatch):
 # ── Bus es un player completo (cross-check con el contrato) ─────────────
 def test_event_bus_can_be_player_for_actions():
     from server.event_bus import OrionEventBus
+
     bus = OrionEventBus()
     for name in (
-        "write_log", "set_state", "muted", "current_file",
-        "on_text_command", "on_interrupt", "wait_for_api_key",
-        "start_speaking", "stop_speaking", "notes_changed",
+        "write_log",
+        "set_state",
+        "muted",
+        "current_file",
+        "on_text_command",
+        "on_interrupt",
+        "wait_for_api_key",
+        "start_speaking",
+        "stop_speaking",
+        "notes_changed",
     ):
         assert hasattr(bus, name), f"OrionEventBus no expone '{name}'"
 
 
 # ── Helper ──────────────────────────────────────────────────────────────
 class _DummyServer:
-    async def serve(self): pass
+    async def serve(self):
+        pass

@@ -37,18 +37,19 @@ if str(PROJECT_ROOT) not in sys.path:
 def isolated(tmp_path, monkeypatch):
     """Aisla TODOS los JSONs que pueden mutarse, incluido api_keys."""
     import config as cfg_pkg
+    import memory.conversations as cv
     import memory.memory_manager as mm
     import memory.quick_notes as qn
-    import memory.conversations as cv
 
-    monkeypatch.setattr(mm, "MEMORY_PATH",   tmp_path / "long_term.json")
-    monkeypatch.setattr(qn, "_NOTES_PATH",   tmp_path / "quick_notes.json")
+    monkeypatch.setattr(mm, "MEMORY_PATH", tmp_path / "long_term.json")
+    monkeypatch.setattr(qn, "_NOTES_PATH", tmp_path / "quick_notes.json")
     monkeypatch.setattr(cv, "_CONVERSATIONS_PATH", tmp_path / "conversations.json")
 
     api_path = tmp_path / "api_keys.json"
     monkeypatch.setattr(cfg_pkg, "API_CONFIG_PATH", api_path)
     # Las rutas de settings importaron API_CONFIG_PATH por nombre; refrescar.
     import server.routes.settings as settings_route
+
     monkeypatch.setattr(settings_route, "API_CONFIG_PATH", api_path)
     monkeypatch.delenv("ORION_GEMINI_KEY", raising=False)
 
@@ -57,8 +58,9 @@ def isolated(tmp_path, monkeypatch):
 
 @pytest.fixture
 def client(isolated):
-    from server.event_bus import OrionEventBus
     from server.app import build_app
+    from server.event_bus import OrionEventBus
+
     bus = OrionEventBus()
     app = build_app(bus)
     with TestClient(app) as tc:
@@ -66,43 +68,9 @@ def client(isolated):
 
 
 # ── Agent / TaskQueue ───────────────────────────────────────────────────
-def test_agent_list_initially_works(client):
-    tc, _ = client
-    r = tc.get("/api/agent/tasks")
-    assert r.status_code == 200
-    assert isinstance(r.json(), list)
-
-
-def test_agent_submit(client):
-    tc, _ = client
-    r = tc.post("/api/agent/tasks", json={"goal": "test goal"})
-    assert r.status_code == 201
-    body = r.json()
-    assert body["status"] == "pending"
-    assert body["goal"] == "test goal"
-    assert body["task_id"]
-
-
-def test_agent_submit_publishes_event(client):
-    tc, _ = client
-    with tc.websocket_connect("/ws") as ws:
-        ws.receive_json(); ws.receive_json()  # saludo
-        tc.post("/api/agent/tasks", json={"goal": "x"})
-        evt = ws.receive_json()
-        assert evt["type"] == "agent.task"
-        assert evt["payload"]["status"] == "pending"
-
-
-def test_agent_get_not_found(client):
-    tc, _ = client
-    r = tc.get("/api/agent/tasks/no_existe")
-    assert r.status_code == 404
-
-
-def test_agent_cancel_unknown(client):
-    tc, _ = client
-    r = tc.post("/api/agent/tasks/zzz/cancel")
-    assert r.status_code == 400
+# Los tests de /api/agent/tasks (TaskQueue vieja) se removieron en Fase 1:
+# el feature fue reemplazado por el sistema Orchestra (/api/agent/orchestra).
+# La cobertura del nuevo flujo vive en tests/test_orchestra_admin.py.
 
 
 # ── IoT (con sistema mockeado para no tocar hardware) ───────────────────
@@ -112,26 +80,34 @@ class _FakeDevice:
         self.name = name
         self.transport = transport
         from actions.iot.devices import Capabilities
+
         self.capabilities = Capabilities.from_dict(caps)
         # Campos opcionales que GET /api/iot/devices serializa para el
         # modal de edición. Tras IoT v3 se devuelven dev.serial y dev.mqtt;
         # los fakes los exponen como None.
         self.serial = None
-        self.mqtt   = None
+        self.mqtt = None
 
 
 class _FakeIoTConfig:
     def __init__(self):
         self.devices = {
-            "luz_sala":  _FakeDevice("luz_sala",  "Luz sala",  "main", {"on_off": True, "dimmable": True}),
-            "tira_tv":   _FakeDevice("tira_tv",   "Tira TV",   "main", {"on_off": True, "rgb": True}),
-            "sensor_t":  _FakeDevice("sensor_t",  "Sensor T",  "main", {"on_off": False, "sensor": "temperature"}),
+            "luz_sala": _FakeDevice(
+                "luz_sala", "Luz sala", "main", {"on_off": True, "dimmable": True}
+            ),
+            "tira_tv": _FakeDevice("tira_tv", "Tira TV", "main", {"on_off": True, "rgb": True}),
+            "sensor_t": _FakeDevice(
+                "sensor_t", "Sensor T", "main", {"on_off": False, "sensor": "temperature"}
+            ),
         }
         self.scenes = {
-            "modo_pelicula": {"name": "Modo película", "actions": [
-                {"device": "luz_sala", "command": "off"},
-                {"device": "tira_tv",  "command": "rgb", "color": "azul"},
-            ]},
+            "modo_pelicula": {
+                "name": "Modo película",
+                "actions": [
+                    {"device": "luz_sala", "command": "off"},
+                    {"device": "tira_tv", "command": "rgb", "color": "azul"},
+                ],
+            },
         }
         self.transports = {}
 
@@ -145,6 +121,7 @@ class _FakeIoTSystem:
 def iot_mock(monkeypatch):
     fake = _FakeIoTSystem()
     import server.routes.iot as iot_route
+
     monkeypatch.setattr(iot_route, "get_system", lambda: fake)
     # iot_control mockeado para no llamar al hardware real
     monkeypatch.setattr(iot_route, "iot_control", lambda params: f"ok({params.get('action')})")
@@ -195,7 +172,8 @@ def test_iot_action_unknown_device(client, iot_mock):
 def test_iot_action_publishes_event(client, iot_mock):
     tc, _ = client
     with tc.websocket_connect("/ws") as ws:
-        ws.receive_json(); ws.receive_json()
+        ws.receive_json()
+        ws.receive_json()
         tc.post("/api/iot/devices/luz_sala/action", json={"action": "off"})
         evt = ws.receive_json()
         assert evt["type"] == "iot.action"
@@ -245,7 +223,8 @@ def test_api_key_too_short_rejected(client):
 def test_api_key_publishes_system_ready(client):
     tc, _ = client
     with tc.websocket_connect("/ws") as ws:
-        ws.receive_json(); ws.receive_json()
+        ws.receive_json()
+        ws.receive_json()
         tc.post("/api/settings/api_key", json={"key": "AIza" + "x" * 30})
         evt = ws.receive_json()
         assert evt["type"] == "system.ready"
@@ -256,6 +235,7 @@ def test_telemetry_event_arrives(client):
     """Con TICK_INTERVAL_S=2 el primer evento llega a los ~2s. Lo
     aceleramos parcheando el módulo."""
     import server.telemetry as tel
+
     with patch.object(tel, "TICK_INTERVAL_S", 0.1):
         # Necesitamos rearrancar el broadcaster con el intervalo nuevo
         # → en este test simplemente comprobamos que _sample() funciona

@@ -1,9 +1,15 @@
 """
 config_manager — Wrapper de compatibilidad sobre config central.
 """
+
 from config import (
-    CONFIG_DIR, API_CONFIG_PATH as CONFIG_FILE,
-    load_config, save_config, get_api_key,
+    API_CONFIG_PATH as CONFIG_FILE,
+)
+from config import (
+    CONFIG_DIR,
+    get_api_key,
+    load_config,
+    save_config,
 )
 
 

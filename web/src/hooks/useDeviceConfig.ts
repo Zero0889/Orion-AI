@@ -24,8 +24,13 @@ import type { IoTDevice } from "@/api/rest";
 const STORAGE_KEY = "orion.iot.config.v1";
 
 export type SensorKind =
-  | "temperature" | "humidity" | "pressure" | "light"
-  | "motion" | "co2" | "custom";
+  | "temperature"
+  | "humidity"
+  | "pressure"
+  | "light"
+  | "motion"
+  | "co2"
+  | "custom";
 
 /** El "kind" elegido por el usuario en el modal. Se persiste localmente
  *  para que un foco no aparezca como "interruptor" solo porque ambos
@@ -34,11 +39,11 @@ export type SensorKind =
 export type DeviceKind = "light" | "switch" | "sensor" | "mixed";
 
 export interface DeviceConfig {
-  displayName?:  string;
-  updateFreqS?:  number;  // user-set polling/refresh hint, seconds
-  showGraph?:    boolean; // sensors only — render an inline sparkline
-  sensorKind?:   SensorKind;
-  kind?:         DeviceKind;
+  displayName?: string;
+  updateFreqS?: number; // user-set polling/refresh hint, seconds
+  showGraph?: boolean; // sensors only — render an inline sparkline
+  sensorKind?: SensorKind;
+  kind?: DeviceKind;
 }
 
 export interface LocalDevice extends IoTDevice {
@@ -48,7 +53,7 @@ export interface LocalDevice extends IoTDevice {
 
 interface Persisted {
   configs: Record<string, DeviceConfig>;
-  local:   LocalDevice[];
+  local: LocalDevice[];
 }
 
 const EMPTY: Persisted = { configs: {}, local: [] };
@@ -61,7 +66,7 @@ function read(): Persisted {
     const parsed = JSON.parse(raw) as Partial<Persisted>;
     return {
       configs: parsed.configs ?? {},
-      local:   (parsed.local ?? []).map((d) => ({ ...d, __local: true as const })),
+      local: (parsed.local ?? []).map((d) => ({ ...d, __local: true as const })),
     };
   } catch {
     return EMPTY;
@@ -69,19 +74,22 @@ function read(): Persisted {
 }
 
 function write(p: Persisted): void {
-  try { window.localStorage.setItem(STORAGE_KEY, JSON.stringify(p)); }
-  catch { /* quota? ignore */ }
+  try {
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(p));
+  } catch {
+    /* quota? ignore */
+  }
 }
 
 /** Recommended update frequency (seconds) per sensor kind. */
 export const SENSOR_FREQ_REC: Record<SensorKind, { value: number; label: string }> = {
-  temperature: { value: 30, label: "30 s · moderada"   },
-  humidity:    { value: 60, label: "60 s · lenta"      },
-  pressure:    { value: 60, label: "60 s · lenta"      },
-  light:       { value: 10, label: "10 s · rápida"     },
-  motion:      { value: 1,  label: "1 s · instantánea" },
-  co2:         { value: 60, label: "60 s · lenta"      },
-  custom:      { value: 10, label: "10 s · genérica"   },
+  temperature: { value: 30, label: "30 s · moderada" },
+  humidity: { value: 60, label: "60 s · lenta" },
+  pressure: { value: 60, label: "60 s · lenta" },
+  light: { value: 10, label: "10 s · rápida" },
+  motion: { value: 1, label: "1 s · instantánea" },
+  co2: { value: 60, label: "60 s · lenta" },
+  custom: { value: 10, label: "10 s · genérica" },
 };
 
 export function useDeviceConfig() {
@@ -111,51 +119,66 @@ export function useDeviceConfig() {
     [state.configs],
   );
 
-  const setConfig = useCallback((id: string, patch: Partial<DeviceConfig>) => {
-    persist((prev) => ({
-      ...prev,
-      configs: {
-        ...prev.configs,
-        [id]: { ...(prev.configs[id] ?? {}), ...patch },
-      },
-    }));
-  }, [persist]);
+  const setConfig = useCallback(
+    (id: string, patch: Partial<DeviceConfig>) => {
+      persist((prev) => ({
+        ...prev,
+        configs: {
+          ...prev.configs,
+          [id]: { ...(prev.configs[id] ?? {}), ...patch },
+        },
+      }));
+    },
+    [persist],
+  );
 
-  const addLocal = useCallback((dev: LocalDevice, cfg?: DeviceConfig) => {
-    persist((prev) => ({
-      configs: cfg ? { ...prev.configs, [dev.id]: cfg } : prev.configs,
-      local:   [...prev.local.filter((d) => d.id !== dev.id), dev],
-    }));
-  }, [persist]);
+  const addLocal = useCallback(
+    (dev: LocalDevice, cfg?: DeviceConfig) => {
+      persist((prev) => ({
+        configs: cfg ? { ...prev.configs, [dev.id]: cfg } : prev.configs,
+        local: [...prev.local.filter((d) => d.id !== dev.id), dev],
+      }));
+    },
+    [persist],
+  );
 
-  const updateLocal = useCallback((id: string, patch: Partial<LocalDevice>, cfg?: Partial<DeviceConfig>) => {
-    persist((prev) => ({
-      configs: cfg
-        ? { ...prev.configs, [id]: { ...(prev.configs[id] ?? {}), ...cfg } }
-        : prev.configs,
-      local: prev.local.map((d) => (d.id === id ? { ...d, ...patch, __local: true } : d)),
-    }));
-  }, [persist]);
+  const updateLocal = useCallback(
+    (id: string, patch: Partial<LocalDevice>, cfg?: Partial<DeviceConfig>) => {
+      persist((prev) => ({
+        configs: cfg
+          ? { ...prev.configs, [id]: { ...(prev.configs[id] ?? {}), ...cfg } }
+          : prev.configs,
+        local: prev.local.map((d) => (d.id === id ? { ...d, ...patch, __local: true } : d)),
+      }));
+    },
+    [persist],
+  );
 
-  const removeLocal = useCallback((id: string) => {
-    persist((prev) => {
-      const nextConfigs = { ...prev.configs };
-      delete nextConfigs[id];
-      return {
-        configs: nextConfigs,
-        local:   prev.local.filter((d) => d.id !== id),
-      };
-    });
-  }, [persist]);
+  const removeLocal = useCallback(
+    (id: string) => {
+      persist((prev) => {
+        const nextConfigs = { ...prev.configs };
+        delete nextConfigs[id];
+        return {
+          configs: nextConfigs,
+          local: prev.local.filter((d) => d.id !== id),
+        };
+      });
+    },
+    [persist],
+  );
 
-  const removeConfig = useCallback((id: string) => {
-    persist((prev) => {
-      if (!prev.configs[id]) return prev;
-      const next = { ...prev.configs };
-      delete next[id];
-      return { ...prev, configs: next };
-    });
-  }, [persist]);
+  const removeConfig = useCallback(
+    (id: string) => {
+      persist((prev) => {
+        if (!prev.configs[id]) return prev;
+        const next = { ...prev.configs };
+        delete next[id];
+        return { ...prev, configs: next };
+      });
+    },
+    [persist],
+  );
 
   const localDevices = useMemo(() => state.local, [state.local]);
 

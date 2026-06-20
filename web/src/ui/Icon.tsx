@@ -8,17 +8,68 @@
 import type { SVGProps } from "react";
 
 export type IconName =
-  | "chat" | "notes" | "memory" | "history" | "telemetry" | "agents"
-  | "iot" | "settings" | "send" | "close" | "check" | "pin" | "edit"
-  | "trash" | "plus" | "sparkles" | "paperclip" | "alert" | "wifi"
-  | "wifi-off" | "mic" | "mic-off" | "stop" | "orbit" | "search"
-  | "chevron-right" | "chevron-down" | "upload" | "download" | "shield"
-  | "cpu" | "bolt" | "moon" | "sun" | "more" | "play" | "command"
-  | "info" | "drag" | "circle-dot" | "panel-left"
-  | "lightbulb" | "thermometer" | "droplet" | "gauge" | "motion"
-  | "wind" | "tag" | "save" | "chart-line" | "plug" | "bell"
-  | "add" | "arrow-left" | "arrow-right" | "arrow-down"
-  | "compass" | "sigma" | "feather" | "chart" | "folder" | "sensors"
+  | "chat"
+  | "notes"
+  | "memory"
+  | "history"
+  | "telemetry"
+  | "agents"
+  | "iot"
+  | "settings"
+  | "send"
+  | "close"
+  | "check"
+  | "pin"
+  | "edit"
+  | "trash"
+  | "plus"
+  | "sparkles"
+  | "paperclip"
+  | "alert"
+  | "wifi"
+  | "wifi-off"
+  | "mic"
+  | "mic-off"
+  | "stop"
+  | "orbit"
+  | "search"
+  | "chevron-right"
+  | "chevron-down"
+  | "upload"
+  | "download"
+  | "shield"
+  | "cpu"
+  | "bolt"
+  | "moon"
+  | "sun"
+  | "more"
+  | "play"
+  | "command"
+  | "info"
+  | "drag"
+  | "circle-dot"
+  | "panel-left"
+  | "lightbulb"
+  | "thermometer"
+  | "droplet"
+  | "gauge"
+  | "motion"
+  | "wind"
+  | "tag"
+  | "save"
+  | "chart-line"
+  | "plug"
+  | "bell"
+  | "add"
+  | "arrow-left"
+  | "arrow-right"
+  | "arrow-down"
+  | "compass"
+  | "sigma"
+  | "feather"
+  | "chart"
+  | "folder"
+  | "sensors"
   | "github";
 
 type Props = SVGProps<SVGSVGElement> & {
@@ -143,7 +194,10 @@ const PATHS: Record<IconName, JSX.Element> = {
   plus: <path d="M12 5v14M5 12h14" />,
   sparkles: (
     <>
-      <path data-part="rays" d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M5.6 18.4l2.1-2.1M16.3 7.7l2.1-2.1" />
+      <path
+        data-part="rays"
+        d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M5.6 18.4l2.1-2.1M16.3 7.7l2.1-2.1"
+      />
       <path data-part="star" d="M12 8.5 13 11l2.5 1L13 13l-1 2.5L11 13 8.5 12 11 11Z" />
     </>
   ),
@@ -211,7 +265,7 @@ const PATHS: Record<IconName, JSX.Element> = {
     </>
   ),
   "chevron-right": <path d="m9 6 6 6-6 6" />,
-  "chevron-down":  <path d="m6 9 6 6 6-6" />,
+  "chevron-down": <path d="m6 9 6 6 6-6" />,
   upload: (
     <>
       <path d="M12 16V4" />
@@ -244,13 +298,15 @@ const PATHS: Record<IconName, JSX.Element> = {
   ),
   more: (
     <>
-      <circle cx="5"  cy="12" r="1" fill="currentColor" />
+      <circle cx="5" cy="12" r="1" fill="currentColor" />
       <circle cx="12" cy="12" r="1" fill="currentColor" />
       <circle cx="19" cy="12" r="1" fill="currentColor" />
     </>
   ),
   play: <path d="M8 5v14l11-7z" />,
-  command: <path d="M9 6a3 3 0 1 0 0 6h6a3 3 0 1 0 0-6 3 3 0 0 0-3 3v6a3 3 0 1 0 3-3H9a3 3 0 1 0 0 6 3 3 0 0 0 3-3V9" />,
+  command: (
+    <path d="M9 6a3 3 0 1 0 0 6h6a3 3 0 1 0 0-6 3 3 0 0 0-3 3v6a3 3 0 1 0 3-3H9a3 3 0 1 0 0 6 3 3 0 0 0 3-3V9" />
+  ),
   info: (
     <>
       <circle cx="12" cy="12" r="9" />
@@ -259,10 +315,10 @@ const PATHS: Record<IconName, JSX.Element> = {
   ),
   drag: (
     <>
-      <circle cx="9"  cy="6"  r="1" fill="currentColor" />
-      <circle cx="9"  cy="12" r="1" fill="currentColor" />
-      <circle cx="9"  cy="18" r="1" fill="currentColor" />
-      <circle cx="15" cy="6"  r="1" fill="currentColor" />
+      <circle cx="9" cy="6" r="1" fill="currentColor" />
+      <circle cx="9" cy="12" r="1" fill="currentColor" />
+      <circle cx="9" cy="18" r="1" fill="currentColor" />
+      <circle cx="15" cy="6" r="1" fill="currentColor" />
       <circle cx="15" cy="12" r="1" fill="currentColor" />
       <circle cx="15" cy="18" r="1" fill="currentColor" />
     </>
@@ -292,9 +348,7 @@ const PATHS: Record<IconName, JSX.Element> = {
       <circle cx="11.5" cy="17" r="1.6" fill="currentColor" />
     </>
   ),
-  droplet: (
-    <path d="M12 3.5s-6 6.5-6 10.5a6 6 0 1 0 12 0c0-4-6-10.5-6-10.5Z" />
-  ),
+  droplet: <path d="M12 3.5s-6 6.5-6 10.5a6 6 0 1 0 12 0c0-4-6-10.5-6-10.5Z" />,
   gauge: (
     <>
       <path d="M12 14 18 8" />
@@ -304,7 +358,7 @@ const PATHS: Record<IconName, JSX.Element> = {
   ),
   motion: (
     <>
-      <circle cx="12" cy="5"  r="1.6" fill="currentColor" />
+      <circle cx="12" cy="5" r="1.6" fill="currentColor" />
       <path d="M9 22V12l-2-2 3-4 3 4-2 2v10" />
       <path d="M15 13l3 3-2 5" />
       <path d="M7 13l-3 3 2 5" />
@@ -336,18 +390,18 @@ const PATHS: Record<IconName, JSX.Element> = {
       <path d="M7 15l4-4 3 3 5-6" />
     </>
   ),
-  add:       <path d="M12 5v14M5 12h14" />,
-  "arrow-left":  <path d="M19 12H5m7-7-7 7 7 7" />,
+  add: <path d="M12 5v14M5 12h14" />,
+  "arrow-left": <path d="M19 12H5m7-7-7 7 7 7" />,
   "arrow-right": <path d="M5 12h14m-7-7 7 7-7 7" />,
-  "arrow-down":  <path d="M12 5v14m-7-7 7 7 7-7" />,
+  "arrow-down": <path d="M12 5v14m-7-7 7 7 7-7" />,
   compass: (
     <>
       <circle cx="12" cy="12" r="10" />
       <path d="M16.2 7.8l-2.4 6.6-6.6 2.4 2.4-6.6Z" />
     </>
   ),
-  sigma:    <path d="M18 7V5H6v2l6 6-6 6v2h12v-2" />,
-  feather:  <path d="M20.2 3 3 20.2M3 3l5.2 5.2M4.5 15.5l4 4" />,
+  sigma: <path d="M18 7V5H6v2l6 6-6 6v2h12v-2" />,
+  feather: <path d="M20.2 3 3 20.2M3 3l5.2 5.2M4.5 15.5l4 4" />,
   chart: (
     <>
       <path d="M18 20V10M12 20V4M6 20v-6" />

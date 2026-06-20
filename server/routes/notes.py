@@ -14,14 +14,16 @@ los clientes WS refresquen sin polling.
 
 from __future__ import annotations
 
-from typing import Optional
-
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from core.logger import get_logger
 from memory.quick_notes import (
-    add_note, count_notes, delete_note, list_notes, update_note,
+    add_note,
+    count_notes,
+    delete_note,
+    list_notes,
+    update_note,
 )
 
 log = get_logger("server.routes.notes")
@@ -29,15 +31,15 @@ router = APIRouter()
 
 
 class NoteCreate(BaseModel):
-    text:   str = Field(..., min_length=1, max_length=4000)
+    text: str = Field(..., min_length=1, max_length=4000)
     pinned: bool = False
-    color:  Optional[str] = None
+    color: str | None = None
 
 
 class NoteUpdate(BaseModel):
-    text:   Optional[str]  = Field(default=None, max_length=4000)
-    pinned: Optional[bool] = None
-    color:  Optional[str]  = None
+    text: str | None = Field(default=None, max_length=4000)
+    pinned: bool | None = None
+    color: str | None = None
 
 
 @router.get("")
@@ -85,7 +87,7 @@ def remove_note(note_id: str, request: Request) -> None:
 
 
 # ── helpers ─────────────────────────────────────────────────────────────
-def _publish_change(request: Request, op: str, *, note_id: Optional[str]) -> None:
+def _publish_change(request: Request, op: str, *, note_id: str | None) -> None:
     bus = getattr(request.app.state, "bus", None)
     if bus is None:
         return

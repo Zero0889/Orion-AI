@@ -1,6 +1,7 @@
 import time
 import webbrowser
 from urllib.parse import quote_plus
+import contextlib
 
 # Cache simple: evita reabrir el navegador si el usuario pregunta la misma
 # ciudad varias veces seguidas (ventana de 2 minutos).
@@ -13,8 +14,8 @@ def weather_action(
     player=None,
     session_memory=None,
 ) -> str:
-    city     = parameters.get("city")
-    when     = parameters.get("time", "today")
+    city = parameters.get("city")
+    when = parameters.get("time", "today")
 
     if not city or not isinstance(city, str) or not city.strip():
         msg = "Señor, falta la ciudad para el reporte del clima."
@@ -24,8 +25,8 @@ def weather_action(
     city = city.strip()
     when = (when or "today").strip()
 
-    search_query  = f"weather in {city} {when}"
-    url           = f"https://www.google.com/search?q={quote_plus(search_query)}"
+    search_query = f"weather in {city} {when}"
+    url = f"https://www.google.com/search?q={quote_plus(search_query)}"
 
     # ── Cache: no reabrir si ya se consultó hace poco ──
     now = time.time()
@@ -56,10 +57,8 @@ def weather_action(
     _log(msg, player)
 
     if session_memory:
-        try:
+        with contextlib.suppress(Exception):
             session_memory.set_last_search(query=search_query, response=msg)
-        except Exception:
-            pass
 
     return msg
 
@@ -67,7 +66,5 @@ def weather_action(
 def _log(message: str, player=None) -> None:
     print(f"[Weather] {message}")
     if player:
-        try:
+        with contextlib.suppress(Exception):
             player.write_log(f"O.R.I.O.N: {message}")
-        except Exception:
-            pass

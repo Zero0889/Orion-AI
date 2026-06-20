@@ -1,65 +1,66 @@
 import threading
 import time
 import uuid
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Callable, Any, Optional
+from typing import Any
+import contextlib
 
 
 class TaskStatus(Enum):
-    PENDING    = "pending"
-    RUNNING    = "running"
-    COMPLETED  = "completed"
-    FAILED     = "failed"
-    CANCELLED  = "cancelled"
+    PENDING = "pending"
+    RUNNING = "running"
+    COMPLETED = "completed"
+    FAILED = "failed"
+    CANCELLED = "cancelled"
 
 
 class TaskPriority(Enum):
-    LOW    = 3
+    LOW = 3
     NORMAL = 2
-    HIGH   = 1   
+    HIGH = 1
 
 
 @dataclass(order=True)
 class Task:
-    priority:    int                       
-    created_at:  float = field(compare=False)
-    task_id:     str   = field(compare=False)
-    goal:        str   = field(compare=False)
-    status:      TaskStatus = field(compare=False, default=TaskStatus.PENDING)
-    result:      Any        = field(compare=False, default=None)
-    error:       str        = field(compare=False, default="")
-    speak:       Any        = field(compare=False, default=None)   
-    on_complete: Any        = field(compare=False, default=None)  
+    priority: int
+    created_at: float = field(compare=False)
+    task_id: str = field(compare=False)
+    goal: str = field(compare=False)
+    status: TaskStatus = field(compare=False, default=TaskStatus.PENDING)
+    result: Any = field(compare=False, default=None)
+    error: str = field(compare=False, default="")
+    speak: Any = field(compare=False, default=None)
+    on_complete: Any = field(compare=False, default=None)
     cancel_flag: threading.Event = field(compare=False, default_factory=threading.Event)
 
 
 class TaskQueue:
     def __init__(self, max_concurrent: int = 1):
-        self._queue:        list[Task]       = []
-        self._lock:         threading.Lock   = threading.Lock()
-        self._condition:    threading.Condition = threading.Condition(self._lock)
-        self._tasks:        dict[str, Task]  = {} 
-        self._running:      bool             = False
+        self._queue: list[Task] = []
+        self._lock: threading.Lock = threading.Lock()
+        self._condition: threading.Condition = threading.Condition(self._lock)
+        self._tasks: dict[str, Task] = {}
+        self._running: bool = False
         self._worker_thread: threading.Thread | None = None
         self._max_concurrent = max_concurrent
-        self._active_count   = 0
-        self._executor       = None  
+        self._active_count = 0
+        self._executor = None
 
     def _get_executor(self):
         if self._executor is None:
             from agent.executor import AgentExecutor
+
             self._executor = AgentExecutor()
         return self._executor
 
     def start(self) -> None:
         if self._running:
             return
-        self._running      = True
+        self._running = True
         self._worker_thread = threading.Thread(
-            target=self._worker_loop,
-            daemon=True,
-            name="AgentTaskQueue"
+            target=self._worker_loop, daemon=True, name="AgentTaskQueue"
         )
         self._worker_thread.start()
         print("[TaskQueue] ✅ Started")
@@ -89,20 +90,20 @@ class TaskQueue:
 
     def submit(
         self,
-        goal:        str,
-        priority:    TaskPriority = TaskPriority.NORMAL,
-        speak:       Callable | None = None,
+        goal: str,
+        priority: TaskPriority = TaskPriority.NORMAL,
+        speak: Callable | None = None,
         on_complete: Callable | None = None,
     ) -> str:
 
         task_id = str(uuid.uuid4())[:8]
-        task    = Task(
-            priority    = priority.value,
-            created_at  = time.time(),
-            task_id     = task_id,
-            goal        = goal,
-            speak       = speak,
-            on_complete = on_complete,
+        task = Task(
+            priority=priority.value,
+            created_at=time.time(),
+            task_id=task_id,
+            goal=goal,
+            speak=speak,
+            on_complete=on_complete,
         )
 
         with self._condition:
@@ -136,21 +137,21 @@ class TaskQueue:
                 return None
             return {
                 "task_id": task.task_id,
-                "goal":    task.goal,
-                "status":  task.status.value,
-                "result":  task.result,
-                "error":   task.error,
+                "goal": task.goal,
+                "status": task.status.value,
+                "result": task.result,
+                "error": task.error,
             }
 
     def get_all_statuses(self) -> list[dict]:
         with self._lock:
             return [
                 {
-                    "task_id":    t.task_id,
-                    "goal":       t.goal,        # completo, ya no cortamos a 50
-                    "status":     t.status.value,
-                    "result":     t.result,
-                    "error":      t.error,
+                    "task_id": t.task_id,
+                    "goal": t.goal,  # completo, ya no cortamos a 50
+                    "status": t.status.value,
+                    "result": t.result,
+                    "error": t.error,
                     "created_at": t.created_at,
                 }
                 for t in self._tasks.values()
@@ -171,17 +172,15 @@ class TaskQueue:
                 if task:
                     task.status = TaskStatus.RUNNING
                     self._active_count += 1
-                    try:
+                    with contextlib.suppress(ValueError):
                         self._queue.remove(task)
-                    except ValueError:
-                        pass
 
             if task:
                 threading.Thread(
                     target=self._run_task,
                     args=(task,),
                     daemon=True,
-                    name=f"AgentTask-{task.task_id}"
+                    name=f"AgentTask-{task.task_id}",
                 ).start()
 
     def _next_task(self) -> Task | None:
@@ -226,7 +225,7 @@ class TaskQueue:
         should_callback = False
         callback_arg: Any = None
         executor = self._get_executor()
-        last_err: Optional[Exception] = None
+        last_err: Exception | None = None
 
         # Loop de retries solo para errores transitorios (Gemini 503,
         # 429, "overloaded"). Para errores reales (ValueError, KeyError,
@@ -236,9 +235,9 @@ class TaskQueue:
                 break
             try:
                 result = executor.execute(
-                    goal        = task.goal,
-                    speak       = task.speak,
-                    cancel_flag = task.cancel_flag,
+                    goal=task.goal,
+                    speak=task.speak,
+                    cancel_flag=task.cancel_flag,
                 )
                 # éxito — salimos del loop
                 with self._condition:
@@ -250,27 +249,29 @@ class TaskQueue:
                     self._active_count -= 1
                     self._condition.notify_all()
                 should_callback = not task.cancel_flag.is_set()
-                callback_arg    = result
-                print(f"[TaskQueue] ✅ Completed: [{task.task_id}]"
-                      + (f" (tras {attempt} retries)" if attempt > 0 else ""))
+                callback_arg = result
+                print(
+                    f"[TaskQueue] ✅ Completed: [{task.task_id}]"
+                    + (f" (tras {attempt} retries)" if attempt > 0 else "")
+                )
                 break
 
             except Exception as e:
                 last_err = e
                 if attempt < self._MAX_TRANSIENT_RETRIES and self._is_transient(e):
                     # Backoff: 2s, 4s
-                    wait = 2 * (2 ** attempt)
-                    print(f"[TaskQueue] ⚠️ Transient error en [{task.task_id}] "
-                          f"(intento {attempt + 1}/{self._MAX_TRANSIENT_RETRIES + 1}): "
-                          f"{str(e)[:80]} — reintento en {wait}s")
+                    wait = 2 * (2**attempt)
+                    print(
+                        f"[TaskQueue] ⚠️ Transient error en [{task.task_id}] "
+                        f"(intento {attempt + 1}/{self._MAX_TRANSIENT_RETRIES + 1}): "
+                        f"{str(e)[:80]} — reintento en {wait}s"
+                    )
                     # Aviso al usuario via speak si está disponible — UX:
                     # mejor que escuche "lo intento de nuevo" que ver
                     # silencio durante el backoff.
                     if task.speak and attempt == 0:
-                        try:
+                        with contextlib.suppress(Exception):
                             task.speak("El servicio está saturado, lo intento de nuevo.")
-                        except Exception:
-                            pass
                     if task.cancel_flag.wait(timeout=wait):
                         # cancelado durante el backoff
                         break
@@ -279,7 +280,7 @@ class TaskQueue:
                 err_msg = str(e)
                 with self._condition:
                     task.status = TaskStatus.FAILED
-                    task.error  = err_msg
+                    task.error = err_msg
                     self._active_count -= 1
                     self._condition.notify_all()
                 should_callback = True
@@ -289,10 +290,12 @@ class TaskQueue:
         else:
             # else del for: solo entra si NO hicimos break — el loop
             # terminó por agotar retries en transient errors.
-            err_msg = f"Servicio no disponible tras {self._MAX_TRANSIENT_RETRIES} reintentos: {last_err}"
+            err_msg = (
+                f"Servicio no disponible tras {self._MAX_TRANSIENT_RETRIES} reintentos: {last_err}"
+            )
             with self._condition:
                 task.status = TaskStatus.FAILED
-                task.error  = err_msg
+                task.error = err_msg
                 self._active_count -= 1
                 self._condition.notify_all()
             should_callback = True
@@ -307,9 +310,10 @@ class TaskQueue:
             except Exception as cb_err:
                 print(f"[TaskQueue] ⚠️ on_complete callback error: {cb_err}")
 
-_queue        = TaskQueue()
+
+_queue = TaskQueue()
 _queue_started = False
-_queue_lock    = threading.Lock()
+_queue_lock = threading.Lock()
 
 
 def get_queue() -> TaskQueue:

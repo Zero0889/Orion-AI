@@ -26,13 +26,13 @@ import tempfile
 import threading
 import uuid
 from datetime import datetime
-from pathlib import Path
 
 from config import MEMORY_DIR
+import contextlib
 
 _CONVERSATIONS_PATH = MEMORY_DIR / "conversations.json"
 MAX_CONVERSATIONS = 50
-MAX_MESSAGES_PER_CONV = 500   # cap por seguridad
+MAX_MESSAGES_PER_CONV = 500  # cap por seguridad
 _LOCK = threading.Lock()
 
 
@@ -57,17 +57,13 @@ def _save_all(convs: list[dict]) -> None:
         convs = convs[-MAX_CONVERSATIONS:]
     payload = json.dumps(convs, indent=2, ensure_ascii=False)
 
-    fd, tmp = tempfile.mkstemp(
-        prefix=".conv_", suffix=".tmp", dir=str(MEMORY_DIR)
-    )
+    fd, tmp = tempfile.mkstemp(prefix=".conv_", suffix=".tmp", dir=str(MEMORY_DIR))
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as f:
             f.write(payload)
             f.flush()
-            try:
+            with contextlib.suppress(OSError):
                 os.fsync(f.fileno())
-            except OSError:
-                pass
         os.replace(tmp, _CONVERSATIONS_PATH)
     except OSError as e:
         print(f"[Conversations] ⚠️  Save error: {e}")
@@ -84,12 +80,14 @@ def list_conversations() -> list[dict]:
         convs = _load_all()
     out = []
     for c in convs:
-        out.append({
-            "id":       c.get("id", ""),
-            "started":  c.get("started", ""),
-            "title":    c.get("title", "Conversación"),
-            "msg_count": len(c.get("messages", [])),
-        })
+        out.append(
+            {
+                "id": c.get("id", ""),
+                "started": c.get("started", ""),
+                "title": c.get("title", "Conversación"),
+                "msg_count": len(c.get("messages", [])),
+            }
+        )
     out.sort(key=lambda x: x["started"], reverse=True)
     return out
 
@@ -169,9 +167,9 @@ class ConversationSession:
         with _LOCK:
             convs = _load_all()
             payload = {
-                "id":       self.id,
-                "started":  self._started,
-                "title":    self.title,
+                "id": self.id,
+                "started": self._started,
+                "title": self.title,
                 "messages": list(self._messages),
             }
             # Reemplazar si existe, sino append

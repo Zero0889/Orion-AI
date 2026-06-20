@@ -31,6 +31,7 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from starlette.websockets import WebSocketState
 
 from core.logger import get_logger
+import contextlib
 
 log = get_logger("server.ws")
 
@@ -122,7 +123,7 @@ def register_ws(app: FastAPI, bus: Any) -> None:
                 return False
             await asyncio.wait_for(ws.send_json(msg), timeout=SEND_TIMEOUT_S)
             return True
-        except (WebSocketDisconnect, asyncio.TimeoutError, RuntimeError):
+        except (TimeoutError, WebSocketDisconnect, RuntimeError):
             return False
         except Exception as e:
             log.debug("WS send error: %s", e)
@@ -139,14 +140,12 @@ def register_ws(app: FastAPI, bus: Any) -> None:
             t = getattr(app.state, attr, None)
             if t is not None:
                 t.cancel()
-                try:
+                with contextlib.suppress(asyncio.CancelledError, Exception):
                     await t
-                except (asyncio.CancelledError, Exception):
-                    pass
 
     # Guardamos referencias para que app.py las pueda invocar.
     app.state.ws_start_drain = _start_drain
-    app.state.ws_stop_drain  = _stop_drain
+    app.state.ws_stop_drain = _stop_drain
 
     # ── Endpoint /ws ──────────────────────────────────────────────────────
     @app.websocket("/ws")
@@ -158,14 +157,20 @@ def register_ws(app: FastAPI, bus: Any) -> None:
 
         # Saludo inicial con el estado actual para que el cliente pinte sin
         # esperar al siguiente evento.
-        await _safe_send(ws, {
-            "type": "state",
-            "payload": {"value": getattr(bus, "_state", "ESCUCHANDO")},
-        })
-        await _safe_send(ws, {
-            "type": "mute",
-            "payload": {"value": bool(bus.muted)},
-        })
+        await _safe_send(
+            ws,
+            {
+                "type": "state",
+                "payload": {"value": getattr(bus, "_state", "ESCUCHANDO")},
+            },
+        )
+        await _safe_send(
+            ws,
+            {
+                "type": "mute",
+                "payload": {"value": bool(bus.muted)},
+            },
+        )
 
         try:
             while True:
@@ -215,10 +220,11 @@ async def _handle_client_message(bus: Any, msg: dict) -> None:
     elif msg_type == "ask_user.response":
         # El usuario respondió a una pregunta interactiva — desbloquea
         # el thread de la tool ask_user que está esperando.
-        qid    = payload.get("question_id")
+        qid = payload.get("question_id")
         answer = (payload.get("answer") or "").strip()
         if qid:
             from core.ask_user import get_ask_user
+
             ok = get_ask_user().submit_answer(qid, answer)
             if not ok:
                 log.warning("ask_user.response sin pregunta pendiente: %s", qid)
@@ -229,6 +235,7 @@ async def _handle_client_message(bus: Any, msg: dict) -> None:
         qid = payload.get("question_id")
         if qid:
             from core.ask_user import get_ask_user
+
             get_ask_user().cancel(qid)
 
     else:

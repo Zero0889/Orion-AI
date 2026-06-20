@@ -29,30 +29,31 @@ from __future__ import annotations
 import threading
 import time
 import uuid
-from typing import Callable, Optional
+from collections.abc import Callable
+import contextlib
 
 # Tipo del callback que publica al bus. Lo inyecta OrionLive.__init__.
 PublishCallback = Callable[[str, str, list, bool], None]
 
-_DEFAULT_TIMEOUT_S = 300   # 5 min — la tool registra timeout=320 para tener margen
+_DEFAULT_TIMEOUT_S = 300  # 5 min — la tool registra timeout=320 para tener margen
 
 
 class AskUserManager:
     """Singleton thread-safe que orquesta preguntas interactivas."""
 
-    _instance: Optional["AskUserManager"] = None
+    _instance: AskUserManager | None = None
 
-    def __new__(cls) -> "AskUserManager":
+    def __new__(cls) -> AskUserManager:
         if cls._instance is None:
             cls._instance = super().__new__(cls)
             cls._instance._init()
         return cls._instance
 
     def _init(self) -> None:
-        self._lock      = threading.Lock()
+        self._lock = threading.Lock()
         # qid → {event, answer, expires_at}
-        self._pending:  dict[str, dict] = {}
-        self._publish:  Optional[PublishCallback] = None
+        self._pending: dict[str, dict] = {}
+        self._publish: PublishCallback | None = None
 
     def set_publisher(self, cb: PublishCallback) -> None:
         """Lo llama OrionLive.__init__ una vez que el bus existe."""
@@ -63,7 +64,7 @@ class AskUserManager:
         question: str,
         options: list[dict],
         allow_other: bool = True,
-        timeout: Optional[float] = None,
+        timeout: float | None = None,
     ) -> str:
         """Bloquea hasta que el usuario responda o expire el timeout.
 
@@ -74,12 +75,12 @@ class AskUserManager:
         if timeout is None:
             timeout = _DEFAULT_TIMEOUT_S
 
-        qid   = uuid.uuid4().hex[:12]
+        qid = uuid.uuid4().hex[:12]
         event = threading.Event()
         with self._lock:
             self._pending[qid] = {
-                "event":      event,
-                "answer":     None,
+                "event": event,
+                "answer": None,
                 "expires_at": time.time() + timeout,
             }
 
@@ -88,10 +89,8 @@ class AskUserManager:
         # al fallback de timeout — devolvemos "Sin respuesta" para que
         # el agente al menos no se cuelgue eternamente.
         if self._publish is not None:
-            try:
+            with contextlib.suppress(Exception):
                 self._publish(qid, question, options, allow_other)
-            except Exception:
-                pass
 
         got_answer = event.wait(timeout=timeout)
         with self._lock:
@@ -127,7 +126,7 @@ class AskUserManager:
 
 # ── Singleton accessor ──────────────────────────────────────────────────
 
-_singleton: Optional[AskUserManager] = None
+_singleton: AskUserManager | None = None
 
 
 def get_ask_user() -> AskUserManager:

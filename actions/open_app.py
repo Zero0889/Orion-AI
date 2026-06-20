@@ -1,24 +1,18 @@
 import json
-import time
-import subprocess
 import platform
 import shutil
+import subprocess
+import time
 from pathlib import Path
 
-try:
-    import psutil
-    _PSUTIL = True
-except ImportError:
-    _PSUTIL = False
-
 _SYSTEM = platform.system()
-from config import BASE_DIR as _BASE_DIR, BROWSER_CONFIG_PATH as _BROWSER_CONFIG_PATH
+from config import BROWSER_CONFIG_PATH as _BROWSER_CONFIG_PATH
 
 
 def _get_chrome_path() -> str | None:
     """Obtiene la ruta de Chrome desde browser.json."""
     try:
-        with open(_BROWSER_CONFIG_PATH, "r", encoding="utf-8") as f:
+        with open(_BROWSER_CONFIG_PATH, encoding="utf-8") as f:
             cfg = json.load(f)
         chrome = cfg.get("chrome_path", "")
         if chrome and Path(chrome).exists():
@@ -37,95 +31,110 @@ def _get_chrome_path() -> str | None:
 
 # URLs directas para apps web — se abren en Chrome sin perfiles nuevos
 _WEB_APPS: dict[str, str] = {
-    "drive":            "https://drive.google.com",
-    "google drive":     "https://drive.google.com",
-    "gmail":            "https://mail.google.com",
-    "youtube":          "https://youtube.com",
-    "maps":             "https://maps.google.com",
-    "google maps":      "https://maps.google.com",
-    "calendar":         "https://calendar.google.com",
-    "google calendar":  "https://calendar.google.com",
-    "docs":             "https://docs.google.com",
-    "google docs":      "https://docs.google.com",
-    "sheets":           "https://sheets.google.com",
-    "google sheets":    "https://sheets.google.com",
-    "slides":           "https://slides.google.com",
-    "google slides":    "https://slides.google.com",
-    "meet":             "https://meet.google.com",
-    "google meet":      "https://meet.google.com",
-    "photos":           "https://photos.google.com",
-    "google photos":    "https://photos.google.com",
-    "keep":             "https://keep.google.com",
-    "google keep":      "https://keep.google.com",
-    "translate":        "https://translate.google.com",
+    "drive": "https://drive.google.com",
+    "google drive": "https://drive.google.com",
+    "gmail": "https://mail.google.com",
+    "youtube": "https://youtube.com",
+    "maps": "https://maps.google.com",
+    "google maps": "https://maps.google.com",
+    "calendar": "https://calendar.google.com",
+    "google calendar": "https://calendar.google.com",
+    "docs": "https://docs.google.com",
+    "google docs": "https://docs.google.com",
+    "sheets": "https://sheets.google.com",
+    "google sheets": "https://sheets.google.com",
+    "slides": "https://slides.google.com",
+    "google slides": "https://slides.google.com",
+    "meet": "https://meet.google.com",
+    "google meet": "https://meet.google.com",
+    "photos": "https://photos.google.com",
+    "google photos": "https://photos.google.com",
+    "keep": "https://keep.google.com",
+    "google keep": "https://keep.google.com",
+    "translate": "https://translate.google.com",
     "google translate": "https://translate.google.com",
-    "contacts":         "https://contacts.google.com",
-    "twitter":          "https://x.com",
-    "x":                "https://x.com",
-    "facebook":         "https://facebook.com",
-    "reddit":           "https://reddit.com",
-    "github":           "https://github.com",
-    "chatgpt":          "https://chat.openai.com",
-    "claude":           "https://claude.ai",
-    "netflix":          "https://netflix.com",
-    "amazon":           "https://amazon.com",
-    "twitch":           "https://twitch.tv",
-    "linkedin":         "https://linkedin.com",
-    "pinterest":        "https://pinterest.com",
-    "canva":            "https://canva.com",
+    "contacts": "https://contacts.google.com",
+    "twitter": "https://x.com",
+    "x": "https://x.com",
+    "facebook": "https://facebook.com",
+    "reddit": "https://reddit.com",
+    "github": "https://github.com",
+    "chatgpt": "https://chat.openai.com",
+    "claude": "https://claude.ai",
+    "netflix": "https://netflix.com",
+    "amazon": "https://amazon.com",
+    "twitch": "https://twitch.tv",
+    "linkedin": "https://linkedin.com",
+    "pinterest": "https://pinterest.com",
+    "canva": "https://canva.com",
 }
 
 _APP_ALIASES: dict[str, dict[str, str]] = {
-
-    "chrome":             {"Windows": "chrome",                  "Darwin": "Google Chrome",        "Linux": "google-chrome"},
-    "google chrome":      {"Windows": "chrome",                  "Darwin": "Google Chrome",        "Linux": "google-chrome"},
-    "firefox":            {"Windows": "firefox",                 "Darwin": "Firefox",              "Linux": "firefox"},
-    "edge":               {"Windows": "msedge",                  "Darwin": "Microsoft Edge",       "Linux": "microsoft-edge"},
-    "brave":              {"Windows": "brave",                   "Darwin": "Brave Browser",        "Linux": "brave-browser"},
-    "safari":             {"Windows": "msedge",                  "Darwin": "Safari",               "Linux": "firefox"},
-    "opera":              {"Windows": "opera",                   "Darwin": "Opera",                "Linux": "opera"},
-    "whatsapp":           {"Windows": "WhatsApp",                "Darwin": "WhatsApp",             "Linux": "whatsapp"},
-    "telegram":           {"Windows": "Telegram",                "Darwin": "Telegram",             "Linux": "telegram"},
-    "discord":            {"Windows": "Discord",                 "Darwin": "Discord",              "Linux": "discord"},
-    "slack":              {"Windows": "Slack",                   "Darwin": "Slack",                "Linux": "slack"},
-    "zoom":               {"Windows": "Zoom",                    "Darwin": "zoom.us",              "Linux": "zoom"},
-    "teams":              {"Windows": "msteams",                 "Darwin": "Microsoft Teams",      "Linux": "teams"},
-    "skype":              {"Windows": "skype",                   "Darwin": "Skype",                "Linux": "skype"},
-    "signal":             {"Windows": "signal",                  "Darwin": "Signal",               "Linux": "signal"},
-    "spotify":            {"Windows": "Spotify",                 "Darwin": "Spotify",              "Linux": "spotify"},
-    "vlc":                {"Windows": "vlc",                     "Darwin": "VLC",                  "Linux": "vlc"},
-    "netflix":            {"Windows": "Netflix",                 "Darwin": "Netflix",              "Linux": "firefox"},
-    "vscode":             {"Windows": "code",                    "Darwin": "Visual Studio Code",   "Linux": "code"},
-    "visual studio code": {"Windows": "code",                    "Darwin": "Visual Studio Code",   "Linux": "code"},
-    "code":               {"Windows": "code",                    "Darwin": "Visual Studio Code",   "Linux": "code"},
-    "terminal":           {"Windows": "wt",                      "Darwin": "Terminal",             "Linux": "gnome-terminal"},
-    "cmd":                {"Windows": "cmd.exe",                 "Darwin": "Terminal",             "Linux": "bash"},
-    "powershell":         {"Windows": "powershell.exe",          "Darwin": "Terminal",             "Linux": "bash"},
-    "postman":            {"Windows": "Postman",                 "Darwin": "Postman",              "Linux": "postman"},
-    "git":                {"Windows": "git-bash",                "Darwin": "Terminal",             "Linux": "bash"},
-    "figma":              {"Windows": "Figma",                   "Darwin": "Figma",                "Linux": "figma"},
-    "blender":            {"Windows": "blender",                 "Darwin": "Blender",              "Linux": "blender"},
-    "word":               {"Windows": "winword",                 "Darwin": "Microsoft Word",       "Linux": "libreoffice --writer"},
-    "excel":              {"Windows": "excel",                   "Darwin": "Microsoft Excel",      "Linux": "libreoffice --calc"},
-    "powerpoint":         {"Windows": "powerpnt",                "Darwin": "Microsoft PowerPoint", "Linux": "libreoffice --impress"},
-    "libreoffice":        {"Windows": "soffice",                 "Darwin": "LibreOffice",          "Linux": "libreoffice"},
-    "notepad":            {"Windows": "notepad.exe",             "Darwin": "TextEdit",             "Linux": "gedit"},
-    "textedit":           {"Windows": "notepad.exe",             "Darwin": "TextEdit",             "Linux": "gedit"},
-    "explorer":           {"Windows": "explorer.exe",            "Darwin": "Finder",               "Linux": "nautilus"},
-    "file explorer":      {"Windows": "explorer.exe",            "Darwin": "Finder",               "Linux": "nautilus"},
-    "finder":             {"Windows": "explorer.exe",            "Darwin": "Finder",               "Linux": "nautilus"},
-    "task manager":       {"Windows": "taskmgr.exe",             "Darwin": "Activity Monitor",     "Linux": "gnome-system-monitor"},
-    "settings":           {"Windows": "ms-settings:",            "Darwin": "System Preferences",   "Linux": "gnome-control-center"},
-    "calculator":         {"Windows": "calc.exe",                "Darwin": "Calculator",           "Linux": "gnome-calculator"},
-    "paint":              {"Windows": "mspaint.exe",             "Darwin": "Preview",              "Linux": "gimp"},
-    "instagram":          {"Windows": "Instagram",               "Darwin": "Instagram",            "Linux": "firefox"},
-    "tiktok":             {"Windows": "TikTok",                  "Darwin": "TikTok",               "Linux": "firefox"},
-    "notion":             {"Windows": "Notion",                  "Darwin": "Notion",               "Linux": "notion"},
-    "obsidian":           {"Windows": "Obsidian",                "Darwin": "Obsidian",             "Linux": "obsidian"},
-    "capcut":             {"Windows": "CapCut",                  "Darwin": "CapCut",               "Linux": "capcut"},
-    "steam":              {"Windows": "steam",                   "Darwin": "Steam",                "Linux": "steam"},
-    "epic":               {"Windows": "EpicGamesLauncher",       "Darwin": "Epic Games Launcher",  "Linux": "legendary"},
-    "epic games":         {"Windows": "EpicGamesLauncher",       "Darwin": "Epic Games Launcher",  "Linux": "legendary"},
+    "chrome": {"Windows": "chrome", "Darwin": "Google Chrome", "Linux": "google-chrome"},
+    "google chrome": {"Windows": "chrome", "Darwin": "Google Chrome", "Linux": "google-chrome"},
+    "firefox": {"Windows": "firefox", "Darwin": "Firefox", "Linux": "firefox"},
+    "edge": {"Windows": "msedge", "Darwin": "Microsoft Edge", "Linux": "microsoft-edge"},
+    "brave": {"Windows": "brave", "Darwin": "Brave Browser", "Linux": "brave-browser"},
+    "safari": {"Windows": "msedge", "Darwin": "Safari", "Linux": "firefox"},
+    "opera": {"Windows": "opera", "Darwin": "Opera", "Linux": "opera"},
+    "whatsapp": {"Windows": "WhatsApp", "Darwin": "WhatsApp", "Linux": "whatsapp"},
+    "telegram": {"Windows": "Telegram", "Darwin": "Telegram", "Linux": "telegram"},
+    "discord": {"Windows": "Discord", "Darwin": "Discord", "Linux": "discord"},
+    "slack": {"Windows": "Slack", "Darwin": "Slack", "Linux": "slack"},
+    "zoom": {"Windows": "Zoom", "Darwin": "zoom.us", "Linux": "zoom"},
+    "teams": {"Windows": "msteams", "Darwin": "Microsoft Teams", "Linux": "teams"},
+    "skype": {"Windows": "skype", "Darwin": "Skype", "Linux": "skype"},
+    "signal": {"Windows": "signal", "Darwin": "Signal", "Linux": "signal"},
+    "spotify": {"Windows": "Spotify", "Darwin": "Spotify", "Linux": "spotify"},
+    "vlc": {"Windows": "vlc", "Darwin": "VLC", "Linux": "vlc"},
+    "netflix": {"Windows": "Netflix", "Darwin": "Netflix", "Linux": "firefox"},
+    "vscode": {"Windows": "code", "Darwin": "Visual Studio Code", "Linux": "code"},
+    "visual studio code": {"Windows": "code", "Darwin": "Visual Studio Code", "Linux": "code"},
+    "code": {"Windows": "code", "Darwin": "Visual Studio Code", "Linux": "code"},
+    "terminal": {"Windows": "wt", "Darwin": "Terminal", "Linux": "gnome-terminal"},
+    "cmd": {"Windows": "cmd.exe", "Darwin": "Terminal", "Linux": "bash"},
+    "powershell": {"Windows": "powershell.exe", "Darwin": "Terminal", "Linux": "bash"},
+    "postman": {"Windows": "Postman", "Darwin": "Postman", "Linux": "postman"},
+    "git": {"Windows": "git-bash", "Darwin": "Terminal", "Linux": "bash"},
+    "figma": {"Windows": "Figma", "Darwin": "Figma", "Linux": "figma"},
+    "blender": {"Windows": "blender", "Darwin": "Blender", "Linux": "blender"},
+    "word": {"Windows": "winword", "Darwin": "Microsoft Word", "Linux": "libreoffice --writer"},
+    "excel": {"Windows": "excel", "Darwin": "Microsoft Excel", "Linux": "libreoffice --calc"},
+    "powerpoint": {
+        "Windows": "powerpnt",
+        "Darwin": "Microsoft PowerPoint",
+        "Linux": "libreoffice --impress",
+    },
+    "libreoffice": {"Windows": "soffice", "Darwin": "LibreOffice", "Linux": "libreoffice"},
+    "notepad": {"Windows": "notepad.exe", "Darwin": "TextEdit", "Linux": "gedit"},
+    "textedit": {"Windows": "notepad.exe", "Darwin": "TextEdit", "Linux": "gedit"},
+    "explorer": {"Windows": "explorer.exe", "Darwin": "Finder", "Linux": "nautilus"},
+    "file explorer": {"Windows": "explorer.exe", "Darwin": "Finder", "Linux": "nautilus"},
+    "finder": {"Windows": "explorer.exe", "Darwin": "Finder", "Linux": "nautilus"},
+    "task manager": {
+        "Windows": "taskmgr.exe",
+        "Darwin": "Activity Monitor",
+        "Linux": "gnome-system-monitor",
+    },
+    "settings": {
+        "Windows": "ms-settings:",
+        "Darwin": "System Preferences",
+        "Linux": "gnome-control-center",
+    },
+    "calculator": {"Windows": "calc.exe", "Darwin": "Calculator", "Linux": "gnome-calculator"},
+    "paint": {"Windows": "mspaint.exe", "Darwin": "Preview", "Linux": "gimp"},
+    "instagram": {"Windows": "Instagram", "Darwin": "Instagram", "Linux": "firefox"},
+    "tiktok": {"Windows": "TikTok", "Darwin": "TikTok", "Linux": "firefox"},
+    "notion": {"Windows": "Notion", "Darwin": "Notion", "Linux": "notion"},
+    "obsidian": {"Windows": "Obsidian", "Darwin": "Obsidian", "Linux": "obsidian"},
+    "capcut": {"Windows": "CapCut", "Darwin": "CapCut", "Linux": "capcut"},
+    "steam": {"Windows": "steam", "Darwin": "Steam", "Linux": "steam"},
+    "epic": {"Windows": "EpicGamesLauncher", "Darwin": "Epic Games Launcher", "Linux": "legendary"},
+    "epic games": {
+        "Windows": "EpicGamesLauncher",
+        "Darwin": "Epic Games Launcher",
+        "Linux": "legendary",
+    },
 }
 
 
@@ -141,13 +150,32 @@ def _normalize(raw: str) -> str:
 
     return raw
 
-def _launch_windows(app_name: str) -> bool:
 
-    if shutil.which(app_name) or shutil.which(app_name.split(".")[0]):
+# Rechaza nombres con metacaracteres de shell — defense in depth aunque ya
+# no usamos shell=True. Un app_name legítimo es un binario o un URI
+# (`ms-settings:`, `https://...`). Cualquier cosa con `&`, `|`, `;`, etc.
+# es input hostil disfrazado.
+_SHELL_METACHARS = set("&|;`$<>(){}\n\r\t")
+
+
+def _safe_app_name(app_name: str) -> bool:
+    if not app_name or len(app_name) > 256:
+        return False
+    return not any(c in _SHELL_METACHARS for c in app_name)
+
+
+def _launch_windows(app_name: str) -> bool:
+    if not _safe_app_name(app_name):
+        print(f"[open_app] Nombre rechazado por contener metacaracteres: {app_name!r}")
+        return False
+
+    # Path 1: binario en PATH. Resolver con shutil.which y ejecutar SIN
+    # shell — la ruta absoluta como único argumento elimina ambigüedad.
+    resolved = shutil.which(app_name) or shutil.which(app_name.split(".")[0])
+    if resolved:
         try:
             subprocess.Popen(
-                app_name,
-                shell=True,
+                [resolved],
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
             )
@@ -156,16 +184,28 @@ def _launch_windows(app_name: str) -> bool:
         except Exception as e:
             print(f"[open_app] subprocess falló: {e}")
 
+    # Path 2: URI con esquema (`ms-settings:`, `mailto:`, `https://...`).
+    # `start` es un builtin de cmd, así que necesitamos pasar por cmd /c
+    # — pero como LISTA, sin shell=True, para que cmd reciba el URI como
+    # un argv aislado y no lo re-parse.
     if ":" in app_name:
         try:
-            subprocess.Popen(f"start {app_name}", shell=True)
+            # `start "" <target>` — el "" es el título de la ventana
+            # (sin él, start interpreta el primer arg como título).
+            subprocess.Popen(
+                ["cmd", "/c", "start", "", app_name],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
             time.sleep(1.0)
             return True
         except Exception:
             pass
 
+    # Path 3: fallback al menú inicio vía pyautogui (escribe el nombre).
     try:
         import pyautogui
+
         pyautogui.PAUSE = 0.1
         pyautogui.press("win")
         time.sleep(0.7)
@@ -183,10 +223,7 @@ def _launch_windows(app_name: str) -> bool:
 def _launch_macos(app_name: str) -> bool:
 
     try:
-        result = subprocess.run(
-            ["open", "-a", app_name],
-            capture_output=True, timeout=8
-        )
+        result = subprocess.run(["open", "-a", app_name], capture_output=True, timeout=8)
         if result.returncode == 0:
             time.sleep(1.0)
             return True
@@ -194,10 +231,7 @@ def _launch_macos(app_name: str) -> bool:
         pass
 
     try:
-        result = subprocess.run(
-            ["open", "-a", f"{app_name}.app"],
-            capture_output=True, timeout=8
-        )
+        result = subprocess.run(["open", "-a", f"{app_name}.app"], capture_output=True, timeout=8)
         if result.returncode == 0:
             time.sleep(1.0)
             return True
@@ -207,11 +241,7 @@ def _launch_macos(app_name: str) -> bool:
     binary = shutil.which(app_name) or shutil.which(app_name.lower())
     if binary:
         try:
-            subprocess.Popen(
-                [binary],
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL
-            )
+            subprocess.Popen([binary], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             time.sleep(1.0)
             return True
         except Exception:
@@ -219,6 +249,7 @@ def _launch_macos(app_name: str) -> bool:
 
     try:
         import pyautogui
+
         pyautogui.hotkey("command", "space")
         time.sleep(0.6)
         pyautogui.write(app_name, interval=0.05)
@@ -235,28 +266,21 @@ def _launch_macos(app_name: str) -> bool:
 def _launch_linux(app_name: str) -> bool:
 
     binary = (
-        shutil.which(app_name) or
-        shutil.which(app_name.lower()) or
-        shutil.which(app_name.lower().replace(" ", "-")) or
-        shutil.which(app_name.lower().replace(" ", "_"))
+        shutil.which(app_name)
+        or shutil.which(app_name.lower())
+        or shutil.which(app_name.lower().replace(" ", "-"))
+        or shutil.which(app_name.lower().replace(" ", "_"))
     )
     if binary:
         try:
-            subprocess.Popen(
-                [binary],
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL
-            )
+            subprocess.Popen([binary], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             time.sleep(1.0)
             return True
         except Exception:
             pass
 
     try:
-        subprocess.run(
-            ["xdg-open", app_name],
-            capture_output=True, timeout=5
-        )
+        subprocess.run(["xdg-open", app_name], capture_output=True, timeout=5)
         return True
     except Exception:
         pass
@@ -267,10 +291,7 @@ def _launch_linux(app_name: str) -> bool:
         app_name.lower().replace(" ", ""),
     ]:
         try:
-            result = subprocess.run(
-                ["gtk-launch", desktop_name],
-                capture_output=True, timeout=5
-            )
+            result = subprocess.run(["gtk-launch", desktop_name], capture_output=True, timeout=5)
             if result.returncode == 0:
                 return True
         except Exception:
@@ -281,9 +302,10 @@ def _launch_linux(app_name: str) -> bool:
 
 _OS_LAUNCHERS = {
     "Windows": _launch_windows,
-    "Darwin":  _launch_macos,
-    "Linux":   _launch_linux,
+    "Darwin": _launch_macos,
+    "Linux": _launch_linux,
 }
+
 
 def _open_web_app(app_name: str, player=None) -> str | None:
     """Si app_name es una app web conocida, la abre en Chrome y devuelve resultado.

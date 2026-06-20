@@ -1,20 +1,21 @@
-import subprocess
-import sys
 import json
 import re
+import shutil
+import subprocess
+import sys
 import time
 from pathlib import Path
 
-
-from config import get_api_key, PROJECTS_DIR
+from config import PROJECTS_DIR
 
 MAX_FIX_ATTEMPTS = 5
-MODEL_PLANNER    = "gemini-2.5-flash"
-MODEL_WRITER     = "gemini-2.5-flash"
+MODEL_PLANNER = "gemini-2.5-flash"
+MODEL_WRITER = "gemini-2.5-flash"
 
 
 def _get_model(model_name: str):
     from core import gemini
+
     return gemini.model(model_name)
 
 
@@ -53,22 +54,34 @@ def _classify_error(output: str) -> str:
 
     if "syntaxerror" in low or "invalid syntax" in low:
         return "syntax_error"
-    
+
     if "cannot import" in low or "importerror" in low:
         return "import_error"
 
-    if any(x in low for x in (
-        "traceback", "exception", "error:", "nameerror", "typeerror",
-        "attributeerror", "valueerror", "keyerror", "indexerror",
-        "zerodivisionerror", "filenotfounderror", "permissionerror",
-    )):
+    if any(
+        x in low
+        for x in (
+            "traceback",
+            "exception",
+            "error:",
+            "nameerror",
+            "typeerror",
+            "attributeerror",
+            "valueerror",
+            "keyerror",
+            "indexerror",
+            "zerodivisionerror",
+            "filenotfounderror",
+            "permissionerror",
+        )
+    ):
         return "runtime_error"
 
     return "none"
 
 
 def _has_error(output: str, run_command: str) -> bool:
-    
+
     low = output.lower()
 
     if "timed out" in low:
@@ -79,6 +92,7 @@ def _has_error(output: str, run_command: str) -> bool:
 
     error_type = _classify_error(output)
     return error_type != "none"
+
 
 class RateLimitError(Exception):
     pass
@@ -127,11 +141,12 @@ JSON:"""
         raw = _strip_fences(response.text)
         return json.loads(raw)
     except json.JSONDecodeError as e:
-        raise ValueError(f"Planner returned invalid JSON: {e}\nRaw: {response.text[:300]}")
+        raise ValueError(f"Planner returned invalid JSON: {e}\nRaw: {response.text[:300]}") from e
     except Exception as e:
         if _is_rate_limit(e):
-            raise RateLimitError(str(e))
+            raise RateLimitError(str(e)) from e
         raise
+
 
 def _write_file(
     file_info: dict,
@@ -148,8 +163,7 @@ def _write_file(
     file_imports = file_info.get("imports", [])
 
     file_list = "\n".join(
-        f"  [{i+1}] {f['path']}: {f.get('description', '')}"
-        for i, f in enumerate(all_files)
+        f"  [{i + 1}] {f['path']}: {f.get('description', '')}" for i, f in enumerate(all_files)
     )
 
     dependency_context = ""
@@ -157,7 +171,9 @@ def _write_file(
         dep_path = dep_dotted.replace(".", "/") + ".py"
         if dep_path in already_written:
             code_snippet = already_written[dep_path][:2000]
-            dependency_context += f"\n\n--- {dep_path} (you must import from this) ---\n{code_snippet}"
+            dependency_context += (
+                f"\n\n--- {dep_path} (you must import from this) ---\n{code_snippet}"
+            )
 
     lang_rules = ""
     if language.lower() == "python":
@@ -214,8 +230,9 @@ Code for {file_path}:"""
 
     except Exception as e:
         if _is_rate_limit(e):
-            raise RateLimitError(str(e))
+            raise RateLimitError(str(e)) from e
         raise
+
 
 def _install_dependencies(dependencies: list[str], project_dir: Path) -> str:
     if not dependencies:
@@ -225,8 +242,7 @@ def _install_dependencies(dependencies: list[str], project_dir: Path) -> str:
     for dep in dependencies:
         pkg_name = re.split(r"[>=<!]", dep)[0].strip()
         result = subprocess.run(
-            [sys.executable, "-m", "pip", "show", pkg_name],
-            capture_output=True, text=True
+            [sys.executable, "-m", "pip", "show", pkg_name], capture_output=True, text=True
         )
         if result.returncode != 0:
             to_install.append(dep)
@@ -240,9 +256,12 @@ def _install_dependencies(dependencies: list[str], project_dir: Path) -> str:
     try:
         result = subprocess.run(
             [sys.executable, "-m", "pip", "install"] + to_install,
-            capture_output=True, text=True,
-            encoding="utf-8", errors="replace",
-            timeout=120, cwd=str(project_dir)
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=120,
+            cwd=str(project_dir),
         )
         if result.returncode == 0:
             return f"Instalado: {', '.join(to_install)}"
@@ -252,6 +271,7 @@ def _install_dependencies(dependencies: list[str], project_dir: Path) -> str:
     except Exception as e:
         return f"Error de instalación (no fatal): {e}"
 
+
 def _open_vscode(project_dir: Path) -> bool:
     vscode_candidates = [
         "code",
@@ -259,12 +279,18 @@ def _open_vscode(project_dir: Path) -> bool:
         r"C:\Program Files\Microsoft VS Code\bin\code.cmd",
     ]
     for cmd in vscode_candidates:
+        # `cmd` viene de una lista hardcoded; `project_dir` es un Path. Pasamos
+        # como LISTA y SIN shell=True — antes el shell=True con lista era un
+        # patrón roto: en Windows solo ejecutaba el primer elemento e
+        # ignoraba el resto. shutil.which valida que el binario exista.
+        resolved = shutil.which(cmd) or (cmd if Path(cmd).exists() else None)
+        if not resolved:
+            continue
         try:
             subprocess.Popen(
-                [cmd, str(project_dir)],
-                shell=True,
+                [resolved, str(project_dir)],
                 stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL
+                stderr=subprocess.DEVNULL,
             )
             time.sleep(1.5)
             print(f"[DevAgent] 💻 VSCode opened: {project_dir}")
@@ -272,6 +298,7 @@ def _open_vscode(project_dir: Path) -> bool:
         except Exception:
             continue
     return False
+
 
 def _run_project(run_command: str, project_dir: Path, timeout: int = 30) -> str:
     print(f"[DevAgent] 🚀 Ejecutando: {run_command}")
@@ -282,10 +309,12 @@ def _run_project(run_command: str, project_dir: Path, timeout: int = 30) -> str:
 
         result = subprocess.run(
             parts,
-            capture_output=True, text=True,
-            encoding="utf-8", errors="replace",
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
             timeout=timeout,
-            cwd=str(project_dir)
+            cwd=str(project_dir),
         )
 
         stdout = result.stdout.strip()
@@ -306,11 +335,10 @@ def _run_project(run_command: str, project_dir: Path, timeout: int = 30) -> str:
     except Exception as e:
         return f"Error de ejecución: {e}"
 
+
 def _try_auto_install(error_output: str, project_dir: Path) -> bool:
     """Si hay ModuleNotFoundError, intenta instalar automáticamente el paquete faltante."""
-    pattern = re.compile(
-        r"No module named ['\"]([a-zA-Z0-9_\-\.]+)['\"]", re.IGNORECASE
-    )
+    pattern = re.compile(r"No module named ['\"]([a-zA-Z0-9_\-\.]+)['\"]", re.IGNORECASE)
     match = pattern.search(error_output)
     if not match:
         return False
@@ -320,13 +348,17 @@ def _try_auto_install(error_output: str, project_dir: Path) -> bool:
     try:
         result = subprocess.run(
             [sys.executable, "-m", "pip", "install", pkg],
-            capture_output=True, text=True,
-            encoding="utf-8", errors="replace",
-            timeout=60, cwd=str(project_dir)
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=60,
+            cwd=str(project_dir),
         )
         return result.returncode == 0
     except Exception:
         return False
+
 
 def _fix_files(
     error_output: str,
@@ -367,9 +399,11 @@ def _fix_files(
                 snippet = code[:1500] + ("..." if len(code) > 1500 else "")
                 other_ctx += f"\n--- {fp} ---\n{snippet}\n"
 
-        line_hint = f"\nError appears to be near line {error_line} in this file." if (
-            error_line and fix_path == error_file
-        ) else ""
+        line_hint = (
+            f"\nError appears to be near line {error_line} in this file."
+            if (error_line and fix_path == error_file)
+            else ""
+        )
 
         prompt = f"""You are an expert {language} debugger. Fix the broken file below.
 
@@ -412,10 +446,11 @@ Fixed code for {fix_path}:"""
 
         except Exception as e:
             if _is_rate_limit(e):
-                raise RateLimitError(str(e))
+                raise RateLimitError(str(e)) from e
             print(f"[DevAgent] ⚠️ Could not fix {fix_path}: {e}")
 
     return updated_codes
+
 
 def _build_project(
     description: str,
@@ -435,22 +470,26 @@ def _build_project(
     try:
         plan = _plan_project(description, language)
     except RateLimitError:
-        msg = "Se alcanzó el límite de solicitudes, señor. Por favor, intente de nuevo en un momento."
-        if speak: speak(msg)
+        msg = (
+            "Se alcanzó el límite de solicitudes, señor. Por favor, intente de nuevo en un momento."
+        )
+        if speak:
+            speak(msg)
         return msg
     except ValueError as e:
         msg = f"La planificación falló: {e}"
-        if speak: speak(msg)
+        if speak:
+            speak(msg)
         return msg
 
-    proj_name    = project_name or plan.get("project_name", "orion_project")
-    proj_name    = re.sub(r"[^\w\-]", "_", proj_name)
-    project_dir  = PROJECTS_DIR / proj_name
+    proj_name = project_name or plan.get("project_name", "orion_project")
+    proj_name = re.sub(r"[^\w\-]", "_", proj_name)
+    project_dir = PROJECTS_DIR / proj_name
     project_dir.mkdir(parents=True, exist_ok=True)
 
-    files        = plan.get("files", [])
-    entry_point  = plan.get("entry_point", "main.py")
-    run_command  = plan.get("run_command", f"python {entry_point}")
+    files = plan.get("files", [])
+    entry_point = plan.get("entry_point", "main.py")
+    run_command = plan.get("run_command", f"python {entry_point}")
     dependencies = plan.get("dependencies", [])
 
     log(f"Project: {proj_name} | Files: {len(files)} | Entry: {entry_point}")
@@ -493,7 +532,8 @@ def _build_project(
 
     if not file_codes:
         msg = "No pude escribir ningún archivo del proyecto, señor."
-        if speak: speak(msg)
+        if speak:
+            speak(msg)
         return msg
 
     if dependencies:
@@ -502,8 +542,8 @@ def _build_project(
 
     _open_vscode(project_dir)
 
-    last_output   = ""
-    auto_installs = 0  
+    last_output = ""
+    auto_installs = 0
 
     for attempt in range(1, MAX_FIX_ATTEMPTS + 1):
         log(f"Ejecutando proyecto (intento {attempt}/{MAX_FIX_ATTEMPTS})...")
@@ -516,7 +556,8 @@ def _build_project(
                 f"Construido en {attempt} intento{'s' if attempt > 1 else ''}. "
                 f"Guardado en: {project_dir}"
             )
-            if speak: speak(msg)
+            if speak:
+                speak(msg)
             return f"{msg}\n\nOutput:\n{last_output}"
 
         if attempt == MAX_FIX_ATTEMPTS:
@@ -546,7 +587,8 @@ def _build_project(
             time.sleep(1)
         except RateLimitError:
             msg = "Se alcanzó el límite de solicitudes durante la corrección. El proyecto está guardado, revíselo manualmente en VSCode."
-            if speak: speak(msg)
+            if speak:
+                speak(msg)
             return msg
         except Exception as e:
             log(f"El paso de corrección falló: {e}")
@@ -555,7 +597,8 @@ def _build_project(
         f"No pude corregir completamente '{proj_name}' después de {MAX_FIX_ATTEMPTS} intentos, señor. "
         f"El proyecto está guardado en {project_dir} — ábralo en VSCode y revíselo manualmente."
     )
-    if speak: speak(msg)
+    if speak:
+        speak(msg)
     return f"{msg}\n\nÚltimo error:\n{last_output[:600]}"
 
 
@@ -566,20 +609,20 @@ def dev_agent(
     session_memory=None,
     speak=None,
 ) -> str:
-    p            = parameters or {}
-    description  = p.get("description", "").strip()
-    language     = p.get("language", "python").strip()
+    p = parameters or {}
+    description = p.get("description", "").strip()
+    language = p.get("language", "python").strip()
     project_name = p.get("project_name", "").strip()
-    timeout      = int(p.get("timeout", 30))
+    timeout = int(p.get("timeout", 30))
 
     if not description:
         return "Por favor, describa el proyecto que desea que construya, señor."
 
     return _build_project(
-        description  = description,
-        language     = language,
-        project_name = project_name,
-        timeout      = timeout,
-        speak        = speak,
-        player       = player,
+        description=description,
+        language=language,
+        project_name=project_name,
+        timeout=timeout,
+        speak=speak,
+        player=player,
     )

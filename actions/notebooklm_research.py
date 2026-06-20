@@ -22,10 +22,11 @@ from __future__ import annotations
 
 import asyncio
 from typing import Any
+import contextlib
 
 _LOGIN_HINT = (
     "NotebookLM aún no está autenticado. Ejecuta una sola vez:\n"
-    "  .venv\\Scripts\\pip.exe install \"notebooklm-py[browser]\"\n"
+    '  .venv\\Scripts\\pip.exe install "notebooklm-py[browser]"\n'
     "  .venv\\Scripts\\notebooklm.exe login\n"
     "Se abrirá Chromium para iniciar sesión con tu cuenta Google."
 )
@@ -38,7 +39,7 @@ def _ensure_auth() -> str | None:
     except ImportError:
         return (
             "notebooklm-py no está instalado en el venv. "
-            "Ejecuta: .venv\\Scripts\\pip.exe install \"notebooklm-py[browser]\""
+            'Ejecuta: .venv\\Scripts\\pip.exe install "notebooklm-py[browser]"'
         )
     path = get_storage_path()
     if not path.exists():
@@ -56,13 +57,12 @@ def _speak(player, text: str) -> None:
     try:
         player.speak(text)
     except Exception:
-        try:
+        with contextlib.suppress(Exception):
             player(text)
-        except Exception:
-            pass
 
 
 # ── Acciones async ──────────────────────────────────────────────────────
+
 
 async def _do_research(
     *,
@@ -85,9 +85,7 @@ async def _do_research(
         if n_sources:
             query = f"{topic} (encuentra hasta {n_sources} fuentes relevantes)"
 
-        start = await client.research.start(
-            notebook_id, query, source=source, mode=mode
-        )
+        start = await client.research.start(notebook_id, query, source=source, mode=mode)
         task = await client.research.wait_for_completion(
             notebook_id, task_id=start.task_id, timeout=timeout
         )
@@ -104,9 +102,7 @@ async def _do_research(
             # está creado con las fuentes encontradas; el usuario puede
             # abrirlo y agregarlas manualmente desde la UI de NotebookLM.
             try:
-                imported = await client.research.import_sources(
-                    notebook_id, start.task_id, inputs
-                )
+                imported = await client.research.import_sources(notebook_id, start.task_id, inputs)
             except Exception as e:
                 import_error = f"{type(e).__name__}: {str(e)[:120]}"
 
@@ -130,11 +126,13 @@ async def _do_list(limit: int) -> dict[str, Any]:
         notebooks = await client.notebooks.list()
         items = []
         for nb in notebooks[:limit]:
-            items.append({
-                "id": nb.id,
-                "title": getattr(nb, "title", "") or "",
-                "url": _notebook_url(nb.id),
-            })
+            items.append(
+                {
+                    "id": nb.id,
+                    "title": getattr(nb, "title", "") or "",
+                    "url": _notebook_url(nb.id),
+                }
+            )
         return {"count": len(items), "notebooks": items}
 
 
@@ -167,6 +165,7 @@ async def _do_delete(notebook_id: str) -> dict[str, Any]:
 
 
 # ── Entry point sync (lo llama el ToolRegistry) ─────────────────────────
+
 
 def _format_research_result(r: dict[str, Any]) -> str:
     lines = [
@@ -232,15 +231,17 @@ def notebooklm_research(parameters: dict, *, player=None, **_) -> str:
             timeout = float(parameters.get("timeout") or 1800)
 
             _speak(player, f"Iniciando investigación en NotebookLM sobre {topic}.")
-            result = asyncio.run(_do_research(
-                topic=topic,
-                n_sources=n_sources,
-                mode=mode,
-                source=source,
-                auto_import=auto_import,
-                notebook_name=notebook_name,
-                timeout=timeout,
-            ))
+            result = asyncio.run(
+                _do_research(
+                    topic=topic,
+                    n_sources=n_sources,
+                    mode=mode,
+                    source=source,
+                    auto_import=auto_import,
+                    notebook_name=notebook_name,
+                    timeout=timeout,
+                )
+            )
             return _format_research_result(result)
 
         if action == "list":
@@ -261,10 +262,7 @@ def notebooklm_research(parameters: dict, *, player=None, **_) -> str:
             asyncio.run(_do_delete(notebook_id))
             return f"Notebook {notebook_id} eliminado."
 
-        return (
-            f"Acción desconocida: {action!r}. "
-            "Usa: research | list | ask | delete"
-        )
+        return f"Acción desconocida: {action!r}. Usa: research | list | ask | delete"
 
     except Exception as e:
         # Si el error parece de auth (401, redirect a accounts.google.com,

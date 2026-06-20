@@ -18,14 +18,14 @@ from __future__ import annotations
 import json
 import os
 from abc import ABC, abstractmethod
+from collections.abc import Iterator
 from dataclasses import dataclass, field
 from functools import lru_cache
-from typing import Iterator
 
 from config import BASE_DIR
 
-
 # ── Tipos de datos ──────────────────────────────────────────────────────────
+
 
 @dataclass
 class LLMMessage:
@@ -63,6 +63,7 @@ class ToolSpec:
 
 # ── Interfaz ────────────────────────────────────────────────────────────────
 
+
 class LLMProvider(ABC):
     """Contrato común para todos los proveedores LLM de la orquesta."""
 
@@ -95,7 +96,10 @@ class LLMProvider(ABC):
         nativo (OpenAI-compat, Anthropic) deben sobrescribir esto.
         """
         resp = self.complete(
-            messages, model=model, temperature=temperature, max_tokens=max_tokens,
+            messages,
+            model=model,
+            temperature=temperature,
+            max_tokens=max_tokens,
         )
         yield resp.text
 
@@ -106,7 +110,7 @@ class LLMProvider(ABC):
     def complete_with_tools(
         self,
         turns: list[dict],
-        tools: list["ToolSpec"],
+        tools: list[ToolSpec],
         *,
         model: str,
         temperature: float = 0.7,
@@ -130,12 +134,11 @@ class LLMProvider(ABC):
         Default: providers que no implementen function-calling pueden caer
         al ``complete`` plano (perdiendo el tool-use).
         """
-        raise NotImplementedError(
-            f"Provider '{self.name}' no soporta function-calling todavía."
-        )
+        raise NotImplementedError(f"Provider '{self.name}' no soporta function-calling todavía.")
 
 
 # ── Resolución de credenciales ──────────────────────────────────────────────
+
 
 @lru_cache(maxsize=1)
 def _providers_file() -> dict:
@@ -179,14 +182,15 @@ def get_provider(name: str) -> LLMProvider:
 
     if name == "gemini":
         from core.llm.gemini_provider import GeminiProvider
+
         _INSTANCES[name] = GeminiProvider()
     elif name in _OPENAI_COMPAT:
         from core.llm.openai_compat import OpenAICompatProvider
+
         _INSTANCES[name] = OpenAICompatProvider(name)
     else:
         raise KeyError(
-            f"Provider '{name}' desconocido. Conocidos: "
-            f"gemini, {', '.join(sorted(_OPENAI_COMPAT))}"
+            f"Provider '{name}' desconocido. Conocidos: gemini, {', '.join(sorted(_OPENAI_COMPAT))}"
         )
 
     return _INSTANCES[name]

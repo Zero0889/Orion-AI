@@ -22,23 +22,24 @@ from __future__ import annotations
 
 import threading
 import time
-from typing import Callable, Optional
+from collections.abc import Callable
 
 from core.logger import get_logger
-from .config import IoTConfig, load_config
+
+from .config import load_config
 
 log = get_logger("iot.control")
 from .devices import Device
 from .rules import (
-    detect_intent_local, detect_intent_with_gemini,
-    normalize, parse_duration, parse_color, parse_percent,
+    detect_intent_local,
+    detect_intent_with_gemini,
+    parse_color,
 )
 from .scenes import execute_scene, find_scene, list_scenes
 from .sensors import get_cache
 from .transports import get_transport
-from .transports.serial_tx import SerialTransport
 from .transports.mqtt_tx import MQTTTransport
-
+from .transports.serial_tx import SerialTransport
 
 # ── Singleton del sistema ────────────────────────────────────────────────────
 
@@ -55,8 +56,9 @@ class IoTSystem:
         self.cfg = load_config()
         # Arranca el datalogger (idempotente, también flushea cuando paused)
         from actions.iot import sensor_log, sheets_sync
+
         sensor_log.start()
-        sheets_sync.auto_start()   # solo si hay un Sheet ya conectado
+        sheets_sync.auto_start()  # solo si hay un Sheet ya conectado
         if not self._is_paused():
             self._init_transports()
             self._wire_sensors()
@@ -73,6 +75,7 @@ class IoTSystem:
         """True si existe el flag de pausa que setea /api/iot/admin/disconnect."""
         try:
             from config import IOT_CONFIG_PATH
+
             return (IOT_CONFIG_PATH.parent / "iot_paused.flag").exists()
         except Exception:
             return False
@@ -102,7 +105,7 @@ class IoTSystem:
             # transporte serial, para que SerialTransport.broadcast()
             # pueda usarlos sin saber del config global.
             if tcfg.get("type") == "serial":
-                tcfg.setdefault("all_on",  self.cfg.global_commands.get("all_on"))
+                tcfg.setdefault("all_on", self.cfg.global_commands.get("all_on"))
                 tcfg.setdefault("all_off", self.cfg.global_commands.get("all_off"))
             get_transport(tid, tcfg)  # construye y cachea
 
@@ -114,17 +117,21 @@ class IoTSystem:
             t = get_transport(dev.transport, self.cfg.transports.get(dev.transport, {}))
             if t is None:
                 continue
+
             def make_callback(d_id):
                 def _sensor_callback(device_id: str, raw_value: str) -> None:
                     val = raw_value.strip()
                     cache.update(d_id, val)
                     # Persistir al datalogger (buffer en memoria, flush 1/min)
                     from actions.iot import sensor_log
+
                     sensor_log.record(d_id, val)
                     from server.event_bus import OrionEventBus
+
                     bus = OrionEventBus.get_instance()
                     if bus:
                         bus.publish("iot.sensor", {"device": d_id, "value": val})
+
                 return _sensor_callback
 
             t.register_sensor_listener(
@@ -142,7 +149,7 @@ class IoTSystem:
         return get_transport(dev.transport, self.cfg.transports.get(dev.transport, {}))
 
 
-_system: Optional[IoTSystem] = None
+_system: IoTSystem | None = None
 _system_lock = threading.Lock()
 
 
@@ -214,7 +221,7 @@ def _exec_rgb(sys: IoTSystem, dev: Device, color) -> str:
     if err:
         return err
     # color puede venir como list/tuple o como string ("rojo", "#ff00aa")
-    rgb: Optional[tuple[int, int, int]] = None
+    rgb: tuple[int, int, int] | None = None
     if isinstance(color, (list, tuple)) and len(color) == 3:
         try:
             rgb = (int(color[0]), int(color[1]), int(color[2]))
@@ -273,11 +280,17 @@ def _exec_list_devices(sys: IoTSystem) -> str:
     lines = []
     for d in sys.cfg.devices.values():
         caps = []
-        if d.capabilities.on_off:   caps.append("on/off")
-        if d.capabilities.dimmable: caps.append("dim")
-        if d.capabilities.rgb:      caps.append("rgb")
-        if d.capabilities.sensor:   caps.append(f"sensor:{d.capabilities.sensor}")
-        lines.append(f"  • {d.name} (id={d.id}, transport={d.transport}, caps={', '.join(caps) or 'ninguna'})")
+        if d.capabilities.on_off:
+            caps.append("on/off")
+        if d.capabilities.dimmable:
+            caps.append("dim")
+        if d.capabilities.rgb:
+            caps.append("rgb")
+        if d.capabilities.sensor:
+            caps.append(f"sensor:{d.capabilities.sensor}")
+        lines.append(
+            f"  • {d.name} (id={d.id}, transport={d.transport}, caps={', '.join(caps) or 'ninguna'})"
+        )
     return "Dispositivos IoT:\n" + "\n".join(lines)
 
 
@@ -295,8 +308,9 @@ def _exec_status(sys: IoTSystem) -> str:
 # ── Timer de auto-off ───────────────────────────────────────────────────────
 
 
-def _schedule_auto_off(sys: IoTSystem, dev_ids: list[str], duration: int,
-                      speak: Optional[Callable] = None) -> None:
+def _schedule_auto_off(
+    sys: IoTSystem, dev_ids: list[str], duration: int, speak: Callable | None = None
+) -> None:
     """Apaga ``dev_ids`` después de ``duration`` segundos en un hilo."""
     if duration <= 0 or not dev_ids:
         return
@@ -325,8 +339,9 @@ def _schedule_auto_off(sys: IoTSystem, dev_ids: list[str], duration: int,
 # ── Dispatcher central ──────────────────────────────────────────────────────
 
 
-def _dispatch_action(sys: IoTSystem, action: str, params: dict,
-                    speak: Optional[Callable] = None) -> str:
+def _dispatch_action(
+    sys: IoTSystem, action: str, params: dict, speak: Callable | None = None
+) -> str:
     """Núcleo: ejecuta UNA acción ya resuelta (sin natural language)."""
     action = (action or "").lower().strip()
 
@@ -390,7 +405,7 @@ def _dispatch_action(sys: IoTSystem, action: str, params: dict,
 # ── Entry point público ─────────────────────────────────────────────────────
 
 
-def iot_control(parameters: dict, player=None, speak: Optional[Callable] = None) -> str:
+def iot_control(parameters: dict, player=None, speak: Callable | None = None) -> str:
     """Punto de entrada que Gemini Live invoca como herramienta.
 
     Acciones soportadas (todas opcionales — el default es 'auto')::
@@ -403,7 +418,7 @@ def iot_control(parameters: dict, player=None, speak: Optional[Callable] = None)
     locales y, si fallan, con Gemini.
     """
     parameters = parameters or {}
-    action      = (parameters.get("action") or "auto").lower().strip()
+    action = (parameters.get("action") or "auto").lower().strip()
     description = (parameters.get("description") or "").strip()
 
     try:
@@ -424,8 +439,10 @@ def iot_control(parameters: dict, player=None, speak: Optional[Callable] = None)
             print("[IoT] Sin regla local, consultando Gemini...")
             intent = detect_intent_with_gemini(description, sys.cfg)
         if intent is None:
-            return ("No pude interpretar la orden. Intenta ser más específico, "
-                    "por ejemplo: 'enciende el foco 1' o 'pon la tira al 30%'.")
+            return (
+                "No pude interpretar la orden. Intenta ser más específico, "
+                "por ejemplo: 'enciende el foco 1' o 'pon la tira al 30%'."
+            )
 
         return _dispatch_action(sys, intent.get("action"), intent, speak=speak)
 

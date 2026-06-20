@@ -13,15 +13,15 @@
 import { useToastStore, type ToastItem } from "@/stores/toast";
 import { Icon, type IconName } from "@/ui/Icon";
 
-const TONE_STYLE: Record<ToastItem["tone"], { icon: IconName; ring: string; bar: string }> = {
-  success: { icon: "check",    ring: "border-ok/40    bg-ok/10",     bar: "bg-ok"     },
-  info:    { icon: "bolt",     ring: "border-pri/40   bg-pri/10",    bar: "bg-pri"    },
-  warn:    { icon: "alert",    ring: "border-warn/40  bg-warn/10",   bar: "bg-warn"   },
-  error:   { icon: "alert",    ring: "border-danger/40 bg-danger/10", bar: "bg-danger" },
+const TONE_STYLE: Record<ToastItem["tone"], { icon: IconName; bar: string }> = {
+  success: { icon: "check", bar: "bg-ok" },
+  info: { icon: "bolt", bar: "bg-pri" },
+  warn: { icon: "alert", bar: "bg-warn" },
+  error: { icon: "alert", bar: "bg-danger" },
 };
 
 export function Toaster() {
-  const items   = useToastStore((s) => s.items);
+  const items = useToastStore((s) => s.items);
   const dismiss = useToastStore((s) => s.dismiss);
 
   if (items.length === 0) return null;
@@ -38,9 +38,9 @@ export function Toaster() {
             key={t.id}
             role="status"
             className={[
-              "pointer-events-auto relative overflow-hidden rounded-lg border backdrop-blur-md",
-              "shadow-[0_8px_32px_-8px_rgb(0_0_0/0.45)]",
-              s.ring,
+              "pointer-events-auto relative overflow-hidden rounded-lg",
+              "border border-white/[0.08] bg-elevated/95 backdrop-blur-xl",
+              "shadow-[0_10px_40px_-12px_rgb(0_0_0/0.55)]",
               "animate-fade-in-up",
             ].join(" ")}
           >
@@ -53,21 +53,20 @@ export function Toaster() {
                 size={16}
                 className={[
                   "mt-0.5 shrink-0",
-                  t.tone === "success" ? "text-ok"
-                : t.tone === "info"    ? "text-pri"
-                : t.tone === "warn"    ? "text-warn"
-                : "text-danger",
+                  t.tone === "success"
+                    ? "text-ok"
+                    : t.tone === "info"
+                      ? "text-pri"
+                      : t.tone === "warn"
+                        ? "text-warn"
+                        : "text-danger",
                 ].join(" ")}
               />
 
               <div className="min-w-0 flex-1">
-                <div className="text-sm font-medium text-text leading-snug">
-                  {t.title}
-                </div>
+                <div className="text-sm font-medium text-text leading-snug">{t.title}</div>
                 {t.detail && (
-                  <div className="mt-1 text-xs text-text-dim leading-relaxed">
-                    {t.detail}
-                  </div>
+                  <div className="mt-1 text-xs text-text-dim leading-relaxed">{t.detail}</div>
                 )}
 
                 {t.confirm && (

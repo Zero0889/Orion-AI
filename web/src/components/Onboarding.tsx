@@ -13,26 +13,37 @@ import { Icon } from "@/ui/Icon";
 import { Button } from "@/ui/primitives";
 
 export function Onboarding() {
-  const configured    = useOrionStore((s) => s.apiKeyConfigured);
+  const configured = useOrionStore((s) => s.apiKeyConfigured);
   const setConfigured = useOrionStore((s) => s.setApiKeyConfigured);
-  const [key,  setKey]   = useState("");
-  const [busy, setBusy]  = useState(false);
-  const [error,setError] = useState<string | null>(null);
+  const [key, setKey] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let alive = true;
-    api.getApiKeyStatus()
-      .then((s) => { if (alive) setConfigured(s.configured); })
-      .catch(() => { /* connection chip handles offline state */ });
-    return () => { alive = false; };
+    api
+      .getApiKeyStatus()
+      .then((s) => {
+        if (alive) setConfigured(s.configured);
+      })
+      .catch(() => {
+        /* connection chip handles offline state */
+      });
+    return () => {
+      alive = false;
+    };
   }, [setConfigured]);
 
   if (configured) return null;
 
   async function submit() {
     const k = key.trim();
-    if (k.length < 10) { setError("La API key parece demasiado corta."); return; }
-    setBusy(true); setError(null);
+    if (k.length < 10) {
+      setError("La API key parece demasiado corta.");
+      return;
+    }
+    setBusy(true);
+    setError(null);
     try {
       await api.setApiKey(k);
       setConfigured(true);
@@ -56,8 +67,8 @@ export function Onboarding() {
             <svg viewBox="0 0 40 40" className="relative h-10 w-10">
               <defs>
                 <radialGradient id="onbCore" cx="50%" cy="40%" r="55%">
-                  <stop offset="0%"   stopColor="#FFFFFF" stopOpacity="0.95" />
-                  <stop offset="50%"  stopColor="rgb(var(--orion-pri))" stopOpacity="0.95" />
+                  <stop offset="0%" stopColor="#FFFFFF" stopOpacity="0.95" />
+                  <stop offset="50%" stopColor="rgb(var(--orion-pri))" stopOpacity="0.95" />
                   <stop offset="100%" stopColor="#000" stopOpacity="0.85" />
                 </radialGradient>
               </defs>
@@ -73,11 +84,14 @@ export function Onboarding() {
         <p className="text-sm text-text-dim leading-relaxed mb-5">
           Para empezar necesitamos tu API key de Gemini. Puedes obtener una gratis en{" "}
           <a
-            href="https://aistudio.google.com/app/apikey" target="_blank" rel="noreferrer"
+            href="https://aistudio.google.com/app/apikey"
+            target="_blank"
+            rel="noopener noreferrer"
             className="text-pri underline-offset-2 hover:underline"
           >
             aistudio.google.com
-          </a>.
+          </a>
+          .
         </p>
 
         <label className="block text-[10px] uppercase tracking-[0.22em] text-text-dim mb-2">
@@ -87,7 +101,9 @@ export function Onboarding() {
           <input
             value={key}
             onChange={(e) => setKey(e.target.value)}
-            onKeyDown={(e) => { if (e.key === "Enter") submit(); }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") submit();
+            }}
             placeholder="AIza…"
             type="password"
             autoFocus
@@ -96,7 +112,11 @@ export function Onboarding() {
                        focus:outline-none focus:border-pri/40 focus:shadow-glow-soft
                        transition-all duration-200 ease-out-expo"
           />
-          <Icon name="shield" size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-pri/70" />
+          <Icon
+            name="shield"
+            size={14}
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-pri/70"
+          />
         </div>
 
         {error && (
@@ -119,8 +139,8 @@ export function Onboarding() {
         </div>
 
         <p className="mt-5 text-[11px] text-muted leading-relaxed">
-          Se guarda localmente en <code className="text-acc/90">config/api_keys.json</code>.
-          Si prefieres usar la variable <code className="text-acc/90">ORION_GEMINI_KEY</code>,
+          Se guarda localmente en <code className="text-acc/90">config/api_keys.json</code>. Si
+          prefieres usar la variable <code className="text-acc/90">ORION_GEMINI_KEY</code>,
           ciérralo, configúrala y reinicia.
         </p>
       </div>

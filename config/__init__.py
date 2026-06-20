@@ -10,8 +10,8 @@ import os
 import sys
 from pathlib import Path
 
-
 # ── Ruta base del proyecto ──────────────────────────────────────────────────
+
 
 def get_base_dir() -> Path:
     """User-writable root (config, memory). Next to exe in frozen mode."""
@@ -35,19 +35,20 @@ def get_resources_dir() -> Path:
     return Path(__file__).resolve().parent.parent
 
 
-BASE_DIR      = get_base_dir()
+BASE_DIR = get_base_dir()
 RESOURCES_DIR = get_resources_dir()
-CONFIG_DIR    = BASE_DIR / "config"
-MEMORY_DIR    = BASE_DIR / "memory"
-CORE_DIR      = RESOURCES_DIR / "core"
-PLUGINS_DIR   = RESOURCES_DIR / "plugins"
+CONFIG_DIR = BASE_DIR / "config"
+MEMORY_DIR = BASE_DIR / "memory"
+CORE_DIR = RESOURCES_DIR / "core"
+PLUGINS_DIR = RESOURCES_DIR / "plugins"
 
-API_CONFIG_PATH    = CONFIG_DIR / "api_keys.json"
+API_CONFIG_PATH = CONFIG_DIR / "api_keys.json"
 BROWSER_CONFIG_PATH = CONFIG_DIR / "browser.json"
 HOTKEYS_CONFIG_PATH = CONFIG_DIR / "hotkeys.json"
-IOT_CONFIG_PATH    = CONFIG_DIR / "iot_config.json"
-MEMORY_PATH        = MEMORY_DIR / "long_term.json"
-PROMPT_PATH        = CORE_DIR / "prompt.txt"
+IOT_CONFIG_PATH = CONFIG_DIR / "iot_config.json"
+MEMORY_PATH = MEMORY_DIR / "long_term.json"
+PROMPT_PATH = CORE_DIR / "prompt.txt"
+
 
 # Carpetas de runtime overridables por env var. PROJECTS_DIR la usa
 # ``actions/dev_agent.py`` para clonar/scaffold proyectos generados por el
@@ -64,10 +65,11 @@ def _default_projects_dir() -> Path:
 
 
 PROJECTS_DIR = _default_projects_dir()
-UPLOADS_DIR  = Path(os.environ.get("ORION_UPLOADS_DIR", "").strip() or (BASE_DIR / "uploads"))
+UPLOADS_DIR = Path(os.environ.get("ORION_UPLOADS_DIR", "").strip() or (BASE_DIR / "uploads"))
 
 
 # ── Carga de configuración ──────────────────────────────────────────────────
+
 
 def load_config() -> dict:
     if not API_CONFIG_PATH.exists():
@@ -109,12 +111,21 @@ def get_api_key() -> str:
 
 # ── OS helpers ──────────────────────────────────────────────────────────────
 
+
 def get_os() -> str:
     return load_config().get("os_system", "windows").lower()
 
-def is_windows() -> bool: return get_os() == "windows"
-def is_mac()     -> bool: return get_os() == "mac"
-def is_linux()   -> bool: return get_os() == "linux"
+
+def is_windows() -> bool:
+    return get_os() == "windows"
+
+
+def is_mac() -> bool:
+    return get_os() == "mac"
+
+
+def is_linux() -> bool:
+    return get_os() == "linux"
 
 
 # Nota Fase 7: la antigua función ``get_ui_mode()`` se eliminó al

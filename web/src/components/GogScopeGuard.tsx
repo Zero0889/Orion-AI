@@ -23,11 +23,11 @@ import { Button, Surface } from "@/ui/primitives";
 import { GogAccountsCard } from "./GogAccountsCard";
 
 interface Props {
-  requires:  string[];
-  account?:  string;
-  children:  React.ReactNode;
+  requires: string[];
+  account?: string;
+  children: React.ReactNode;
   /** Título mostrado en el banner cuando faltan scopes. */
-  title?:    string;
+  title?: string;
 }
 
 type CheckState =
@@ -46,7 +46,10 @@ export function GogScopeGuard({ requires, account, children, title }: Props) {
       let target = account;
       if (!target) {
         const accs: GogAccount[] = await api.gogAccounts();
-        if (accs.length === 0) { setState({ kind: "no_accounts" }); return; }
+        if (accs.length === 0) {
+          setState({ kind: "no_accounts" });
+          return;
+        }
         target = accs[0].email;
       }
       const r = await api.gogCheckScopes({ account: target, services: requires });
@@ -57,7 +60,9 @@ export function GogScopeGuard({ requires, account, children, title }: Props) {
     }
   }, [account, requires]);
 
-  useEffect(() => { check(); }, [check]);
+  useEffect(() => {
+    check();
+  }, [check]);
 
   // Poll cada 30s — barato y nos cubre el caso "el usuario completó auth en otra pestaña"
   useEffect(() => {
@@ -98,9 +103,11 @@ export function GogScopeGuard({ requires, account, children, title }: Props) {
   if (showInline) {
     return (
       <div className="flex flex-col gap-3">
-        <button onClick={() => setShowInline(false)}
-                className="text-[11px] uppercase tracking-[0.18em] text-text-dim
-                           hover:text-text self-start">
+        <button
+          onClick={() => setShowInline(false)}
+          className="text-[11px] uppercase tracking-[0.18em] text-text-dim
+                           hover:text-text self-start"
+        >
           ← Volver
         </button>
         <GogAccountsCard defaultServices={requires} />
@@ -111,9 +118,11 @@ export function GogScopeGuard({ requires, account, children, title }: Props) {
   return (
     <Surface level={2} className="p-4 border border-amber-400/30 bg-amber-400/[0.06]">
       <div className="flex items-start gap-3">
-        <span className="grid place-items-center h-9 w-9 rounded-lg
+        <span
+          className="grid place-items-center h-9 w-9 rounded-lg
                          bg-amber-400/15 border border-amber-400/40
-                         text-amber-300 shrink-0">
+                         text-amber-300 shrink-0"
+        >
           <Icon name="shield" size={16} />
         </span>
         <div className="flex-1 min-w-0">

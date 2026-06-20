@@ -31,10 +31,12 @@ if str(PROJECT_ROOT) not in sys.path:
 def client(tmp_path, monkeypatch):
     # Apunta uploads a tmp_path (no contaminar el repo real)
     import server.routes.files as files_route
+
     monkeypatch.setattr(files_route, "UPLOADS_DIR", tmp_path / "uploads")
 
-    from server.event_bus import OrionEventBus
     from server.app import build_app
+    from server.event_bus import OrionEventBus
+
     bus = OrionEventBus()
     app = build_app(bus)
     with TestClient(app) as tc:
@@ -62,7 +64,8 @@ def test_upload_creates_file_and_sets_bus_current(client):
 def test_upload_publishes_file_attached(client):
     tc, _, _ = client
     with tc.websocket_connect("/ws") as ws:
-        ws.receive_json(); ws.receive_json()  # saludo state + mute
+        ws.receive_json()
+        ws.receive_json()  # saludo state + mute
         tc.post(
             "/api/files/upload",
             files={"file": ("doc.pdf", io.BytesIO(b"x" * 10), "application/pdf")},
@@ -93,6 +96,7 @@ def test_upload_sanitizes_filename(client):
 def test_upload_size_cap_enforced(client, monkeypatch):
     """Forzamos un cap pequeño para no generar 50 MB en RAM."""
     import server.routes.files as files_route
+
     monkeypatch.setattr(files_route, "MAX_BYTES", 10)
 
     tc, _, _ = client
@@ -140,7 +144,8 @@ def test_delete_current_clears_and_emits_event(client):
     assert bus.current_file is not None
 
     with tc.websocket_connect("/ws") as ws:
-        ws.receive_json(); ws.receive_json()  # saludo
+        ws.receive_json()
+        ws.receive_json()  # saludo
         r = tc.delete("/api/files/current")
         assert r.status_code == 204
         evt = ws.receive_json()

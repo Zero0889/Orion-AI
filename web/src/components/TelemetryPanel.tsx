@@ -10,9 +10,9 @@ import { Badge, Empty, SectionHeader, Surface } from "@/ui/primitives";
 
 type Key = "cpu" | "ram" | "disk";
 const METRICS: { key: Key; label: string; tone: string; gradientId: string }[] = [
-  { key: "cpu",  label: "CPU",   tone: "rgb(var(--orion-pri))",    gradientId: "telCpu"  },
-  { key: "ram",  label: "RAM",   tone: "rgb(var(--orion-acc))",    gradientId: "telRam"  },
-  { key: "disk", label: "Disco", tone: "rgb(var(--orion-ok))",     gradientId: "telDisk" },
+  { key: "cpu", label: "CPU", tone: "rgb(var(--orion-pri))", gradientId: "telCpu" },
+  { key: "ram", label: "RAM", tone: "rgb(var(--orion-acc))", gradientId: "telRam" },
+  { key: "disk", label: "Disco", tone: "rgb(var(--orion-ok))", gradientId: "telDisk" },
 ];
 
 export function TelemetryPanel() {
@@ -43,7 +43,7 @@ export function TelemetryPanel() {
           <section className="p-6 grid grid-cols-1 lg:grid-cols-3 gap-3">
             {METRICS.map((m, i) => {
               const series = tel[m.key];
-              const value  = tel.last ? tel.last[m.key] : 0;
+              const value = tel.last ? tel.last[m.key] : 0;
               return (
                 <Surface
                   key={m.key}
@@ -53,8 +53,13 @@ export function TelemetryPanel() {
                 >
                   <header className="flex items-center justify-between mb-2">
                     <div>
-                      <div className="text-[10px] uppercase tracking-[0.22em] text-text-dim">{m.label}</div>
-                      <div className="mt-1 text-3xl font-semibold tabular-nums" style={{ color: m.tone }}>
+                      <div className="text-[10px] uppercase tracking-[0.22em] text-text-dim">
+                        {m.label}
+                      </div>
+                      <div
+                        className="mt-1 text-3xl font-semibold tabular-nums"
+                        style={{ color: m.tone }}
+                      >
                         {(value * 100).toFixed(0)}
                         <span className="text-base text-muted ml-0.5">%</span>
                       </div>
@@ -78,14 +83,27 @@ export function TelemetryPanel() {
 function PulseDot({ color }: { color: string }) {
   return (
     <span className="relative inline-grid place-items-center h-6 w-6">
-      <span className="absolute inset-0 rounded-full animate-pulse-soft" style={{ background: color, opacity: 0.18 }} />
+      <span
+        className="absolute inset-0 rounded-full animate-pulse-soft"
+        style={{ background: color, opacity: 0.18 }}
+      />
       <span className="relative h-1.5 w-1.5 rounded-full" style={{ background: color }} />
     </span>
   );
 }
 
-function AreaChart({ values, tone, gradientId }: { values: number[]; tone: string; gradientId: string }) {
-  const W = 260, H = 80, P = 4;
+function AreaChart({
+  values,
+  tone,
+  gradientId,
+}: {
+  values: number[];
+  tone: string;
+  gradientId: string;
+}) {
+  const W = 260,
+    H = 80,
+    P = 4;
   if (values.length < 2) {
     return (
       <div className="h-20 rounded-md bg-white/[0.02] flex items-center justify-center text-[10px] text-muted">
@@ -94,9 +112,9 @@ function AreaChart({ values, tone, gradientId }: { values: number[]; tone: strin
       </div>
     );
   }
-  const max  = Math.max(...values, 0.01);
+  const max = Math.max(...values, 0.01);
   const step = (W - 2 * P) / Math.max(values.length - 1, 1);
-  const pts  = values.map((v, i) => {
+  const pts = values.map((v, i) => {
     const x = P + i * step;
     const y = H - P - (v / max) * (H - 2 * P);
     return [x, y] as const;
@@ -108,11 +126,11 @@ function AreaChart({ values, tone, gradientId }: { values: number[]; tone: strin
     <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-20">
       <defs>
         <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%"   stopColor={tone} stopOpacity="0.4" />
+          <stop offset="0%" stopColor={tone} stopOpacity="0.4" />
           <stop offset="100%" stopColor={tone} stopOpacity="0" />
         </linearGradient>
         <linearGradient id={`${gradientId}-line`} x1="0" y1="0" x2="1" y2="0">
-          <stop offset="0%"   stopColor={tone} stopOpacity="0.2" />
+          <stop offset="0%" stopColor={tone} stopOpacity="0.2" />
           <stop offset="100%" stopColor={tone} stopOpacity="1" />
         </linearGradient>
       </defs>
@@ -126,9 +144,13 @@ function AreaChart({ values, tone, gradientId }: { values: number[]; tone: strin
         strokeLinecap="round"
       />
       {/* leading dot */}
-      <circle cx={pts[pts.length - 1][0]} cy={pts[pts.length - 1][1]} r="2.5"
-              fill={tone}
-              style={{ filter: `drop-shadow(0 0 4px ${tone})` }} />
+      <circle
+        cx={pts[pts.length - 1][0]}
+        cy={pts[pts.length - 1][1]}
+        r="2.5"
+        fill={tone}
+        style={{ filter: `drop-shadow(0 0 4px ${tone})` }}
+      />
     </svg>
   );
 }

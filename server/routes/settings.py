@@ -19,13 +19,23 @@ from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from config import (
-    API_CONFIG_PATH, load_config as load_api_config,
+    API_CONFIG_PATH,
+)
+from config import (
+    load_config as load_api_config,
+)
+from config import (
     save_config as save_api_config,
 )
 from config.theme_tokens import (
-    DEFAULT_THEME, THEMES, get_theme, list_themes, load_theme_name,
+    DEFAULT_THEME,
+    THEMES,
+    get_theme,
+    list_themes,
+    load_theme_name,
     save_theme_name,
 )
+import contextlib
 
 router = APIRouter()
 
@@ -37,12 +47,13 @@ class ThemePatch(BaseModel):
 # Handlers con I/O sincrónico (load_theme_name, load_api_config) van como
 # `def` para que FastAPI los despache al threadpool y no bloqueen el loop.
 
+
 @router.get("/theme")
 def get_theme_endpoint() -> dict:
     name = load_theme_name() or DEFAULT_THEME
     return {
-        "name":      name,
-        "theme":     get_theme(name),
+        "name": name,
+        "theme": get_theme(name),
         "available": [{"id": tid, "name": tname} for tid, tname in list_themes()],
     }
 
@@ -64,8 +75,8 @@ def get_api_key_status() -> dict:
     configured = bool(env_key or file_key)
     return {
         "configured": configured,
-        "source":     "env" if env_key else ("file" if file_key else None),
-        "path":       str(API_CONFIG_PATH) if not env_key else None,
+        "source": "env" if env_key else ("file" if file_key else None),
+        "path": str(API_CONFIG_PATH) if not env_key else None,
     }
 
 
@@ -89,10 +100,8 @@ def set_api_key(body: ApiKeyBody, request: Request) -> dict:
 
     bus = getattr(request.app.state, "bus", None)
     if bus is not None:
-        try:
+        with contextlib.suppress(Exception):
             bus.mark_ready()
-        except Exception:
-            pass
 
     return {"ok": True, "configured": True}
 
@@ -105,11 +114,12 @@ class SharingBody(BaseModel):
 def get_sharing_endpoint() -> dict:
     """Devuelve el estado del toggle 'Compartir vía Tailscale' + la IP
     Tailscale detectada (si está) para mostrarla en la UI."""
-    from server.sharing import get_sharing, detect_tailscale_ip
+    from server.sharing import detect_tailscale_ip, get_sharing
+
     return {
-        "enabled":     get_sharing(),
+        "enabled": get_sharing(),
         "tailscale_ip": detect_tailscale_ip(),
-        "port":        8765,
+        "port": 8765,
     }
 
 
@@ -117,19 +127,18 @@ def get_sharing_endpoint() -> dict:
 def post_sharing_endpoint(body: SharingBody, request: Request) -> dict:
     """Activa/desactiva el filtro de IP. Persiste en config/sharing.json
     y notifica via bus (settings.sharing) para que el frontend re-renderice."""
-    from server.sharing import set_sharing, detect_tailscale_ip
+    from server.sharing import detect_tailscale_ip, set_sharing
+
     enabled = set_sharing(body.enabled)
     bus = getattr(request.app.state, "bus", None)
     if bus is not None:
-        try:
+        with contextlib.suppress(Exception):
             bus.publish("settings.sharing", {"enabled": enabled})
-        except Exception:
-            pass
     return {
-        "ok":           True,
-        "enabled":      enabled,
+        "ok": True,
+        "enabled": enabled,
         "tailscale_ip": detect_tailscale_ip(),
-        "port":         8765,
+        "port": 8765,
     }
 
 
@@ -143,11 +152,12 @@ def patch_theme(body: ThemePatch, request: Request) -> dict:
     save_theme_name(body.name)
     bus = getattr(request.app.state, "bus", None)
     if bus is not None:
-        try:
-            bus.publish("settings.theme", {
-                "name":  body.name,
-                "theme": get_theme(body.name),
-            })
-        except Exception:
-            pass
+        with contextlib.suppress(Exception):
+            bus.publish(
+                "settings.theme",
+                {
+                    "name": body.name,
+                    "theme": get_theme(body.name),
+                },
+            )
     return {"ok": True, "name": body.name, "theme": get_theme(body.name)}

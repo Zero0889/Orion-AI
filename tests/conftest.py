@@ -27,7 +27,6 @@ from __future__ import annotations
 import pytest
 from starlette.testclient import TestClient as _StarletteTestClient
 
-
 _original_init = _StarletteTestClient.__init__
 
 

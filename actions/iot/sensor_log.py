@@ -21,9 +21,9 @@ import threading
 from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
 
 from core.logger import get_logger
+import contextlib
 
 log = get_logger("iot.sensor_log")
 
@@ -31,8 +31,8 @@ log = get_logger("iot.sensor_log")
 # ── Estado interno ──────────────────────────────────────────────────────
 _buffers: dict[str, list[float]] = defaultdict(list)
 _lock = threading.Lock()
-_log_path: Optional[Path] = None
-_flusher_thread: Optional[threading.Thread] = None
+_log_path: Path | None = None
+_flusher_thread: threading.Thread | None = None
 _flusher_stop = threading.Event()
 
 FLUSH_INTERVAL_S = 60
@@ -40,10 +40,10 @@ FLUSH_INTERVAL_S = 60
 # Unidades por tipo de sensor (mismo set que el frontend en sensorPersonality.ts)
 UNIT_MAP = {
     "temperature": "°C",
-    "humidity":    "%",
-    "light":       "lx",
-    "geo":         "",
-    "count":       "",
+    "humidity": "%",
+    "light": "lx",
+    "geo": "",
+    "count": "",
 }
 
 CSV_HEADER = ["timestamp", "device", "value", "unit", "samples"]
@@ -54,6 +54,7 @@ def _resolve_path() -> Path:
     global _log_path
     if _log_path is None:
         from config import IOT_CONFIG_PATH
+
         # IOT_CONFIG_PATH = .../config/iot_config.json → root del proyecto
         root = IOT_CONFIG_PATH.parent.parent
         _log_path = root / "memory" / "iot_sensor_log.csv"
@@ -65,6 +66,7 @@ def _resolve_unit(device_id: str) -> str:
     """Mira el config del IoT system para sacar la unidad."""
     try:
         from actions.iot import get_system
+
         sys = get_system()
         dev = sys.cfg.devices.get(device_id)
         if dev and dev.capabilities.sensor:
@@ -77,11 +79,21 @@ def _resolve_unit(device_id: str) -> str:
 # ── API pública ────────────────────────────────────────────────────────
 def record(device_id: str, raw_value: str) -> None:
     """Acumula una lectura. Llamado desde el callback del transport.
-    Valores no numéricos (lat/lon u otros) se ignoran silenciosamente
-    — el datalogger sólo persiste series numéricas."""
+
+    Reglas para evitar 'valores fantasma' en el log/Sheet:
+      * No numéricos (lat/lon, strings) se descartan.
+      * NaN / ±Inf se descartan (a veces los sensores devuelven NaN
+        cuando se desconectan momentáneamente).
+      * Si en un minuto no llega ninguna lectura para un device, no se
+        escribe fila para él en :func:`_flush_once`.
+    """
+    import math
+
     try:
         v = float(raw_value)
     except (TypeError, ValueError):
+        return
+    if math.isnan(v) or math.isinf(v):
         return
     with _lock:
         _buffers[device_id].append(v)
@@ -132,7 +144,9 @@ def start() -> None:
     _resolve_path()
     _flusher_stop.clear()
     _flusher_thread = threading.Thread(
-        target=_flusher_loop, daemon=True, name="iot-sensor-log-flusher",
+        target=_flusher_loop,
+        daemon=True,
+        name="iot-sensor-log-flusher",
     )
     _flusher_thread.start()
     log.info("datalogger iniciado (flush cada %ds)", FLUSH_INTERVAL_S)
@@ -141,23 +155,19 @@ def start() -> None:
 def stop() -> None:
     """Para el thread y persiste el buffer remanente."""
     _flusher_stop.set()
-    try:
+    with contextlib.suppress(Exception):
         _flush_once()
-    except Exception:
-        pass
 
 
 # ── Lectura para descarga ──────────────────────────────────────────────
 def read_csv_bytes() -> bytes:
     """Devuelve el CSV completo. Vacío con header si no hay data aún."""
     # Asegurar que el buffer activo esté en disco antes de exportar
-    try:
+    with contextlib.suppress(Exception):
         _flush_once()
-    except Exception:
-        pass
     path = _resolve_path()
     if not path.exists() or path.stat().st_size == 0:
-        return ("," .join(CSV_HEADER) + "\n").encode("utf-8")
+        return (",".join(CSV_HEADER) + "\n").encode("utf-8")
     return path.read_bytes()
 
 
@@ -167,20 +177,16 @@ def read_xlsx_bytes() -> bytes:
     from openpyxl.styles import Alignment, Font, PatternFill
     from openpyxl.utils import get_column_letter
 
-    try:
+    with contextlib.suppress(Exception):
         _flush_once()
-    except Exception:
-        pass
 
     path = _resolve_path()
     rows: list[list[str]] = []
     if path.exists() and path.stat().st_size > 0:
         with path.open("r", encoding="utf-8", newline="") as f:
             reader = csv.reader(f)
-            try:
+            with contextlib.suppress(StopIteration):
                 next(reader)  # skip header
-            except StopIteration:
-                pass
             rows = [r for r in reader if r]
 
     head_fill = PatternFill(start_color="1F2937", end_color="1F2937", fill_type="solid")
@@ -197,7 +203,7 @@ def read_xlsx_bytes() -> bytes:
             ws.append(row)
         widths = [len(h) for h in header]
         for row in data_rows:
-            for i, v in enumerate(row[:len(widths)]):
+            for i, v in enumerate(row[: len(widths)]):
                 widths[i] = max(widths[i], len(str(v)))
         for i, w in enumerate(widths, start=1):
             ws.column_dimensions[get_column_letter(i)].width = min(max(w + 2, 10), 32)

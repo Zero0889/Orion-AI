@@ -1,10 +1,7 @@
 import json
 import re
-import sys
-from pathlib import Path
 
-from config import get_api_key
-from core.tool_registry  import ToolRegistry
+from core.tool_registry import ToolRegistry
 from core.tools_bootstrap import register_builtin_tools
 
 # Asegura que el registry esté poblado antes de renderizar el prompt.
@@ -20,6 +17,7 @@ def _build_agents_text() -> str:
     """
     try:
         from agent.registry import list_agents
+
         agents = list_agents()
     except Exception as e:
         print(f"[Planner] ⚠️ Sin registro de agentes: {e}")
@@ -41,6 +39,7 @@ def _build_skills_text() -> str:
     invocar ``use_skill``. Vacío si no hay skills."""
     try:
         from core.skills import build_skill_catalog_prompt
+
         cat = build_skill_catalog_prompt()
     except Exception as e:
         print(f"[Planner] ⚠️ Sin catálogo de skills: {e}")
@@ -51,8 +50,8 @@ def _build_skills_text() -> str:
         "AVAILABLE SKILLS (load with use_skill BEFORE the step that needs them):\n"
         f"{cat}\n\n"
         "When a goal matches a skill description, plan TWO steps:\n"
-        "  1) any agent | use_skill | skill_id: \"<id>\"   (loads the recipe)\n"
-        "  2) coder | generated_code | description: \"<execute as the skill says>\"\n\n"
+        '  1) any agent | use_skill | skill_id: "<id>"   (loads the recipe)\n'
+        '  2) coder | generated_code | description: "<execute as the skill says>"\n\n'
     )
 
 
@@ -62,7 +61,7 @@ def _build_planner_prompt() -> str:
     desde ``agent.registry``. Si añades una tool al bootstrap o un
     agente a ``config/agents.json``, aparece aquí sin tocar nada más.
     """
-    tools_text  = ToolRegistry().to_planner_text()
+    tools_text = ToolRegistry().to_planner_text()
     agents_text = _build_agents_text()
     skills_text = _build_skills_text()
 
@@ -155,7 +154,7 @@ def _normalize_agent(step: dict) -> None:
     omitió el campo o asignó un agente inexistente/inhabilitado, cae al
     primer agente habilitado capaz de usar la tool, y si no, al director."""
     try:
-        from agent.registry import agent_for_tool, has_agent, agent_can_use, list_agents
+        from agent.registry import agent_can_use, agent_for_tool, has_agent, list_agents
     except Exception:
         return  # sin registro de agentes → modo legacy
 
@@ -178,10 +177,7 @@ def _normalize_agent(step: dict) -> None:
 def create_plan(goal: str, context: str = "") -> dict:
     from core import gemini
 
-    model = gemini.model(
-        "gemini-2.5-flash-lite",
-        system_instruction=_build_planner_prompt()
-    )
+    model = gemini.model("gemini-2.5-flash-lite", system_instruction=_build_planner_prompt())
 
     user_input = f"Goal: {goal}"
     if context:
@@ -189,8 +185,8 @@ def create_plan(goal: str, context: str = "") -> dict:
 
     try:
         response = model.generate_content(user_input)
-        text     = response.text.strip()
-        text     = re.sub(r"```(?:json)?", "", text).strip().rstrip("`").strip()
+        text = response.text.strip()
+        text = re.sub(r"```(?:json)?", "", text).strip().rstrip("`").strip()
 
         plan = json.loads(text)
 
@@ -200,11 +196,14 @@ def create_plan(goal: str, context: str = "") -> dict:
         for step in plan["steps"]:
             if step.get("tool") in ("generated_code",):
                 # Solo lo permitimos si el agente asignado lo tiene en su lista.
-                from agent.registry import has_agent, agent_can_use
+                from agent.registry import agent_can_use, has_agent
+
                 agent_id = step.get("agent", "")
-                allowed  = has_agent(agent_id) and agent_can_use(agent_id, "generated_code")
+                allowed = has_agent(agent_id) and agent_can_use(agent_id, "generated_code")
                 if not allowed:
-                    print(f"[Planner] ⚠️ generated_code rechazado en step {step.get('step')} (agente {agent_id!r}) — replacing with web_search")
+                    print(
+                        f"[Planner] ⚠️ generated_code rechazado en step {step.get('step')} (agente {agent_id!r}) — replacing with web_search"
+                    )
                     desc = step.get("description", goal)
                     step["tool"] = "web_search"
                     step["parameters"] = {"query": desc[:200]}
@@ -213,7 +212,7 @@ def create_plan(goal: str, context: str = "") -> dict:
 
         print(f"[Planner] ✅ Plan: {len(plan['steps'])} steps")
         for s in plan["steps"]:
-            print(f"  Step {s['step']}: <{s.get('agent','?')}> [{s['tool']}] {s['description']}")
+            print(f"  Step {s['step']}: <{s.get('agent', '?')}> [{s['tool']}] {s['description']}")
 
         return plan
 
@@ -232,7 +231,7 @@ def _fallback_plan(goal: str) -> dict:
         "tool": "web_search",
         "description": f"Search for: {goal}",
         "parameters": {"query": goal},
-        "critical": True
+        "critical": True,
     }
     _normalize_agent(step)
     return {"goal": goal, "steps": [step]}
@@ -241,34 +240,32 @@ def _fallback_plan(goal: str) -> dict:
 def replan(goal: str, completed_steps: list, failed_step: dict, error: str) -> dict:
     from core import gemini
 
-    model = gemini.model(
-        "gemini-2.5-flash",
-        system_instruction=_build_planner_prompt()
-    )
+    model = gemini.model("gemini-2.5-flash", system_instruction=_build_planner_prompt())
 
     completed_summary = "\n".join(
-        f"  - Step {s['step']} <{s.get('agent','?')}> ({s['tool']}): DONE" for s in completed_steps
+        f"  - Step {s['step']} <{s.get('agent', '?')}> ({s['tool']}): DONE" for s in completed_steps
     )
 
     prompt = f"""Goal: {goal}
 
 Already completed:
-{completed_summary if completed_summary else '  (none)'}
+{completed_summary if completed_summary else "  (none)"}
 
-Failed step: <{failed_step.get('agent','?')}> [{failed_step.get('tool')}] {failed_step.get('description')}
+Failed step: <{failed_step.get("agent", "?")}> [{failed_step.get("tool")}] {failed_step.get("description")}
 Error: {error}
 
 Create a REVISED plan for the remaining work only. Do not repeat completed steps."""
 
     try:
         response = model.generate_content(prompt)
-        text     = response.text.strip()
-        text     = re.sub(r"```(?:json)?", "", text).strip().rstrip("`").strip()
-        plan     = json.loads(text)
+        text = response.text.strip()
+        text = re.sub(r"```(?:json)?", "", text).strip().rstrip("`").strip()
+        plan = json.loads(text)
 
         for step in plan.get("steps", []):
             if step.get("tool") == "generated_code":
-                from agent.registry import has_agent, agent_can_use
+                from agent.registry import agent_can_use, has_agent
+
                 agent_id = step.get("agent", "")
                 if not (has_agent(agent_id) and agent_can_use(agent_id, "generated_code")):
                     step["tool"] = "web_search"

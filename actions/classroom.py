@@ -8,30 +8,31 @@ Reads Chrome path from config/browser.json.
 """
 
 import json
-import subprocess
 import platform
+import subprocess
 from pathlib import Path
 
 _OS = platform.system()
-from config import BASE_DIR as _BASE_DIR, BROWSER_CONFIG_PATH as _BROWSER_CONFIG_PATH
+from config import BROWSER_CONFIG_PATH as _BROWSER_CONFIG_PATH
 
 _CLASSROOM_URLS = {
-    "personal":       "https://classroom.google.com/u/0/",
-    "normal":         "https://classroom.google.com/u/0/",
-    "principal":      "https://classroom.google.com/u/0/",
-    "institucional":  "https://classroom.google.com/u/1/h",
-    "universidad":    "https://classroom.google.com/u/1/h",
-    "uni":            "https://classroom.google.com/u/1/h",
-    "unmsm":          "https://classroom.google.com/u/1/h",
-    "secundaria":     "https://classroom.google.com/u/1/h",
+    "personal": "https://classroom.google.com/u/0/",
+    "normal": "https://classroom.google.com/u/0/",
+    "principal": "https://classroom.google.com/u/0/",
+    "institucional": "https://classroom.google.com/u/1/h",
+    "universidad": "https://classroom.google.com/u/1/h",
+    "uni": "https://classroom.google.com/u/1/h",
+    "unmsm": "https://classroom.google.com/u/1/h",
+    "secundaria": "https://classroom.google.com/u/1/h",
 }
 
 
 def _get_chrome_path() -> str | None:
     """Obtiene la ruta de Chrome desde browser.json o busca en el sistema."""
     import shutil
+
     try:
-        with open(_BROWSER_CONFIG_PATH, "r", encoding="utf-8") as f:
+        with open(_BROWSER_CONFIG_PATH, encoding="utf-8") as f:
             cfg = json.load(f)
         chrome = cfg.get("chrome_path", "")
         if chrome and Path(chrome).exists():

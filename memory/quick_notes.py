@@ -20,13 +20,13 @@ import tempfile
 import threading
 import uuid
 from datetime import datetime
-from pathlib import Path
 
 from config import MEMORY_DIR
+import contextlib
 
 _NOTES_PATH = MEMORY_DIR / "quick_notes.json"
-MAX_NOTES   = 500
-MAX_LEN     = 4000
+MAX_NOTES = 500
+MAX_LEN = 4000
 _LOCK = threading.Lock()
 
 
@@ -50,17 +50,13 @@ def _save_all(notes: list[dict]) -> None:
         notes = notes[-MAX_NOTES:]
     payload = json.dumps(notes, indent=2, ensure_ascii=False)
 
-    fd, tmp = tempfile.mkstemp(
-        prefix=".notes_", suffix=".tmp", dir=str(MEMORY_DIR)
-    )
+    fd, tmp = tempfile.mkstemp(prefix=".notes_", suffix=".tmp", dir=str(MEMORY_DIR))
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as f:
             f.write(payload)
             f.flush()
-            try:
+            with contextlib.suppress(OSError):
                 os.fsync(f.fileno())
-            except OSError:
-                pass
         os.replace(tmp, _NOTES_PATH)
     except OSError as e:
         print(f"[QuickNotes] ⚠️  Save error: {e}")
@@ -94,10 +90,10 @@ def add_note(text: str, color: str | None = None) -> dict:
     with _LOCK:
         notes = _load_all()
         n = {
-            "id":      uuid.uuid4().hex[:8],
-            "text":    text,
-            "color":   color or "",
-            "pinned":  False,
+            "id": uuid.uuid4().hex[:8],
+            "text": text,
+            "color": color or "",
+            "pinned": False,
             "created": _now_iso(),
             "updated": _now_iso(),
         }
@@ -106,9 +102,9 @@ def add_note(text: str, color: str | None = None) -> dict:
         return n
 
 
-def update_note(note_id: str, *, text: str | None = None,
-                color: str | None = None,
-                pinned: bool | None = None) -> bool:
+def update_note(
+    note_id: str, *, text: str | None = None, color: str | None = None, pinned: bool | None = None
+) -> bool:
     with _LOCK:
         notes = _load_all()
         for n in notes:

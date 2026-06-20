@@ -25,7 +25,7 @@ globales — la app es siempre creada con el bus inyectado.
 from __future__ import annotations
 
 import asyncio
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
 from pathlib import Path
 from typing import Any
 
@@ -34,7 +34,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from config import BASE_DIR, RESOURCES_DIR
+from config import RESOURCES_DIR
 from core.logger import get_logger
 
 log = get_logger("server.app")
@@ -71,6 +71,7 @@ def build_app(bus: Any) -> FastAPI:
 
         # Telemetría periódica (CPU/RAM/disco) — Fase 3b
         from server.telemetry import run as run_telemetry
+
         app.state.telemetry_task = asyncio.create_task(run_telemetry(bus))
 
         try:
@@ -79,10 +80,8 @@ def build_app(bus: Any) -> FastAPI:
             t = getattr(app.state, "telemetry_task", None)
             if t is not None:
                 t.cancel()
-                try:
+                with suppress(asyncio.CancelledError, Exception):
                     await t
-                except (asyncio.CancelledError, Exception):
-                    pass
 
             stop = getattr(app.state, "ws_stop_drain", None)
             if stop is not None:
@@ -107,6 +106,7 @@ def build_app(bus: Any) -> FastAPI:
     # también lo usan otros ISP, y `credentials=true` con regex amplia
     # amplificaba el riesgo (ver auditoría I-08).
     from server.sharing import detect_tailscale_ip
+
     allowed_origins = [
         "http://localhost:5173",
         "http://127.0.0.1:5173",
@@ -130,48 +130,69 @@ def build_app(bus: Any) -> FastAPI:
 
     # ── Sharing (filtra por IP en cada request) ──────────────────────────
     # Cargado desde config/sharing.json al arrancar; toggleable via API.
-    from server.sharing import init_state as init_sharing, install as install_sharing
+    from server.sharing import init_state as init_sharing
+    from server.sharing import install as install_sharing
+
     init_sharing()
     install_sharing(app)
 
     # ── Endpoint de salud (Fase 1, sin auth) ─────────────────────────────
     @app.get("/api/health")
     async def health() -> JSONResponse:
-        return JSONResponse({
-            "ok": True,
-            "service": "orion-backend",
-            "version": app.version,
-            "state": getattr(bus, "_state", "ESCUCHANDO"),
-            "muted": bool(bus.muted),
-        })
+        return JSONResponse(
+            {
+                "ok": True,
+                "service": "orion-backend",
+                "version": app.version,
+                "state": getattr(bus, "_state", "ESCUCHANDO"),
+                "muted": bool(bus.muted),
+            }
+        )
 
     # ── Routers ───────────────────────────────────────────────────────────
     from server.routes import (
-        agent, circuit, conversations, files, integrations, iot, mcp, memory,
-        notebooklm as notebooklm_route,
-        notes, notifications, skills, settings as settings_route,
+        agent,
+        circuit,
+        conversations,
+        files,
+        integrations,
+        iot,
+        mcp,
+        memory,
+        notes,
+        notifications,
+        skills,
     )
-    app.include_router(memory.router,            prefix="/api/memory",        tags=["memory"])
-    app.include_router(notes.router,             prefix="/api/notes",         tags=["notes"])
-    app.include_router(conversations.router,     prefix="/api/conversations", tags=["conversations"])
-    app.include_router(settings_route.router,    prefix="/api/settings",      tags=["settings"])
-    app.include_router(agent.router,             prefix="/api/agent",         tags=["agent"])
-    app.include_router(iot.router,               prefix="/api/iot",           tags=["iot"])
-    app.include_router(mcp.router,               prefix="/api/mcp",           tags=["mcp"])
-    app.include_router(skills.router,            prefix="/api/skills",        tags=["skills"])
-    app.include_router(notifications.router,     prefix="/api/notifications", tags=["notifications"])
-    app.include_router(files.router,             prefix="/api/files",         tags=["files"])
-    app.include_router(notebooklm_route.router,  prefix="/api/notebooklm",    tags=["notebooklm"])
-    app.include_router(integrations.router,      prefix="/api/integrations",  tags=["integrations"])
-    app.include_router(circuit.router,           prefix="/api/circuit",       tags=["circuit"])
+    from server.routes import (
+        notebooklm as notebooklm_route,
+    )
+    from server.routes import (
+        settings as settings_route,
+    )
+
+    app.include_router(memory.router, prefix="/api/memory", tags=["memory"])
+    app.include_router(notes.router, prefix="/api/notes", tags=["notes"])
+    app.include_router(conversations.router, prefix="/api/conversations", tags=["conversations"])
+    app.include_router(settings_route.router, prefix="/api/settings", tags=["settings"])
+    app.include_router(agent.router, prefix="/api/agent", tags=["agent"])
+    app.include_router(iot.router, prefix="/api/iot", tags=["iot"])
+    app.include_router(mcp.router, prefix="/api/mcp", tags=["mcp"])
+    app.include_router(skills.router, prefix="/api/skills", tags=["skills"])
+    app.include_router(notifications.router, prefix="/api/notifications", tags=["notifications"])
+    app.include_router(files.router, prefix="/api/files", tags=["files"])
+    app.include_router(notebooklm_route.router, prefix="/api/notebooklm", tags=["notebooklm"])
+    app.include_router(integrations.router, prefix="/api/integrations", tags=["integrations"])
+    app.include_router(circuit.router, prefix="/api/circuit", tags=["circuit"])
 
     # ── WebSocket hub ────────────────────────────────────────────────────
     from server.ws import register_ws
+
     register_ws(app, bus)
 
     # ── Notification poller (Gmail + Classroom en background) ─────────────
     try:
         from actions.notifications import get_poller, start_poller
+
         get_poller().set_publish(bus.publish)
         start_poller()
     except Exception as e:
@@ -207,6 +228,8 @@ def build_app(bus: Any) -> FastAPI:
 
         log.info("Frontend estatico servido desde %s", dist_dir)
     else:
-        log.info("web/dist no presente: ejecuta `npm run build` en web/ para empaquetar el frontend")
+        log.info(
+            "web/dist no presente: ejecuta `npm run build` en web/ para empaquetar el frontend"
+        )
 
     return app

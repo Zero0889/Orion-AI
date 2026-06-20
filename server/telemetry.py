@@ -29,6 +29,7 @@ import psutil
 
 from config import BASE_DIR
 from core.logger import get_logger
+import contextlib
 
 log = get_logger("server.telemetry")
 
@@ -39,10 +40,8 @@ async def run(bus: Any) -> None:
     """Loop infinito. Se cancela limpiamente con CancelledError."""
     log.info("Telemetry broadcaster iniciado (cada %.1fs)", TICK_INTERVAL_S)
     # Primer cpu_percent siempre devuelve 0 — lo precalentamos.
-    try:
+    with contextlib.suppress(Exception):
         psutil.cpu_percent(interval=None)
-    except Exception:
-        pass
     while True:
         try:
             await asyncio.sleep(TICK_INTERVAL_S)
@@ -63,16 +62,16 @@ _DISK_PATH = str(BASE_DIR)
 
 def _sample() -> dict | None:
     try:
-        cpu  = psutil.cpu_percent(interval=None) / 100.0
+        cpu = psutil.cpu_percent(interval=None) / 100.0
         vmem = psutil.virtual_memory()
-        ram  = vmem.percent / 100.0
+        ram = vmem.percent / 100.0
         disk = psutil.disk_usage(_DISK_PATH).percent / 100.0
     except Exception as e:
         log.debug("psutil falló: %s", e)
         return None
     return {
-        "cpu":  round(cpu,  4),
-        "ram":  round(ram,  4),
+        "cpu": round(cpu, 4),
+        "ram": round(ram, 4),
         "disk": round(disk, 4),
-        "ts":   time.time(),
+        "ts": time.time(),
     }

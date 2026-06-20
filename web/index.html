@@ -2,8 +2,34 @@
 <html lang="es">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>O.R.I.O.N</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+
+    <title>O.R.I.O.N — Sistema Operativo de IA</title>
+    <meta name="description" content="Orion: sistema operativo de inteligencia artificial. Conversación, agentes autónomos, memoria, IoT y skills en una sola interfaz." />
+
+    <!-- Color del chrome del navegador en mobile y tab bar de PWA. Sigue
+         el negro espacial del tema dark; en light se actualiza vía JS. -->
+    <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#F5F7FB" media="(prefers-color-scheme: light)" />
+
+    <!-- iOS / Android web-app: cuando se "instala" en home screen,
+         arranca sin chrome del browser. -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Orion" />
+
+    <!-- Favicon SVG: escala perfecta en cualquier densidad. -->
+    <link rel="icon" type="image/svg+xml" href="/icons/orion.svg" />
+    <link rel="apple-touch-icon" href="/icons/orion.svg" />
+
+    <!-- Open Graph / Twitter — link previews limpios cuando se comparte. -->
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="O.R.I.O.N" />
+    <meta property="og:description" content="Sistema operativo de inteligencia artificial." />
+    <meta property="og:locale" content="es_ES" />
+    <meta name="twitter:card" content="summary" />
+
+    <meta name="format-detection" content="telephone=no" />
   </head>
   <body class="bg-bg text-text">
     <div id="root"></div>

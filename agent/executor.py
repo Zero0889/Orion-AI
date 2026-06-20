@@ -1,16 +1,17 @@
-import json
-import re
-import sys
-import threading
-import subprocess
-import tempfile
 import os
+import re
+import subprocess
+import sys
+import tempfile
+import threading
+from collections.abc import Callable
+from datetime import UTC
 from pathlib import Path
-from typing import Callable
 
-from config import get_api_key
-from agent.planner       import create_plan, replan
-from agent.error_handler import analyze_error, generate_fix, ErrorDecision
+from agent.error_handler import ErrorDecision, analyze_error, generate_fix
+from agent.planner import create_plan, replan
+import contextlib
+
 
 def _looks_non_python(code: str) -> bool:
     """Heurística rápida: ¿esto NO es Python?
@@ -43,7 +44,9 @@ def _detect_lang(code: str) -> str:
         return "html"
     if head.startswith("<svg"):
         return "svg"
-    if head.startswith("<style") or (":" in head and "{" in head and "}" in head and "<" not in head):
+    if head.startswith("<style") or (
+        ":" in head and "{" in head and "}" in head and "<" not in head
+    ):
         return "css"
     if head.startswith(("{", "[")):
         return "json"
@@ -69,16 +72,19 @@ def _run_generated_code(
     if speak:
         speak("Escribiendo código personalizado para esta tarea, señor.")
 
-    home      = Path.home()
-    desktop   = home / "Desktop"
+    home = Path.home()
+    desktop = home / "Desktop"
     downloads = home / "Downloads"
     documents = home / "Documents"
 
     if not desktop.exists():
         try:
             import winreg
-            key     = winreg.OpenKey(winreg.HKEY_CURRENT_USER,
-                r"Software\Microsoft\Windows\CurrentVersion\Explorer\Shell Folders")
+
+            key = winreg.OpenKey(
+                winreg.HKEY_CURRENT_USER,
+                r"Software\Microsoft\Windows\CurrentVersion\Explorer\Shell Folders",
+            )
             desktop = Path(winreg.QueryValueEx(key, "Desktop")[0])
         except Exception:
             pass
@@ -102,6 +108,7 @@ def _run_generated_code(
     if agent_id:
         try:
             from agent.registry import ask_agent, has_agent
+
             if has_agent(agent_id):
                 code = ask_agent(agent_id, user_prompt)
                 routed_via_agent = True
@@ -111,6 +118,7 @@ def _run_generated_code(
 
     if not routed_via_agent:
         from core import gemini
+
         model = gemini.model(
             "gemini-2.5-flash",
             system_instruction=(
@@ -120,7 +128,7 @@ def _run_generated_code(
                 "Install missing packages with subprocess + pip if needed. "
                 "Return ONLY the Python code. No explanation, no markdown, no backticks.\n\n"
                 + paths_block
-            )
+            ),
         )
         response = model.generate_content(
             f"Write Python code to accomplish this task:\n\n{description}"
@@ -150,7 +158,7 @@ def _run_generated_code(
         print(f"[Executor] 🐍 Running generated code: {tmp_path}")
         # Loggeamos el código generado (truncado) para poder debuggear cuando
         # el coder LLM elige un comando equivocado.
-        _code_preview = code if len(code) <= 800 else code[:800] + f"…[+{len(code)-800} chars]"
+        _code_preview = code if len(code) <= 800 else code[:800] + f"…[+{len(code) - 800} chars]"
         print(f"[Executor] 📝 Code:\n{_code_preview}")
 
         # Prepend tools/<name>/ dirs al PATH para que el código que llama
@@ -159,6 +167,7 @@ def _run_generated_code(
         env = os.environ.copy()
         try:
             from core.cli_installer import extra_path_dirs
+
             extras = extra_path_dirs()
             if extras:
                 env["PATH"] = os.pathsep.join(extras + [env.get("PATH", "")])
@@ -173,27 +182,28 @@ def _run_generated_code(
 
         result = subprocess.run(
             [sys.executable, tmp_path],
-            capture_output=True, text=True,
-            timeout=120, cwd=str(Path.home()),
+            capture_output=True,
+            text=True,
+            timeout=120,
+            cwd=str(Path.home()),
             env=env,
-            encoding="utf-8", errors="replace",
+            encoding="utf-8",
+            errors="replace",
         )
 
         output = result.stdout.strip()
-        error  = result.stderr.strip()
+        error = result.stderr.strip()
 
         # Si rc=0 pero no imprimió nada, guardamos el .py para debug en vez
         # de borrarlo — así podemos abrirlo y ver qué escribió el coder.
-        keep_for_debug = (result.returncode == 0 and not output)
+        keep_for_debug = result.returncode == 0 and not output
         if keep_for_debug:
             print(f"[Executor] ⚠️ rc=0 pero stdout vacío. Código preservado en: {tmp_path}")
             if error:
                 print(f"[Executor] 📥 stderr capturado:\n{error[:1000]}")
         else:
-            try:
+            with contextlib.suppress(Exception):
                 os.unlink(tmp_path)
-            except Exception:
-                pass
 
         if result.returncode == 0 and output:
             return output
@@ -211,12 +221,13 @@ def _run_generated_code(
             raise RuntimeError(f"Error de código: {error[:400]}")
         return "Completado."
 
-    except subprocess.TimeoutExpired:
-        raise RuntimeError("El código generado excedió el tiempo límite de 120 segundos.")
+    except subprocess.TimeoutExpired as e:
+        raise RuntimeError("El código generado excedió el tiempo límite de 120 segundos.") from e
     except RuntimeError:
         raise
     except (OSError, ValueError) as e:
-        raise RuntimeError(f"El código generado falló: {e}")
+        raise RuntimeError(f"El código generado falló: {e}") from e
+
 
 def _inject_context(params: dict, tool: str, step_results: dict, goal: str = "") -> dict:
     if not step_results:
@@ -228,14 +239,15 @@ def _inject_context(params: dict, tool: str, step_results: dict, goal: str = "")
         content = params.get("content", "")
         if not content or len(content) < 50:
             all_results = [
-                v for v in step_results.values()
+                v
+                for v in step_results.values()
                 if v and len(v) > 100 and v not in ("Done.", "Completed.")
             ]
             if all_results:
                 combined = "\n\n---\n\n".join(all_results)
                 translated = _translate_to_goal_language(combined, goal)
                 params["content"] = translated
-                print(f"[Executor] 💉 Injected + translated content")
+                print("[Executor] 💉 Injected + translated content")
 
     # generated_code: si un step previo cargó una skill (use_skill), inyectamos
     # SOLO las líneas del SKILL.md que matchean con el goal — el cuerpo completo
@@ -243,7 +255,8 @@ def _inject_context(params: dict, tool: str, step_results: dict, goal: str = "")
     # de OpenClaw: el modelo razona sobre la skill, no se le sirve todo).
     if tool == "generated_code":
         skill_blobs = [
-            v for v in step_results.values()
+            v
+            for v in step_results.values()
             if isinstance(v, str) and v.startswith("# Skill cargada:")
         ]
         if skill_blobs:
@@ -282,15 +295,18 @@ def _inject_context(params: dict, tool: str, step_results: dict, goal: str = "")
                 f"6. For 'latest N mails' / 'últimos N correos' use: `gog gmail search 'in:inbox' --max N` "
                 f"(or 'is:unread' if user asks for unread)."
             )
-            print(f"[Executor] 💉 Injected filtered skill recipes ({len(filtered)} chars) for goal: {goal[:60]}")
+            print(
+                f"[Executor] 💉 Injected filtered skill recipes ({len(filtered)} chars) for goal: {goal[:60]}"
+            )
 
     return params
 
 
 def _today_iso() -> str:
     """Fecha de hoy en ISO para que el coder calcule rangos relativos."""
-    from datetime import datetime, timezone
-    return datetime.now(timezone.utc).strftime("%Y-%m-%d (%A UTC)")
+    from datetime import datetime
+
+    return datetime.now(UTC).strftime("%Y-%m-%d (%A UTC)")
 
 
 # Mapeo keyword → categorías que probablemente matcheen. La idea no es ser
@@ -298,27 +314,27 @@ def _today_iso() -> str:
 # de las 30+ que tiene completo. Si no matcheamos nada, devolvemos el body
 # completo (mejor mucho contexto que ninguno).
 _SKILL_KEYWORDS: dict[str, tuple[str, ...]] = {
-    "calendar":  ("calendar",),
-    "evento":    ("calendar",),
-    "agenda":    ("calendar",),
-    "cita":      ("calendar",),
-    "reunion":   ("calendar",),
-    "reunión":   ("calendar",),
-    "mail":      ("gmail",),
-    "correo":    ("gmail",),
-    "email":     ("gmail",),
-    "gmail":     ("gmail",),
-    "bandeja":   ("gmail",),
-    "draft":     ("gmail draft", "drafts"),
-    "borrador":  ("gmail draft", "drafts"),
-    "drive":     ("drive",),
-    "archivo":   ("drive",),
-    "contacto":  ("contacts",),
-    "sheet":     ("sheets",),
-    "hoja":      ("sheets",),
-    "planilla":  ("sheets",),
+    "calendar": ("calendar",),
+    "evento": ("calendar",),
+    "agenda": ("calendar",),
+    "cita": ("calendar",),
+    "reunion": ("calendar",),
+    "reunión": ("calendar",),
+    "mail": ("gmail",),
+    "correo": ("gmail",),
+    "email": ("gmail",),
+    "gmail": ("gmail",),
+    "bandeja": ("gmail",),
+    "draft": ("gmail draft", "drafts"),
+    "borrador": ("gmail draft", "drafts"),
+    "drive": ("drive",),
+    "archivo": ("drive",),
+    "contacto": ("contacts",),
+    "sheet": ("sheets",),
+    "hoja": ("sheets",),
+    "planilla": ("sheets",),
     "spreadsheet": ("sheets",),
-    "doc":       ("docs",),
+    "doc": ("docs",),
     "documento": ("docs",),
 }
 
@@ -346,7 +362,11 @@ def _filter_skill_for_goal(skill_body: str, goal: str, desc: str) -> str:
         # Cabeceras siempre se mantienen
         if lstripped.startswith("#"):
             section_text = lstripped.lower()
-            keep_section = any(c in section_text for c in matched_categories) or "setup" in section_text or "common commands" in section_text
+            keep_section = (
+                any(c in section_text for c in matched_categories)
+                or "setup" in section_text
+                or "common commands" in section_text
+            )
             if keep_section:
                 out_lines.append(line)
             continue
@@ -364,8 +384,11 @@ def _filter_skill_for_goal(skill_body: str, goal: str, desc: str) -> str:
         # Filtro demasiado agresivo → fallback al body completo.
         return skill_body
     return filtered
+
+
 def _detect_language(text: str) -> str:
     from core import gemini
+
     model = gemini.model("gemini-2.5-flash-lite")
     try:
         response = model.generate_content(
@@ -383,6 +406,7 @@ def _translate_to_goal_language(content: str, goal: str) -> str:
         return content
     try:
         from core import gemini
+
         model = gemini.model("gemini-2.5-flash")
 
         target_lang = _detect_language(goal)
@@ -406,6 +430,7 @@ def _translate_to_goal_language(content: str, goal: str) -> str:
         print(f"[Executor] ⚠️ Translation failed: {e}")
         return content
 
+
 def _call_tool(
     tool: str,
     parameters: dict,
@@ -424,7 +449,7 @@ def _call_tool(
     escriba el LLM del agente asignado (p. ej. Coder con DeepSeek) en
     lugar del Gemini por defecto.
     """
-    from core.tool_registry  import ToolRegistry
+    from core.tool_registry import ToolRegistry
     from core.tools_bootstrap import register_builtin_tools
 
     # Idempotente — si main.py ya lo llamó, no hace nada.
@@ -443,50 +468,56 @@ def _call_tool(
             f"Accomplish this task: {parameters}", speak=speak, agent_id=agent_id
         )
 
-    return registry.call_sync(
-        tool, parameters,
-        player=None,         # executor corre headless, sin UI
-        speak=speak,
-    ) or "Done."
+    return (
+        registry.call_sync(
+            tool,
+            parameters,
+            player=None,  # executor corre headless, sin UI
+            speak=speak,
+        )
+        or "Done."
+    )
+
 
 class AgentExecutor:
-
     MAX_REPLAN_ATTEMPTS = 2
 
     def execute(
         self,
-        goal:        str,
-        speak:       Callable | None        = None,
+        goal: str,
+        speak: Callable | None = None,
         cancel_flag: threading.Event | None = None,
     ) -> str:
         print(f"\n[Executor] 🎯 Goal: {goal}")
 
         replan_attempts = 0
         completed_steps = []
-        step_results    = {} 
-        plan            = create_plan(goal)
+        step_results = {}
+        plan = create_plan(goal)
 
         while True:
             steps = plan.get("steps", [])
 
             if not steps:
                 msg = "No pude crear un plan válido para esta tarea, señor."
-                if speak: speak(msg)
+                if speak:
+                    speak(msg)
                 return msg
 
-            success      = True
-            failed_step  = None
+            success = True
+            failed_step = None
             failed_error = ""
 
             for step in steps:
                 if cancel_flag and cancel_flag.is_set():
-                    if speak: speak("Tarea cancelada, señor.")
+                    if speak:
+                        speak("Tarea cancelada, señor.")
                     return "Tarea cancelada."
 
                 step_num = step.get("step", "?")
-                tool     = step.get("tool", "generated_code")
-                desc     = step.get("description", "")
-                params   = step.get("parameters", {})
+                tool = step.get("tool", "generated_code")
+                desc = step.get("description", "")
+                params = step.get("parameters", {})
                 agent_id = step.get("agent")
 
                 params = _inject_context(params, tool, step_results, goal=goal)
@@ -508,14 +539,18 @@ class AgentExecutor:
                         # truncado a 100 chars escondía si el resultado venía
                         # bien o no.
                         _r = str(result)
-                        _preview = _r if len(_r) <= 1200 else _r[:1200] + f"…[+{len(_r)-1200} chars]"
+                        _preview = (
+                            _r if len(_r) <= 1200 else _r[:1200] + f"…[+{len(_r) - 1200} chars]"
+                        )
                         print(f"[Executor] ✅ Step {step_num} done ({len(_r)} chars):\n{_preview}")
                         step_ok = True
                         break
 
                     except Exception as e:
                         error_msg = str(e)
-                        print(f"[Executor] ❌ Step {step_num} attempt {attempt} failed: {error_msg}")
+                        print(
+                            f"[Executor] ❌ Step {step_num} attempt {attempt} failed: {error_msg}"
+                        )
 
                         recovery = analyze_error(step, error_msg, attempt=attempt)
                         decision = recovery["decision"]
@@ -526,7 +561,9 @@ class AgentExecutor:
 
                         if decision == ErrorDecision.RETRY:
                             attempt += 1
-                            import time; time.sleep(2)
+                            import time
+
+                            time.sleep(2)
                             continue
 
                         elif decision == ErrorDecision.SKIP:
@@ -537,15 +574,17 @@ class AgentExecutor:
 
                         elif decision == ErrorDecision.ABORT:
                             msg = f"Tarea abortada, señor. {recovery.get('reason', '')}"
-                            if speak: speak(msg)
+                            if speak:
+                                speak(msg)
                             return msg
 
-                        else: 
+                        else:
                             fix_suggestion = recovery.get("fix_suggestion", "")
                             if fix_suggestion and tool != "generated_code":
                                 try:
                                     fixed_step = generate_fix(step, error_msg, fix_suggestion)
-                                    if speak: speak("Intentando un enfoque alternativo, señor.")
+                                    if speak:
+                                        speak("Intentando un enfoque alternativo, señor.")
                                     res = _call_tool(
                                         fixed_step["tool"],
                                         fixed_step["parameters"],
@@ -559,15 +598,15 @@ class AgentExecutor:
                                 except Exception as fix_err:
                                     print(f"[Executor] ⚠️ Fix failed: {fix_err}")
 
-                            failed_step  = step
+                            failed_step = step
                             failed_error = error_msg
-                            success      = False
+                            success = False
                             break
 
                 if not step_ok and not failed_step:
-                    failed_step  = step
+                    failed_step = step
                     failed_error = "Máximo de reintentos alcanzado"
-                    success      = False
+                    success = False
 
                 if not success:
                     break
@@ -584,7 +623,10 @@ class AgentExecutor:
                 # tiene ≥50 chars y no es uno de los strings genéricos que
                 # devuelve el handler de generated_code cuando algo va mal.
                 _GENERIC_RESULTS = (
-                    "Listo.", "Done.", "Completed.", "Completado.",
+                    "Listo.",
+                    "Done.",
+                    "Completed.",
+                    "Completado.",
                     "Tarea completada exitosamente.",
                 )
                 last_result = None
@@ -602,7 +644,8 @@ class AgentExecutor:
                     # Concatenamos cualquier code block previo (HTML/JSON/etc.)
                     # con la data del último step para no perder nada.
                     code_blocks = [
-                        str(r) for r in step_results.values()
+                        str(r)
+                        for r in step_results.values()
                         if isinstance(r, str) and r.lstrip().startswith("```")
                     ]
                     if code_blocks:
@@ -612,7 +655,8 @@ class AgentExecutor:
                 # Fallback: ningún step produjo data sustanciosa → summary LLM.
                 summary = self._summarize(goal, completed_steps, speak)
                 code_blocks = [
-                    str(r) for r in step_results.values()
+                    str(r)
+                    for r in step_results.values()
                     if isinstance(r, str) and r.lstrip().startswith("```")
                 ]
                 if code_blocks:
@@ -621,18 +665,20 @@ class AgentExecutor:
 
             if replan_attempts >= self.MAX_REPLAN_ATTEMPTS:
                 msg = f"La tarea falló después de {replan_attempts} intentos de replanificación, señor."
-                if speak: speak(msg)
+                if speak:
+                    speak(msg)
                 return msg
 
-            if speak: speak("Ajustando mi enfoque, señor.")
+            if speak:
+                speak("Ajustando mi enfoque, señor.")
 
             replan_attempts += 1
             plan = replan(goal, completed_steps, failed_step, failed_error)
 
     def _summarize(self, goal: str, completed_steps: list, speak: Callable | None) -> str:
-        fallback  = f"Listo, señor. Completé {len(completed_steps)} pasos para: {goal[:60]}."
+        fallback = f"Listo, señor. Completé {len(completed_steps)} pasos para: {goal[:60]}."
         steps_str = "\n".join(f"- {s.get('description', '')}" for s in completed_steps)
-        prompt    = (
+        prompt = (
             f'User goal: "{goal}"\n'
             f"Completed steps:\n{steps_str}\n\n"
             "Write a single natural sentence in Spanish summarizing what was accomplished. "
@@ -643,11 +689,13 @@ class AgentExecutor:
         # UI de Orquesta). Si el usuario lo desactivó o no existe, caemos
         # al hardcoded por compatibilidad histórica.
         try:
-            from agent.registry import has_agent, ask_agent
+            from agent.registry import ask_agent, has_agent
+
             if has_agent("summarizer"):
                 summary = ask_agent("summarizer", prompt).strip()
                 if summary:
-                    if speak: speak(summary)
+                    if speak:
+                        speak(summary)
                     return summary
         except Exception as e:
             print(f"[Executor] ⚠️ Agente 'summarizer' falló, cayendo al default: {e}")
@@ -656,14 +704,17 @@ class AgentExecutor:
         # de flash-lite porque tiene 250 req/día gratis vs 20 del lite.
         try:
             from core import gemini
-            model    = gemini.model("gemini-2.5-flash")
+
+            model = gemini.model("gemini-2.5-flash")
             response = model.generate_content(prompt)
-            summary  = (response.text or "").strip()
+            summary = (response.text or "").strip()
             if summary:
-                if speak: speak(summary)
+                if speak:
+                    speak(summary)
                 return summary
         except Exception as e:
             print(f"[Executor] ⚠️ Gemini summarize falló: {e}")
 
-        if speak: speak(fallback)
+        if speak:
+            speak(fallback)
         return fallback

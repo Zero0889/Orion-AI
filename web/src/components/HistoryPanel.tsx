@@ -26,7 +26,8 @@ import { Badge, Button, Empty, SectionHeader, Surface } from "@/ui/primitives";
 // Patrones que típicamente vienen como ruido en mensajes "sys":
 // "Conversación cargada (N mensajes)", "Reconectando…", etc. Si todos
 // los mensajes de una conversación matchean estos, la consideramos vacía.
-const NOISE_RE = /^(conversaci[oó]n cargada|reconectando|sistema:?|orion en l[ií]nea|error de|sin conexi[oó]n)/i;
+const NOISE_RE =
+  /^(conversaci[oó]n cargada|reconectando|sistema:?|orion en l[ií]nea|error de|sin conexi[oó]n)/i;
 
 function isRealMessage(m: { role: string; text: string }): boolean {
   if (m.role === "user" || m.role === "ai") return true;
@@ -37,9 +38,9 @@ function isRealMessage(m: { role: string; text: string }): boolean {
 
 export function HistoryPanel() {
   const rev = useOrionStore((s) => s.rev.convs);
-  const [list,    setList]    = useState<ConversationSummary[]>([]);
-  const [active,  setActive]  = useState<string | null>(null);
-  const [detail,  setDetail]  = useState<ConversationDetail | null>(null);
+  const [list, setList] = useState<ConversationSummary[]>([]);
+  const [active, setActive] = useState<string | null>(null);
+  const [detail, setDetail] = useState<ConversationDetail | null>(null);
   // Modo selección múltiple — cuando hay items seleccionados aparecen
   // las acciones de bulk en la toolbar.
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -47,83 +48,129 @@ export function HistoryPanel() {
 
   useEffect(() => {
     let alive = true;
-    api.listConversations()
-      .then((cs) => { if (alive) setList(cs); })
-      .catch((e) => { if (alive) toast.error("No pude cargar el historial", String(e)); });
-    return () => { alive = false; };
+    api
+      .listConversations()
+      .then((cs) => {
+        if (alive) setList(cs);
+      })
+      .catch((e) => {
+        if (alive) toast.error("No pude cargar el historial", String(e));
+      });
+    return () => {
+      alive = false;
+    };
   }, [rev]);
 
   useEffect(() => {
-    if (!active) { setDetail(null); return; }
+    if (!active) {
+      setDetail(null);
+      return;
+    }
     let alive = true;
-    api.getConversation(active)
-      .then((c) => { if (alive) setDetail(c); })
-      .catch((e) => { if (alive) toast.error("No pude abrir la conversación", String(e)); });
-    return () => { alive = false; };
+    api
+      .getConversation(active)
+      .then((c) => {
+        if (alive) setDetail(c);
+      })
+      .catch((e) => {
+        if (alive) toast.error("No pude abrir la conversación", String(e));
+      });
+    return () => {
+      alive = false;
+    };
   }, [active, rev]);
 
   /* ── Selección ───────────────────────────────────────────────── */
   function toggleSelected(id: string) {
     setSelected((prev) => {
       const next = new Set(prev);
-      if (next.has(id)) next.delete(id); else next.add(id);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
       return next;
     });
   }
-  function selectAll()  { setSelected(new Set(list.map((c) => c.id))); }
-  function clearSel()   { setSelected(new Set()); }
-  function exitSelMode(){ setSelectMode(false); setSelected(new Set()); }
+  function selectAll() {
+    setSelected(new Set(list.map((c) => c.id)));
+  }
+  function clearSel() {
+    setSelected(new Set());
+  }
+  function exitSelMode() {
+    setSelectMode(false);
+    setSelected(new Set());
+  }
 
   /* ── Acciones ────────────────────────────────────────────────── */
   async function removeOne(id: string, title?: string) {
     const ok = await toast.confirm({
-      title:   "¿Borrar conversación?",
-      detail:  title ? `"${title.slice(0, 60)}" se eliminará del historial.` : undefined,
+      title: "¿Borrar conversación?",
+      detail: title ? `"${title.slice(0, 60)}" se eliminará del historial.` : undefined,
       confirmLabel: "Borrar",
-      danger:  true,
+      danger: true,
     });
     if (!ok) return;
     try {
       await api.deleteConversation(id);
-      if (active === id) { setActive(null); setDetail(null); }
-      setSelected((s) => { const n = new Set(s); n.delete(id); return n; });
+      if (active === id) {
+        setActive(null);
+        setDetail(null);
+      }
+      setSelected((s) => {
+        const n = new Set(s);
+        n.delete(id);
+        return n;
+      });
       toast.success("Conversación borrada");
-    } catch (e) { toast.error("No se pudo borrar", String(e)); }
+    } catch (e) {
+      toast.error("No se pudo borrar", String(e));
+    }
   }
 
   async function removeSelected() {
     const ids = Array.from(selected);
     if (ids.length === 0) return;
     const ok = await toast.confirm({
-      title:        `¿Borrar ${ids.length} conversación${ids.length === 1 ? "" : "es"}?`,
-      detail:       "Esta acción no se puede deshacer.",
+      title: `¿Borrar ${ids.length} conversación${ids.length === 1 ? "" : "es"}?`,
+      detail: "Esta acción no se puede deshacer.",
       confirmLabel: `Borrar ${ids.length}`,
-      danger:       true,
+      danger: true,
     });
     if (!ok) return;
     try {
       const { deleted } = await api.bulkDeleteConversations(ids);
-      if (active && selected.has(active)) { setActive(null); setDetail(null); }
-      clearSel(); setSelectMode(false);
-      toast.success(`${deleted} conversación${deleted === 1 ? "" : "es"} borrada${deleted === 1 ? "" : "s"}`);
-    } catch (e) { toast.error("Borrado masivo falló", String(e)); }
+      if (active && selected.has(active)) {
+        setActive(null);
+        setDetail(null);
+      }
+      clearSel();
+      setSelectMode(false);
+      toast.success(
+        `${deleted} conversación${deleted === 1 ? "" : "es"} borrada${deleted === 1 ? "" : "s"}`,
+      );
+    } catch (e) {
+      toast.error("Borrado masivo falló", String(e));
+    }
   }
 
   async function removeAll() {
     if (list.length === 0) return;
     const ok = await toast.confirm({
-      title:        `¿Borrar TODAS las conversaciones?`,
-      detail:       `${list.length} en total. Acción irreversible.`,
+      title: `¿Borrar TODAS las conversaciones?`,
+      detail: `${list.length} en total. Acción irreversible.`,
       confirmLabel: "Borrar todo",
-      danger:       true,
+      danger: true,
     });
     if (!ok) return;
     try {
       const { deleted } = await api.deleteAllConversations();
-      setActive(null); setDetail(null);
-      clearSel(); setSelectMode(false);
+      setActive(null);
+      setDetail(null);
+      clearSel();
+      setSelectMode(false);
       toast.success(`Historial limpio · ${deleted} conversaciones borradas`);
-    } catch (e) { toast.error("Wipe falló", String(e)); }
+    } catch (e) {
+      toast.error("Wipe falló", String(e));
+    }
   }
 
   const allSelected = list.length > 0 && selected.size === list.length;
@@ -139,15 +186,17 @@ export function HistoryPanel() {
             <Badge tone="neutral">{list.length}</Badge>
             {selectMode ? (
               <>
-                <span className="text-[11px] text-text-dim tabular-nums">
-                  {selected.size} sel.
-                </span>
-                <Button variant="ghost" size="sm"
-                        onClick={allSelected ? clearSel : selectAll}>
+                <span className="text-[11px] text-text-dim tabular-nums">{selected.size} sel.</span>
+                <Button variant="ghost" size="sm" onClick={allSelected ? clearSel : selectAll}>
                   {allSelected ? "Ninguno" : "Todos"}
                 </Button>
-                <Button variant="danger" size="sm" icon="trash"
-                        onClick={removeSelected} disabled={selected.size === 0}>
+                <Button
+                  variant="danger"
+                  size="sm"
+                  icon="trash"
+                  onClick={removeSelected}
+                  disabled={selected.size === 0}
+                >
                   Borrar ({selected.size})
                 </Button>
                 <Button variant="ghost" size="sm" onClick={exitSelMode}>
@@ -156,13 +205,23 @@ export function HistoryPanel() {
               </>
             ) : (
               <>
-                <Button variant="ghost" size="sm" icon="check"
-                        onClick={() => setSelectMode(true)} disabled={list.length === 0}>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  icon="check"
+                  onClick={() => setSelectMode(true)}
+                  disabled={list.length === 0}
+                >
                   Seleccionar
                 </Button>
-                <Button variant="ghost" size="sm" icon="trash"
-                        onClick={removeAll} disabled={list.length === 0}
-                        title="Borrar todo el historial">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  icon="trash"
+                  onClick={removeAll}
+                  disabled={list.length === 0}
+                  title="Borrar todo el historial"
+                >
                   Borrar todo
                 </Button>
               </>
@@ -175,20 +234,24 @@ export function HistoryPanel() {
         {/* ── lista ─────────────────────────────────────────────── */}
         <aside className="border-r border-white/[0.06] overflow-y-auto scrollbar-thin p-3">
           {list.length === 0 && (
-            <Empty icon="history" title="Sin conversaciones"
-                   hint="Cuando tengas tu primera charla con Orion aparecerá aquí." />
+            <Empty
+              icon="history"
+              title="Sin conversaciones"
+              hint="Cuando tengas tu primera charla con Orion aparecerá aquí."
+            />
           )}
           <div className="flex flex-col gap-1.5">
             {list.map((c, i) => (
               <ConversationItem
                 key={c.id}
-                c={c} i={i}
+                c={c}
+                i={i}
                 isActive={active === c.id}
                 isSelected={selected.has(c.id)}
                 selectMode={selectMode}
                 onOpen={() => {
                   if (selectMode) toggleSelected(c.id);
-                  else            setActive(c.id);
+                  else setActive(c.id);
                 }}
                 onToggleSelect={() => toggleSelected(c.id)}
                 onDelete={() => removeOne(c.id, c.title)}
@@ -201,8 +264,11 @@ export function HistoryPanel() {
         <main className="overflow-y-auto scrollbar-thin">
           {!detail ? (
             <div className="h-full grid place-items-center">
-              <Empty icon="chat" title="Selecciona una conversación"
-                     hint="Haz clic en cualquier elemento de la lista para abrirla." />
+              <Empty
+                icon="chat"
+                title="Selecciona una conversación"
+                hint="Haz clic en cualquier elemento de la lista para abrirla."
+              />
             </div>
           ) : (
             <DetailView detail={detail} onDelete={() => removeOne(detail.id, detail.title)} />
@@ -214,19 +280,16 @@ export function HistoryPanel() {
 }
 
 /* ─── Detail con filtro de ruido + empty state contextual ──────────── */
-function DetailView({
-  detail, onDelete,
-}: { detail: ConversationDetail; onDelete: () => void }) {
-  const realMessages = useMemo(
-    () => detail.messages.filter(isRealMessage),
-    [detail.messages],
-  );
+function DetailView({ detail, onDelete }: { detail: ConversationDetail; onDelete: () => void }) {
+  const realMessages = useMemo(() => detail.messages.filter(isRealMessage), [detail.messages]);
 
   return (
     <div className="mx-auto max-w-3xl px-6 py-6 flex flex-col gap-5 animate-fade-in">
       <header className="border-b border-white/[0.06] pb-3 mb-1 flex items-start justify-between gap-4">
         <div className="min-w-0">
-          <div className="text-[10px] uppercase tracking-[0.22em] text-pri/80 font-mono">Conversación</div>
+          <div className="text-[10px] uppercase tracking-[0.22em] text-pri/80 font-mono">
+            Conversación
+          </div>
           <h3 className="text-base font-semibold text-text mt-0.5 truncate">
             {detail.title || detail.id}
           </h3>
@@ -251,9 +314,7 @@ function DetailView({
           />
         </div>
       ) : (
-        realMessages.map((m, i) => (
-          <DetailMessage key={i} role={m.role} text={m.text} ts={m.ts} />
-        ))
+        realMessages.map((m, i) => <DetailMessage key={i} role={m.role} text={m.text} ts={m.ts} />)
       )}
     </div>
   );
@@ -261,8 +322,14 @@ function DetailView({
 
 /* ─── Item de lista ─────────────────────────────────────────────────── */
 function ConversationItem({
-  c, i, isActive, isSelected, selectMode,
-  onOpen, onToggleSelect, onDelete,
+  c,
+  i,
+  isActive,
+  isSelected,
+  selectMode,
+  onOpen,
+  onToggleSelect,
+  onDelete,
 }: {
   c: ConversationSummary;
   i: number;
@@ -294,12 +361,13 @@ function ConversationItem({
         {/* checkbox visible solo en modo selección */}
         {selectMode && (
           <span
-            onClick={(e) => { e.stopPropagation(); onToggleSelect(); }}
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggleSelect();
+            }}
             className={[
               "shrink-0 h-4 w-4 rounded border grid place-items-center cursor-pointer transition-colors",
-              isSelected
-                ? "border-pri bg-pri/30"
-                : "border-white/20 hover:border-pri/60",
+              isSelected ? "border-pri bg-pri/30" : "border-white/20 hover:border-pri/60",
             ].join(" ")}
           >
             {isSelected && <Icon name="check" size={10} className="text-pri" />}
@@ -313,7 +381,10 @@ function ConversationItem({
             </span>
             {!selectMode && (
               <button
-                onClick={(e) => { e.stopPropagation(); onDelete(); }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDelete();
+                }}
                 title="Borrar"
                 className="h-6 w-6 grid place-items-center rounded text-muted shrink-0
                            opacity-0 group-hover:opacity-100 hover:text-danger hover:bg-danger/10
@@ -340,7 +411,9 @@ function DetailMessage({ role, text, ts }: { role: string; text: string; ts: str
     return (
       <div className="flex items-center gap-2 my-1">
         <span className={`h-1 w-1 rounded-full ${role === "err" ? "bg-danger" : "bg-muted"}`} />
-        <span className={`text-xs italic ${role === "err" ? "text-danger" : "text-text-dim"}`}>{text}</span>
+        <span className={`text-xs italic ${role === "err" ? "text-danger" : "text-text-dim"}`}>
+          {text}
+        </span>
         <span className="text-[10px] text-muted ml-1 font-mono">{ts}</span>
       </div>
     );
@@ -349,7 +422,8 @@ function DetailMessage({ role, text, ts }: { role: string; text: string; ts: str
     return (
       <div className="self-start">
         <Surface level={2} className="inline-flex items-center gap-2 px-3 py-1.5 text-xs text-acc">
-          <Icon name="paperclip" size={13} /><span>{text}</span>
+          <Icon name="paperclip" size={13} />
+          <span>{text}</span>
         </Surface>
       </div>
     );
@@ -370,7 +444,9 @@ function DetailMessage({ role, text, ts }: { role: string; text: string; ts: str
     <div className="self-start max-w-[90%]">
       <div className="flex items-center gap-2 mb-1.5">
         <span className="h-2 w-2 rounded-full bg-pri" />
-        <span className="text-[10px] uppercase tracking-[0.22em] text-pri/90 font-medium">Orion</span>
+        <span className="text-[10px] uppercase tracking-[0.22em] text-pri/90 font-medium">
+          Orion
+        </span>
         <span className="text-[10px] text-muted font-mono">{ts}</span>
       </div>
       <div className="whitespace-pre-wrap leading-[1.7] text-[15px] text-text">{text}</div>

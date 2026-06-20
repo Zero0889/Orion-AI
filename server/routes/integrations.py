@@ -19,8 +19,6 @@ para tener una API REST que el frontend pueda consumir con poll.
 
 from __future__ import annotations
 
-from typing import Optional
-
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
@@ -34,13 +32,13 @@ router = APIRouter()
 
 
 class StartAuthBody(BaseModel):
-    account:       str
-    services:      Optional[list[str]] = None
+    account: str
+    services: list[str] | None = None
     force_consent: bool = True
 
 
 class CheckBody(BaseModel):
-    account:  str
+    account: str
     services: list[str] = Field(..., description="Servicios requeridos")
 
 
@@ -50,7 +48,7 @@ def gog_accounts() -> list[dict]:
         return gog_auth.list_accounts()
     except Exception as e:
         log.warning("list_accounts falló: %s", e)
-        raise HTTPException(status_code=500, detail=safe_error_detail(e))
+        raise HTTPException(status_code=500, detail=safe_error_detail(e)) from e
 
 
 @router.get("/gog/services")
@@ -59,7 +57,7 @@ def gog_services() -> list[dict]:
         return gog_auth.list_services()
     except Exception as e:
         log.warning("list_services falló: %s", e)
-        raise HTTPException(status_code=500, detail=safe_error_detail(e))
+        raise HTTPException(status_code=500, detail=safe_error_detail(e)) from e
 
 
 @router.get("/gog/flow_status")
@@ -77,7 +75,7 @@ def gog_start_auth(body: StartAuthBody) -> dict:
         )
     except Exception as e:
         log.exception("start_auth falló")
-        raise HTTPException(status_code=400, detail=safe_error_detail(e))
+        raise HTTPException(status_code=400, detail=safe_error_detail(e)) from e
 
 
 @router.post("/gog/cancel")

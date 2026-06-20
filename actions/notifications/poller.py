@@ -5,25 +5,25 @@ from __future__ import annotations
 import json
 import threading
 import time
-from pathlib import Path
-from typing import Callable, Optional
+from collections.abc import Callable
 
 from config import CONFIG_DIR
 from core.logger import get_logger
-from .base import NotificationAdapter, NotificationItem
-from .store import get_store
+
+from .base import NotificationAdapter
 from .classroom import ClassroomAdapter
 from .gmail import GmailAdapter
+from .store import get_store
 
 log = get_logger("notif_poller")
 
 _CONFIG_PATH = CONFIG_DIR / "notifications.json"
 _DEFAULT_CONFIG: dict = {
-    "enabled":           True,
-    "interval_seconds":  600,    # 10 min
-    "max_per_source":    20,
+    "enabled": True,
+    "interval_seconds": 600,  # 10 min
+    "max_per_source": 20,
     "sources": {
-        "gmail":     {"enabled": True},
+        "gmail": {"enabled": True},
         "classroom": {"enabled": True},
     },
 }
@@ -81,13 +81,13 @@ def _invalidate_config() -> None:
 class NotificationPoller:
     def __init__(self) -> None:
         self._stop_event = threading.Event()
-        self._thread:      Optional[threading.Thread] = None
-        self._adapters:    dict[str, NotificationAdapter] = {
-            "gmail":     GmailAdapter(),
+        self._thread: threading.Thread | None = None
+        self._adapters: dict[str, NotificationAdapter] = {
+            "gmail": GmailAdapter(),
             "classroom": ClassroomAdapter(),
         }
-        self._publish:     Optional[Callable[[str, dict], None]] = None
-        self._last_status: dict[str, dict] = {}    # source → {ok, ts, error?}
+        self._publish: Callable[[str, dict], None] | None = None
+        self._last_status: dict[str, dict] = {}  # source → {ok, ts, error?}
 
     def set_publish(self, publish: Callable[[str, dict], None]) -> None:
         """``publish(event_type, payload)`` típicamente ``bus.publish``."""
@@ -102,7 +102,9 @@ class NotificationPoller:
             return
         self._stop_event.clear()
         self._thread = threading.Thread(
-            target=self._loop, daemon=True, name="NotifPoller",
+            target=self._loop,
+            daemon=True,
+            name="NotifPoller",
         )
         self._thread.start()
         log.info("iniciado")
@@ -111,12 +113,12 @@ class NotificationPoller:
         self._stop_event.set()
         log.info("parado")
 
-    def poll_once(self, *, only_source: Optional[str] = None) -> dict:
+    def poll_once(self, *, only_source: str | None = None) -> dict:
         """Una vuelta manual. Útil para el botón 'Refrescar ahora' del UI."""
         cfg = _load_config()
         max_per = int(cfg.get("max_per_source", 20))
-        srcs    = cfg.get("sources", {})
-        store   = get_store()
+        srcs = cfg.get("sources", {})
+        store = get_store()
         results: dict[str, dict] = {}
 
         for src, adapter in self._adapters.items():
@@ -128,26 +130,33 @@ class NotificationPoller:
             if not adapter.is_configured():
                 results[src] = {"skipped": "not_configured"}
                 self._last_status[src] = {
-                    "ok": False, "ts": time.time(), "error": "no configurado",
+                    "ok": False,
+                    "ts": time.time(),
+                    "error": "no configurado",
                 }
                 continue
             try:
                 items = adapter.fetch(max_items=max_per)
-                new   = store.add_many(items)
+                new = store.add_many(items)
                 results[src] = {"fetched": len(items), "new": len(new)}
                 self._last_status[src] = {"ok": True, "ts": time.time()}
                 if new and self._publish:
-                    self._publish("notification.new", {
-                        "source": src,
-                        "count":  len(new),
-                        "items":  [it.to_dict() for it in new],
-                    })
+                    self._publish(
+                        "notification.new",
+                        {
+                            "source": src,
+                            "count": len(new),
+                            "items": [it.to_dict() for it in new],
+                        },
+                    )
             except Exception as e:
                 msg = str(e)
                 log.warning("%s falló: %s", src, msg)
                 results[src] = {"error": msg}
                 self._last_status[src] = {
-                    "ok": False, "ts": time.time(), "error": msg,
+                    "ok": False,
+                    "ts": time.time(),
+                    "error": msg,
                 }
         return results
 
@@ -164,10 +173,10 @@ class NotificationPoller:
                 log.warning("is_configured(%s) falló: %s", src, e)
                 is_configured[src] = False
         return {
-            "running":       bool(self._thread and self._thread.is_alive()),
-            "last_status":   self._last_status,
+            "running": bool(self._thread and self._thread.is_alive()),
+            "last_status": self._last_status,
             "is_configured": is_configured,
-            "config":        _load_config(),
+            "config": _load_config(),
         }
 
     # ── Loop interno ────────────────────────────────────────────────────
@@ -181,8 +190,8 @@ class NotificationPoller:
             self._stop_event.wait(interval)
 
 
-_poller: Optional[NotificationPoller] = None
-_lock   = threading.Lock()
+_poller: NotificationPoller | None = None
+_lock = threading.Lock()
 
 
 def get_poller() -> NotificationPoller:

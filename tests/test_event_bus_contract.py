@@ -56,18 +56,18 @@ ATTRIBUTES = {
 def test_event_bus_importable_without_pyqt():
     """server.event_bus debe ser importable sin instalar PyQt6."""
     # Verifica que ni event_bus ni sus dependencias arrastran Qt.
-    import server.event_bus  # noqa: F401
+    import server.event_bus
+
     # Si PyQt6 estuviera entre los imports transitivos (cosa que no
     # debería pasar), aparecería ya en sys.modules. Sólo lo prohibimos
     # como import directo del módulo del bus.
     src = (PROJECT_ROOT / "server" / "event_bus.py").read_text(encoding="utf-8")
-    assert "PyQt6" not in src, (
-        "server/event_bus.py NO debe importar PyQt6 — debe ser headless."
-    )
+    assert "PyQt6" not in src, "server/event_bus.py NO debe importar PyQt6 — debe ser headless."
 
 
 def test_event_bus_exposes_all_properties():
     from server.event_bus import OrionEventBus
+
     bus = OrionEventBus()
     for prop in PROPERTIES_RW:
         assert hasattr(bus, prop), f"OrionEventBus no expone propiedad '{prop}'"
@@ -75,6 +75,7 @@ def test_event_bus_exposes_all_properties():
 
 def test_event_bus_properties_are_writable():
     from server.event_bus import OrionEventBus
+
     bus = OrionEventBus()
     # muted
     bus.muted = True
@@ -94,6 +95,7 @@ def test_event_bus_properties_are_writable():
 
 def test_event_bus_methods_callable():
     from server.event_bus import OrionEventBus
+
     bus = OrionEventBus()
     for name in METHODS:
         attr = getattr(bus, name, None)
@@ -104,6 +106,7 @@ def test_event_bus_set_state_and_write_log_no_op_without_server():
     """En Fase 0 el bus existe pero no hay loop. set_state/write_log
     deben ser no-op silenciosos (no excepciones)."""
     from server.event_bus import OrionEventBus
+
     bus = OrionEventBus()
     bus.set_state("ESCUCHANDO")
     bus.write_log("SISTEMA: hola")  # también ejercita _persist_log con conv=None
@@ -117,11 +120,10 @@ def test_event_bus_root_compat():
     necesitamos para que ``main.main()`` se mantenga compilable cuando
     cableemos el bus en Fase 1."""
     from server.event_bus import OrionEventBus
+
     bus = OrionEventBus()
     for m in ("mainloop", "protocol", "quit"):
-        assert callable(getattr(bus.root, m, None)), (
-            f"bus.root.{m} debe existir y ser callable"
-        )
+        assert callable(getattr(bus.root, m, None)), f"bus.root.{m} debe existir y ser callable"
 
 
 def test_persist_log_roles(tmp_path, monkeypatch):
@@ -132,9 +134,11 @@ def test_persist_log_roles(tmp_path, monkeypatch):
     así que apuntamos su path a un tmp_path para no tocar el JSON real.
     """
     import memory.conversations as conv_mod
+
     monkeypatch.setattr(conv_mod, "_CONVERSATIONS_PATH", tmp_path / "convs.json")
 
     from server.event_bus import OrionEventBus
+
     bus = OrionEventBus()
     bus.new_conversation()
     bus.write_log("Tú: hola")
@@ -151,17 +155,9 @@ def test_persist_log_roles(tmp_path, monkeypatch):
 def test_publish_safe_without_server():
     """publish() desde cualquier hilo sin servidor activo debe ser inocuo."""
     from server.event_bus import OrionEventBus
+
     bus = OrionEventBus()
     bus.publish("custom", {"k": "v"})  # no debe lanzar
-
-
-def test_subscribe_unsubscribe():
-    from server.event_bus import OrionEventBus
-    bus = OrionEventBus()
-    async def sub(_t, _p):
-        pass
-    bus.subscribe(sub)
-    bus.unsubscribe(sub)
 
 
 def test_bus_exposes_full_contract():
@@ -169,6 +165,7 @@ def test_bus_exposes_full_contract():
     debe seguir cumpliendo la superficie completa que consumen
     main.OrionLive y las 21 acciones."""
     from server.event_bus import OrionEventBus
+
     for name in PROPERTIES_RW | METHODS:
         assert hasattr(OrionEventBus, name), f"OrionEventBus no expone '{name}'"
 

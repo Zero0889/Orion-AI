@@ -51,6 +51,14 @@ config/*.flag
 *.pid
 *.lock
 
+# ── Caches de tooling ───────────────────────────────────────────────────────
+.ruff_cache/
+.mypy_cache/
+.pytest_cache/
+.coverage
+htmlcov/
+node_modules/
+
 # ── Atajos y artefactos del SO ──────────────────────────────────────────────
 *.lnk
 .DS_Store

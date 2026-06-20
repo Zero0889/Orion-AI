@@ -35,6 +35,7 @@ router = APIRouter()
 # threadpool de starlette automáticamente, liberando el event loop para
 # que el WS y otros REST sigan respondiendo.
 
+
 @router.get("")
 def list_notifications(source: str | None = None, unread: bool = False) -> list[dict]:
     return get_store().list_all(source=source, unread_only=unread)
@@ -103,13 +104,14 @@ async def classroom_authorize() -> dict:
             loop.run_in_executor(None, authorize_interactive),
             timeout=_OAUTH_TIMEOUT_S,
         )
-    except asyncio.TimeoutError:
+    except TimeoutError as e:
         # El thread del OAuth queda huérfano en background — no podemos
         # cancelarlo (Google no expone API de abort). El usuario simplemente
         # cerró/abandonó el navegador. Próxima llamada limpia.
-        raise HTTPException(status_code=504, detail="OAuth timeout (3min)")
+        raise HTTPException(status_code=504, detail="OAuth timeout (3min)") from e
     except Exception as e:
         from server import safe_error_detail
+
         log.exception("OAuth Classroom falló")
-        raise HTTPException(status_code=500, detail=safe_error_detail(e))
+        raise HTTPException(status_code=500, detail=safe_error_detail(e)) from e
     return {"ok": True, "token_path": token_path}
