@@ -79,34 +79,60 @@ def _testclient_uses_loopback(monkeypatch):
 @pytest.fixture(autouse=True)
 def _isolated_sqlite_db(tmp_path, monkeypatch):
     """Autouse — apunta el SQLite singleton a un archivo dentro de
-    ``tmp_path`` y resetea las stores que cachean instancias.
+    ``tmp_path`` y resetea TODOS los stores que cachean instancias.
 
-    Sin esta fixture, el primer test que importe
-    ``actions.notifications.store`` migra el JSON real del usuario al
-    ``data/orion.sqlite`` real. Acá garantizamos que cada test parte de
-    un DB vacío en tmp y no toca producción.
+    Sin esta fixture, el primer test que importe un store migraría el
+    JSON real del usuario al ``data/orion.sqlite`` real. Acá garantizamos
+    que cada test parte de un DB vacío en tmp y no toca producción.
     """
     from storage import override_db_path_for_tests
 
     db_path = tmp_path / "orion_test.sqlite"
     override_db_path_for_tests(db_path)
 
-    # Apuntamos el legacy json a algo que NO existe — los tests no
-    # quieren que se importe data real al SQLite de prueba.
+    # Por cada store: apuntar el legacy json a algo que NO existe (no
+    # importar data real) + resetear el flag de inicialización para que
+    # el próximo `_init_if_needed()` arme schema contra el nuevo DB.
+    _reset_helpers = []
     try:
         from actions.notifications import store as _notif_store
 
-        monkeypatch.setattr(_notif_store, "_LEGACY_JSON_PATH", tmp_path / "no_legacy.json")
+        monkeypatch.setattr(_notif_store, "_LEGACY_JSON_PATH", tmp_path / "no_notif.json")
         _notif_store._reset_for_tests()
+        _reset_helpers.append(_notif_store._reset_for_tests)
+    except ImportError:
+        pass
+
+    try:
+        from memory import quick_notes as _qn
+
+        monkeypatch.setattr(_qn, "_NOTES_PATH", tmp_path / "no_qn.json")
+        _qn._reset_for_tests()
+        _reset_helpers.append(_qn._reset_for_tests)
+    except ImportError:
+        pass
+
+    try:
+        from memory import conversations as _cv
+
+        monkeypatch.setattr(_cv, "_CONVERSATIONS_PATH", tmp_path / "no_conv.json")
+        _cv._reset_for_tests()
+        _reset_helpers.append(_cv._reset_for_tests)
+    except ImportError:
+        pass
+
+    try:
+        from memory import memory_manager as _mm
+
+        # memory_manager mira MEMORY_PATH del config — lo apuntamos a tmp.
+        monkeypatch.setattr(_mm, "MEMORY_PATH", tmp_path / "no_long_term.json")
+        _mm._reset_for_tests()
+        _reset_helpers.append(_mm._reset_for_tests)
     except ImportError:
         pass
 
     yield db_path
 
     # Cleanup: limpia singletons para que el próximo test arranque limpio.
-    try:
-        from actions.notifications import store as _notif_store
-
-        _notif_store._reset_for_tests()
-    except ImportError:
-        pass
+    for reset in _reset_helpers:
+        reset()

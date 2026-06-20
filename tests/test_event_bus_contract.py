@@ -146,8 +146,9 @@ def test_persist_log_roles(tmp_path, monkeypatch):
     bus.write_log("SISTEMA: lista")
     bus.write_log("ERROR: x falló")
     bus.write_log("Archivo: foo.pdf")
-    msgs = getattr(bus._conversation, "_messages", None)
-    assert msgs is not None, "ConversationSession._messages cambió de nombre"
+    # API pública post-Fase 3B (storage backed por SQLite): .messages()
+    # devuelve la lista persistida en orden de inserción.
+    msgs = bus._conversation.messages()
     roles = [m["role"] for m in msgs]
     assert roles == ["user", "ai", "sys", "err", "file"]
 

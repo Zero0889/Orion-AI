@@ -33,6 +33,20 @@ def main() -> int:
     app = build_app(OrionEventBus())
     schema = app.openapi()
 
+    # Filtrar rutas SPA-fallback: `/` y `/{full_path:path}` se registran
+    # condicionalmente en server/app.py si `web/dist/index.html` existe.
+    # En mi máquina existe (tengo el build), en CI Linux fresco NO existe,
+    # → openapi.json regenerado en CI no incluye estas rutas y el drift
+    # check ve diff artificial. Estas rutas no son API real (sirven el
+    # index.html del SPA), así que generar tipos TS para ellas no aporta
+    # nada. Las excluímos del dump para que el output sea independiente
+    # de si el frontend está buildeado.
+    spa_paths = {"/", "/{full_path}"}
+    schema_paths = schema.get("paths", {})
+    for p in list(schema_paths.keys()):
+        if p in spa_paths:
+            del schema_paths[p]
+
     OUTPUT_PATH.parent.mkdir(parents=True, exist_ok=True)
     # `sort_keys=True` para que el output sea determinista entre runs.
     # Sin esto, la primera regeneración tras un cambio menor mete diff
