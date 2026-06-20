@@ -84,23 +84,55 @@ User reportó: cada turno aparecía dos veces en el chat. **Root cause:** `main.
 
 **Fixes:** backend usa `persist_log_only` (persiste sin re-publicar al WS); frontend dedupea con walk-backwards buscando mensaje del mismo role con `turnId` no `confirmedByLog`.
 
-### 🟡 Fase 3C / Fase 4 — Romper god-files frontend (pendiente)
-Cuatro componentes >900 LOC:
-- `web/src/components/MCPPanel.tsx` (1452 LOC) — 12 sub-componentes + 2 types
-- `web/src/components/DeviceFormModal.tsx` (~1001)
-- `web/src/components/AgentsPanel.tsx` (~955)
-- `web/src/components/IoTPanel.tsx` (~921)
+### ✅ Fase 4 — Romper god-files frontend (cerrado, CI verde)
+Los 4 componentes >900 LOC del audit migrados a feature-folders. Ningún
+archivo nuevo > 1019 LOC, la mayoría < 400. API pública intacta —
+`import { X } from "@/components/X"` sigue resolviendo a `index.tsx`
+porque Vite/TS lo hacen automático.
 
-**Riesgo:** `tsc + lint + build` pueden pasar verde aunque el split introduzca bugs sutiles de runtime (stale closures, state que no se preserva al cambiar de tab, hook order, props mal pasados). **Necesita validación visual** con `npm run dev` corriendo y clickear cada tab/panel después de cada split.
+| God-file antes | Commit | Después | Archivos en la carpeta |
+|---|---|---|---|
+| `MCPPanel.tsx` (1452 LOC) | `822f524` | 7 archivos, max 379 | `index.tsx` (shell+TabButton) · `InstalledTab.tsx` (ServerCard+StatusPill) · `ExploreTab.tsx` (RegistryRow+isOfficial) · `CuratedTab.tsx` (RecipeCard+RecipeInstallModal) · `ServerFormModal.tsx` · `StarBadge.tsx` (shared) · `types.ts` |
+| `DeviceFormModal.tsx` (1183 LOC) | `ed8da18` | 3 archivos, max 1019 | `index.tsx` (forma cohesiva con ~40 useState) · `constants.ts` (catálogos + helpers puros) · `controls.tsx` (NumInput+QuickPick+CapChip+ReadOnlyBackendBadges) |
+| `IoTPanel.tsx` (1032 LOC) | `159b005` | 4 archivos, max 356 | `index.tsx` (shell + 3 secciones + Subhead) · `DeviceCard.tsx` (memo'd + SensorReadout + RangeBar + Sparkline + QUICK_COLORS) · `SheetsPanel.tsx` (sync continuo + IntervalControl + formatAge) · `ExportMenu.tsx` (dropdown CSV/XLSX) |
+| `AgentsPanel.tsx` (1150 LOC) | `e78e8fd` | 5 archivos, max 373 | `index.tsx` (state cross-vista + LoadingGrid) · `types.ts` (ChatMsg/ChatSession + agentIconTone + session persistence) · `AgentGrid.tsx` (grid + AgentCard) · `AgentChatView.tsx` (chat con sidebar) · `AgentEditorModal.tsx` (CRUD agente + inputCls) |
 
-**Plan recomendado para esta fase:**
-1. Empezar por `MCPPanel.tsx` (el más grande). Split sugerido:
-   - `MCPPanel/index.tsx` — el shell con tabs + `TabButton`
-   - `MCPPanel/ExploreTab.tsx` — `RegistryRow` + `ServerCard` + `StatusPill` + `ServerFormModal`
-   - `MCPPanel/CuratedTab.tsx` — `RecipeCard` + `StarBadge` + `RecipeInstallModal`
-   - `MCPPanel/types.ts` — `Tab`, `PrefillFromRegistry`
-2. Una vez validado MCPPanel en el browser, hacer los 3 restantes con el mismo patrón.
-3. Migrar los `interface` manuales en `web/src/api/rest.ts` a `Schemas["..."]` (auto-generados) en el camino — Fase 3D dejó el sistema listo.
+**Nota sobre `DeviceFormModal`** — el split es mucho más modesto (3
+archivos vs 4-7 de los otros). Razón: es UN solo formulario con ~40
+useState compartidos entre secciones. Romperlo por sección requeriría
+prop-drilling masivo (15+ props por hijo) o un Context — más complejidad
+accidental que beneficio. Solo se extrajeron los catálogos estáticos y
+los controles UI puros (NumInput etc.).
+
+**Validación visual obligatoria tras cualquier cambio futuro a estos
+paneles:** `npm run dev` + browser + clickear cada tab/sección. `tsc +
+lint + build` pueden estar verdes con bugs sutiles de runtime (stale
+closures, state que no se preserva al cambiar de vista, hook order, props
+mal pasados).
+
+### 🟡 Pendientes que NECESITAN acción del usuario
+1. **Validación visual de los 4 god-files** post-split. Hacer la primera
+   vez que se reinicie Orion tras pull. Si algo rompe, screenshot + qué
+   panel + qué interacción.
+2. **Limpiar 3 secrets del historial git** (commits `e709ef48`,
+   `95fe264e`): `config/api_keys.json`, `config/credentials.json`,
+   `config/gdrive_token.json`. **Ya fueron rotados** en Google Cloud
+   Console, así que las keys reales no funcionan más — pero los blobs
+   siguen accesibles en el historial. Para borrar:
+   ```bash
+   pip install git-filter-repo
+   git filter-repo --invert-paths \
+     --path config/api_keys.json \
+     --path config/credentials.json \
+     --path config/gdrive_token.json
+   git push --force-with-lease origin main
+   ```
+   ⚠️ Destructivo: reescribe SHAs de toda la historia. Cualquier clone
+   existente queda inválido — hay que borrar y re-clonar. Solo conviene
+   hacerlo si vas a abrir el repo a público o agregar colaboradores.
+3. **Migrar interfaces manuales en `web/src/api/rest.ts` a `Schemas["..."]`**
+   (auto-generados desde OpenAPI por Fase 3D). Hacelo oportunístico cuando
+   toques un panel — no vale la pena un PR dedicado.
 
 ---
 
@@ -175,7 +207,7 @@ O.R.I.O.N/
         │   ├── ws.ts             # WS client (auto-reconnect).
         │   ├── openapi.json      # Generado — NO editar a mano.
         │   └── generated.ts      # 4538 LOC de tipos TS — NO editar.
-        ├── components/           # ⚠️ MCPPanel, DeviceFormModal, AgentsPanel, IoTPanel son god-files (Fase 3C pendiente).
+        ├── components/           # MCPPanel/, DeviceFormModal/, IoTPanel/, AgentsPanel/ ahora son carpetas con index.tsx + subarchivos (Fase 4 ✅). El resto siguen siendo .tsx planos.
         ├── stores/orion.ts       # Zustand store. Dedup de chat (post-fix `8664938`).
         ├── types.ts              # ChatMessage, ConnectionStatus, etc.
         └── App.tsx
@@ -300,4 +332,33 @@ npm run build                                  # built in ~3s
 gh run list --limit 3                          # último commit en verde
 ```
 
-Si todo verde: arrancar Fase 3C / Fase 4 (god-files frontend). Si rojo: ver §4.
+Si todo verde: el refactor mayor del audit está **completo** (Fases 1, 2, 3A, 3B, 3D, 4 cerradas). Las próximas sesiones se ocupan de features nuevas o lo que el user pida. Si CI rojo: ver §4.
+
+---
+
+## 9. Patrón establecido para splittear componentes grandes
+
+De los 4 god-files migrados en Fase 4 quedaron 2 patrones distintos según
+la naturaleza del componente. **Reusarlos cuando algún componente nuevo
+crezca a >900 LOC:**
+
+### Patrón A — Componente con sub-vistas independientes (MCPPanel, IoTPanel, AgentsPanel)
+Cuando el componente tiene tabs/secciones que comparten poco state:
+- `index.tsx` — shell, state global cross-vista, routing entre vistas
+- `XTab.tsx` (o equivalente) — una por sección, recibe handlers + state via props
+- `types.ts` — tipos compartidos
+- `Shared.tsx` — micro-componentes usados por >1 archivo (StarBadge en MCP)
+- Carpeta queda en 4-7 archivos, ninguno >400 LOC.
+
+### Patrón B — Componente con state ultra-acoplado (DeviceFormModal)
+Cuando todas las "secciones" leen/escriben el mismo conjunto de useState
+(formularios complejos, modales con muchos campos correlacionados):
+- `index.tsx` — TODO el componente, sigue grande pero solo (sin más mezcla)
+- `constants.ts` — catálogos estáticos + helpers puros (sin React)
+- `controls.tsx` — controles UI puros sin lógica de negocio (inputs, chips, badges)
+- Carpeta queda en 3 archivos. El `index` sigue grande pero ya no mezcla
+  declaración de catálogos con lógica de formulario.
+
+**Anti-patrón:** romper Patrón B en sub-componentes por sección requiere
+prop-drilling de 15+ props por hijo o un Context. Ambas opciones son
+complejidad accidental que no paga.
