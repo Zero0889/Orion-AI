@@ -57,7 +57,11 @@ def _save_all(convs: list[dict]) -> None:
         convs = convs[-MAX_CONVERSATIONS:]
     payload = json.dumps(convs, indent=2, ensure_ascii=False)
 
-    fd, tmp = tempfile.mkstemp(prefix=".conv_", suffix=".tmp", dir=str(MEMORY_DIR))
+    # tempfile en el mismo dir que el destino: `os.replace` falla
+    # cross-filesystem en Windows (ver memory/quick_notes.py para detalle).
+    target_dir = _CONVERSATIONS_PATH.parent
+    target_dir.mkdir(parents=True, exist_ok=True)
+    fd, tmp = tempfile.mkstemp(prefix=".conv_", suffix=".tmp", dir=str(target_dir))
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as f:
             f.write(payload)

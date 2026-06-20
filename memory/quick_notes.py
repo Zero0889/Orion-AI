@@ -45,12 +45,19 @@ def _load_all() -> list[dict]:
 
 
 def _save_all(notes: list[dict]) -> None:
-    MEMORY_DIR.mkdir(parents=True, exist_ok=True)
+    # IMPORTANTE — el tempfile debe estar en el MISMO directorio que el
+    # destino final, no en MEMORY_DIR a secas. Razón: `os.replace` falla
+    # cross-filesystem en Windows; si tests monkeypatchean _NOTES_PATH a
+    # otra ruta (p.ej. pytest tmp_path en otro drive) y el tempfile se
+    # crea en MEMORY_DIR real, el replace tira WinError y la nota no
+    # persiste. Derivar del parent garantiza misma unidad/volumen siempre.
+    target_dir = _NOTES_PATH.parent
+    target_dir.mkdir(parents=True, exist_ok=True)
     if len(notes) > MAX_NOTES:
         notes = notes[-MAX_NOTES:]
     payload = json.dumps(notes, indent=2, ensure_ascii=False)
 
-    fd, tmp = tempfile.mkstemp(prefix=".notes_", suffix=".tmp", dir=str(MEMORY_DIR))
+    fd, tmp = tempfile.mkstemp(prefix=".notes_", suffix=".tmp", dir=str(target_dir))
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as f:
             f.write(payload)
