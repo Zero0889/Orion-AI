@@ -59,15 +59,11 @@ jobs:
         # `--follow-imports=silent` evita que mypy reporte errores en
         # módulos transitivos no anotados (el resto del repo). El gate
         # sólo bloquea regresiones de tipo en los archivos críticos.
-        run: |
-          mypy --follow-imports=silent \
-            core/logger.py \
-            core/tool_registry.py \
-            core/llm/base.py \
-            server/app.py \
-            server/event_bus.py \
-            server/sharing.py \
-            server/telemetry.py
+        # IMPORTANTE — todo en UNA línea: `\` para continuar líneas
+        # funciona en bash pero NO en PowerShell (default del runner
+        # Windows), que lo interpreta como path literal `\` → `C:\` y
+        # mypy intenta scanear el disco entero. Mantener en single line.
+        run: mypy --follow-imports=silent core/logger.py core/tool_registry.py core/llm/base.py server/app.py server/event_bus.py server/sharing.py server/telemetry.py
 
       - name: Pytest
         env:
