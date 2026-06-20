@@ -247,14 +247,14 @@
     "classroom:618128281593:an:629839461615",
     "classroom:618128281593:an:629819989784",
     "classroom:618137079652:an:624937121125",
-    "gmail:19ee2817541d33d0"
+    "gmail:19ee2817541d33d0",
+    "gmail:19ee2afa31fb35c2",
+    "gmail:19ee2ad622738213",
+    "gmail:19ee2a7d740b0830"
   ],
   "unread": [
-    "classroom:797171997932:cw:797931980608",
     "classroom:797171997932:cw:863672616318",
-    "classroom:797171997932:cw:867192782347",
     "classroom:797171997932:cw:868045685955",
-    "classroom:797903405589:an:798091396518",
     "gmail:19ea2d06e2d8bb91",
     "gmail:19ea3160e891fdb5",
     "gmail:19ea31b59865ac4a",
@@ -425,7 +425,10 @@
     "gmail:19ee1232d4fa932d",
     "gmail:19ee12f1af49ecdc",
     "gmail:19ee1663350d1829",
-    "gmail:19ee2817541d33d0"
+    "gmail:19ee2817541d33d0",
+    "gmail:19ee2a7d740b0830",
+    "gmail:19ee2ad622738213",
+    "gmail:19ee2afa31fb35c2"
   ],
   "items": {
     "gmail:19ea1b8ad0baeb51": {
@@ -765,44 +768,6 @@
           "INBOX"
         ],
         "message_count": 1
-      }
-    },
-    "classroom:797171997932:cw:797931980608": {
-      "uid": "classroom:797171997932:cw:797931980608",
-      "source": "classroom",
-      "title": "📚 Laboratorio_04_CE",
-      "summary": "Circuitos Eléctricos · entrega 15/06/2026 04:59",
-      "url": "https://classroom.google.com/c/Nzk3MTcxOTk3OTMy/a/Nzk3OTMxOTgwNjA4/details",
-      "received_ts": 1780699164.075,
-      "metadata": {
-        "course_id": "797171997932",
-        "kind": "coursework",
-        "work_type": "ASSIGNMENT"
-      }
-    },
-    "classroom:797171997932:cw:867192782347": {
-      "uid": "classroom:797171997932:cw:867192782347",
-      "source": "classroom",
-      "title": "📚 Laboratorio_05_CE",
-      "summary": "Circuitos Eléctricos · entrega 15/06/2026 04:59",
-      "url": "https://classroom.google.com/c/Nzk3MTcxOTk3OTMy/a/ODY3MTkyNzgyMzQ3/details",
-      "received_ts": 1780694849.277,
-      "metadata": {
-        "course_id": "797171997932",
-        "kind": "coursework",
-        "work_type": "ASSIGNMENT"
-      }
-    },
-    "classroom:797903405589:an:798091396518": {
-      "uid": "classroom:797903405589:an:798091396518",
-      "source": "classroom",
-      "title": "📢 Laboratorio de Fisca III-2026",
-      "summary": "Para todos, este jueves 4 de junio es el Examen Parcial de Laboratorio, es presencial y experimental. También deben p…",
-      "url": "https://classroom.google.com/c/Nzk3OTAzNDA1NTg5/p/Nzk4MDkxMzk2NTE4",
-      "received_ts": 1780454484.364,
-      "metadata": {
-        "course_id": "797903405589",
-        "kind": "announcement"
       }
     },
     "gmail:19ea31eab62d19d8": {
@@ -3800,6 +3765,57 @@
       "received_ts": 1781916540.0,
       "metadata": {
         "thread_id": "19ee2817541d33d0",
+        "labels": [
+          "UNREAD",
+          "CATEGORY_UPDATES",
+          "INBOX"
+        ],
+        "message_count": 1
+      }
+    },
+    "gmail:19ee2afa31fb35c2": {
+      "uid": "gmail:19ee2afa31fb35c2",
+      "source": "gmail",
+      "title": "✉️ Temu <temu@shop.temuofficial.com>: 10pcs Disipador ...: S/ 4.90",
+      "summary": "",
+      "url": "https://mail.google.com/mail/u/0/#inbox/19ee2afa31fb35c2",
+      "received_ts": 1781919600.0,
+      "metadata": {
+        "thread_id": "19ee2afa31fb35c2",
+        "labels": [
+          "CATEGORY_PROMOTIONS",
+          "UNREAD",
+          "INBOX"
+        ],
+        "message_count": 1
+      }
+    },
+    "gmail:19ee2ad622738213": {
+      "uid": "gmail:19ee2ad622738213",
+      "source": "gmail",
+      "title": "✉️ Reddit <noreply@redditmail.com>: \"Is this normal?\"",
+      "summary": "",
+      "url": "https://mail.google.com/mail/u/0/#inbox/19ee2ad622738213",
+      "received_ts": 1781919420.0,
+      "metadata": {
+        "thread_id": "19ee2ad622738213",
+        "labels": [
+          "UNREAD",
+          "CATEGORY_UPDATES",
+          "INBOX"
+        ],
+        "message_count": 1
+      }
+    },
+    "gmail:19ee2a7d740b0830": {
+      "uid": "gmail:19ee2a7d740b0830",
+      "source": "gmail",
+      "title": "✉️ Zero0889 <notifications@github.com>: [Zero0889/Orion-AI] Run failed: CI - main (1b0e683)",
+      "summary": "",
+      "url": "https://mail.google.com/mail/u/0/#inbox/19ee2a7d740b0830",
+      "received_ts": 1781919060.0,
+      "metadata": {
+        "thread_id": "19ee2a7d740b0830",
         "labels": [
           "UNREAD",
           "CATEGORY_UPDATES",

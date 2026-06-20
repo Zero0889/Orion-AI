@@ -24,6 +24,35 @@ socket TCP, así que esto no afecta nada fuera de pytest.
 
 from __future__ import annotations
 
+import sys
+import tempfile
+from pathlib import Path
+from unittest.mock import MagicMock
+
+# ── Mock sounddevice antes de cualquier import de main/actions ──────────
+# main.py importa `sounddevice` (audio I/O nativo). En CI Linux la
+# librería del sistema (PortAudio) no está instalada y el import crashea
+# con ModuleNotFoundError — rompe test_ui_mode que importa `main`.
+# Mock vacío: los tests no ejercen audio real.
+sys.modules.setdefault("sounddevice", MagicMock())
+
+# ── Permitir tmpdir como SAFE_ROOT durante tests ────────────────────────
+# `actions.file_controller._SAFE_ROOTS` se computa al import como
+# [Path.home(), $OneDrive]. En Windows el tmpdir cae bajo
+# C:\Users\<user>\AppData\Local\Temp → relativo a home → pasa. En Linux
+# el tmpdir es /tmp/ → NO está bajo /home/runner → rechaza con "Acceso
+# denegado". Los ~40 tests de file_controller usan `tmp_path` y fallan
+# por esto. Solución: extender _SAFE_ROOTS con gettempdir() para tests.
+# Esto NO toca la prod — solo el módulo cargado en este proceso pytest.
+try:
+    from actions import file_controller as _fc
+
+    _fc._SAFE_ROOTS = [*_fc._SAFE_ROOTS, Path(tempfile.gettempdir()).resolve()]
+except Exception:
+    # Si el módulo no se puede importar acá, los tests fallarán igual con
+    # un error más claro — no enmascaramos.
+    pass
+
 import pytest
 from starlette.testclient import TestClient as _StarletteTestClient
 

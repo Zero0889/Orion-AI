@@ -1,0 +1,39 @@
+# Normalización de line endings para que el repo sea consistente entre
+# Windows / Linux / macOS. Sin esto, `ruff format --check` en el runner
+# Windows ve CRLF (autocrlf convierte en checkout) y rompe el CI.
+#
+# `text=auto`: git detecta archivos de texto y los almacena con LF, los
+# entrega con LF al checkout (`eol=lf`) independiente del SO local.
+* text=auto eol=lf
+
+# Excepciones: scripts que el SO ejecuta directamente y EXIGEN su EOL
+# nativo para parsear correctamente.
+*.bat   text eol=crlf
+*.cmd   text eol=crlf
+*.ps1   text eol=crlf
+*.sh    text eol=lf
+
+# Binarios — git NO debe tocarlos.
+*.png    binary
+*.jpg    binary
+*.jpeg   binary
+*.gif    binary
+*.ico    binary
+*.svg    text
+*.exe    binary
+*.dll    binary
+*.so     binary
+*.dylib  binary
+*.pdf    binary
+*.zip    binary
+*.gz     binary
+*.tar    binary
+*.woff   binary
+*.woff2  binary
+*.ttf    binary
+*.otf    binary
+*.eot    binary
+*.mp3    binary
+*.mp4    binary
+*.wav    binary
+*.webp   binary

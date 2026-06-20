@@ -14,12 +14,19 @@ default_language_version:
 
 repos:
   # ── Higiene básica ─────────────────────────────────────────────────
+  # NOTA — `_STATE_FILES`: archivos que el runtime reescribe constantemente
+  # (notifs, conversations, memoria, logs IoT). Los excluimos de los hooks
+  # de "limpieza" (whitespace, EOF, line endings) porque cada commit los
+  # toca y los hooks intentan "arreglarlos" en cada save, generando
+  # conflictos con stash. La integridad de estos archivos la garantiza el
+  # propio runtime, no el pre-commit.
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v5.0.0
     hooks:
       - id: trailing-whitespace
-        exclude: '\.md$'   # los .md a veces usan dos espacios para <br>
+        exclude: '\.md$|^(config/notifications_store\.json|memory/conversations\.json|memory/quick_notes\.json|memory/long_term\.json|memory/iot_sensor_log\.csv)$'
       - id: end-of-file-fixer
+        exclude: '^(config/notifications_store\.json|memory/conversations\.json|memory/quick_notes\.json|memory/long_term\.json|memory/iot_sensor_log\.csv)$'
       - id: check-yaml
       - id: check-toml
       - id: check-json
@@ -29,11 +36,15 @@ repos:
       - id: check-merge-conflict
       - id: mixed-line-ending
         args: ["--fix=lf"]
+        exclude: '^(config/notifications_store\.json|memory/conversations\.json|memory/quick_notes\.json|memory/long_term\.json|memory/iot_sensor_log\.csv)$'
       - id: detect-private-key
 
   # ── Python: ruff lint + format ─────────────────────────────────────
+  # Mantener `rev` alineado con la versión de ruff en requirements-dev.txt /
+  # pyproject.toml. Si difieren, el hook puede no reconocer reglas nuevas
+  # que el pyproject.toml usa (p.ej. RUF059 fue agregada en >=0.9).
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.8.4
+    rev: v0.15.18
     hooks:
       - id: ruff
         args: ["--fix"]
