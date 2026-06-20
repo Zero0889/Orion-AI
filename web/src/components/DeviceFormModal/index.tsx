@@ -2,7 +2,6 @@
  * DeviceFormModal — crear / editar / inspeccionar dispositivos IoT.
  *
  * Cambios v2 (refactor enero 2026):
- *
  *   ✓ Selector de TIPO DE TRANSPORTE (ESP32-MQTT / Arduino-Serial / Custom)
  *     con campos condicionales: COM+baud para serial, host+port+topics para MQTT.
  *   ✓ Auto-save para edición de dispositivos backend (no hay que dar a
@@ -13,6 +12,16 @@
  *     ahora se pueden promover al backend con un click.
  *   ✓ Inputs numéricos sin spinners nativos (CSS global) y con quick-picks
  *     que aplican el cambio al instante.
+ *
+ * Estructura (Fase 4):
+ *   - constants.ts → catálogos + types + helpers puros
+ *   - controls.tsx → NumInput / QuickPick / CapChip / ReadOnlyBackendBadges
+ *   - index.tsx (este archivo) → componente principal + state + form JSX
+ *
+ * Nota de diseño: a diferencia de MCPPanel (que tenía tabs independientes
+ * naturalmente separables), este es UN solo formulario con ~40 useState
+ * compartidos entre secciones. Romper en sub-componentes requeriría
+ * prop-drilling masivo o un Context — preferimos mantener cohesión.
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -25,7 +34,7 @@ import {
   type IoTFullConfig,
   type IoTTransportBody,
 } from "@/api/rest";
-import { Icon, type IconName } from "@/ui/Icon";
+import { Icon } from "@/ui/Icon";
 import { Badge, Button, Field, Modal, Surface, Switch, TextInput } from "@/ui/primitives";
 import {
   SENSOR_FREQ_REC,
@@ -34,12 +43,25 @@ import {
   type SensorKind,
 } from "@/hooks/useDeviceConfig";
 
-type Mode = "create" | "edit-local" | "edit-backend";
-type TransportType = "mqtt" | "serial" | "custom";
+import {
+  DEVICE_KINDS,
+  SENSOR_PRESETS,
+  TRANSPORT_KINDS,
+  type DeviceKind,
+  type Mode,
+  type TransportType,
+  isObj,
+  kindFromDevice,
+  slugify,
+} from "./constants";
+import { CapChip, NumInput, QuickPick, ReadOnlyBackendBadges } from "./controls";
 
-/** Palabras que sugieren "esto es una luz/foco" cuando solo tenemos
- *  on/off y no podemos distinguir entre foco e interruptor por capabilities. */
-const LIGHT_HINTS = /\b(foco|luz|lampar|bombill|light|lamp|spot|led)\w*/i;
+// (Badge se mantiene como import porque se usa en `ReadOnlyBackendBadges`
+// indirectamente vía controls.tsx; aquí lo importamos sin uso directo
+// para que no falten cuando el tree-shake decide. ESLint ya valida que
+// no haya unused imports — si se vuelve uno, este comentario y la línea
+// pueden eliminarse.)
+void Badge;
 
 interface Props {
   open: boolean;
@@ -54,69 +76,6 @@ interface Props {
   onDeleteLocal?: (id: string) => void;
 }
 
-/* ── presets ──────────────────────────────────────────────────────── */
-type DeviceKind = "light" | "switch" | "sensor" | "mixed";
-
-const DEVICE_KINDS: { id: DeviceKind; label: string; icon: IconName; hint: string }[] = [
-  { id: "light", label: "Foco / luz", icon: "lightbulb", hint: "Encendido, regulable, RGB" },
-  { id: "switch", label: "Interruptor", icon: "bolt", hint: "Solo on/off" },
-  { id: "sensor", label: "Sensor", icon: "gauge", hint: "Lecturas numéricas" },
-  { id: "mixed", label: "Mixto / avanzado", icon: "cpu", hint: "Combinación libre" },
-];
-
-const SENSOR_PRESETS: { id: SensorKind; label: string; icon: IconName; backendId: string }[] = [
-  { id: "temperature", label: "Temperatura", icon: "thermometer", backendId: "temperature" },
-  { id: "humidity", label: "Humedad", icon: "droplet", backendId: "humidity" },
-  { id: "pressure", label: "Presión", icon: "gauge", backendId: "pressure" },
-  { id: "light", label: "Luminosidad", icon: "sun", backendId: "light" },
-  { id: "motion", label: "Movimiento", icon: "motion", backendId: "motion" },
-  { id: "co2", label: "Calidad aire", icon: "wind", backendId: "co2" },
-  { id: "custom", label: "Personalizado", icon: "tag", backendId: "" },
-];
-
-const TRANSPORT_KINDS: { id: TransportType; label: string; icon: IconName; hint: string }[] = [
-  { id: "mqtt", label: "ESP32 (MQTT)", icon: "wifi", hint: "WiFi, broker MQTT" },
-  { id: "serial", label: "Arduino (Serial)", icon: "bolt", hint: "USB, puerto COM" },
-  {
-    id: "custom",
-    label: "Otro / existente",
-    icon: "cpu",
-    hint: "Transport ya definido en el backend",
-  },
-];
-
-/* ── helpers ──────────────────────────────────────────────────────── */
-function slugify(s: string): string {
-  return s
-    .trim()
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
-    .replace(/[^a-z0-9]+/g, "_")
-    .replace(/^_+|_+$/g, "")
-    .slice(0, 32);
-}
-
-function kindFromDevice(d?: IoTDevice, cfg?: DeviceConfig): DeviceKind {
-  // Si el usuario ya eligió un kind manualmente, respétalo siempre.
-  if (cfg?.kind) return cfg.kind;
-  if (!d) return "light";
-  const c = d.capabilities;
-  if (c.sensor) return "sensor";
-  if (c.rgb || c.dimmable) return "light";
-  if (c.on_off && !c.dimmable && !c.rgb) {
-    // Heurística por nombre/id: "foco", "luz", "lampara"... → light
-    const hint = `${d.name ?? ""} ${d.id ?? ""}`;
-    return LIGHT_HINTS.test(hint) ? "light" : "switch";
-  }
-  return "mixed";
-}
-
-function isObj(v: unknown): v is Record<string, unknown> {
-  return typeof v === "object" && v !== null;
-}
-
-/* ── component ────────────────────────────────────────────────────── */
 export function DeviceFormModal({
   open,
   onClose,
@@ -1053,131 +1012,8 @@ export function DeviceFormModal({
           </Field>
         )}
 
-        {readOnlyBackendBadges(device, mode)}
+        <ReadOnlyBackendBadges device={device} mode={mode} />
       </div>
     </Modal>
-  );
-}
-
-function readOnlyBackendBadges(device: IoTDevice | LocalDevice | undefined, mode: Mode) {
-  if (mode !== "edit-backend" || !device) return null;
-  return (
-    <Field label="Capacidades reales del backend (lectura)">
-      <div className="flex flex-wrap gap-1.5">
-        {device.capabilities.on_off && <Badge tone="info">on/off</Badge>}
-        {device.capabilities.dimmable && <Badge tone="accent">dim</Badge>}
-        {device.capabilities.rgb && <Badge tone="neutral">rgb</Badge>}
-        {device.capabilities.sensor && (
-          <Badge tone="warn">sensor · {device.capabilities.sensor}</Badge>
-        )}
-      </div>
-    </Field>
-  );
-}
-
-/* ── helpers visuales ─────────────────────────────────────────────── */
-function NumInput({
-  value,
-  onChange,
-  min,
-  max,
-  step,
-  className,
-}: {
-  value: number;
-  onChange: (n: number) => void;
-  min?: number;
-  max?: number;
-  step?: number;
-  className?: string;
-}) {
-  return (
-    <TextInput
-      type="number"
-      value={Number.isFinite(value) ? value : ""}
-      onChange={(e) => {
-        const raw = e.target.value;
-        if (raw === "") {
-          onChange(0);
-          return;
-        }
-        const n = Number(raw);
-        if (Number.isNaN(n)) return;
-        let v = n;
-        if (min !== undefined) v = Math.max(min, v);
-        if (max !== undefined) v = Math.min(max, v);
-        onChange(v);
-      }}
-      min={min}
-      max={max}
-      step={step}
-      className={className}
-    />
-  );
-}
-
-function QuickPick({
-  active,
-  onClick,
-  label,
-}: {
-  active: boolean;
-  onClick: () => void;
-  label: string;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={[
-        "text-[10px] uppercase tracking-[0.16em] px-2 py-1 rounded-md border transition-colors",
-        active
-          ? "bg-pri/15 border-pri/40 text-pri"
-          : "bg-elevated/40 border-white/[0.06] text-text-dim hover:text-text",
-      ].join(" ")}
-    >
-      {label}
-    </button>
-  );
-}
-
-function CapChip({
-  label,
-  active,
-  disabled,
-  onClick,
-}: {
-  label: string;
-  active: boolean;
-  disabled?: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={disabled ? undefined : onClick}
-      disabled={disabled}
-      className={[
-        "inline-flex items-center gap-2 h-9 px-3 rounded-lg border text-sm",
-        "transition-all duration-200 ease-out-expo",
-        disabled
-          ? "opacity-30 cursor-not-allowed border-white/[0.04] bg-elevated/30 text-muted"
-          : active
-            ? "bg-pri/15 border-pri/40 text-pri shadow-glow-soft"
-            : "bg-elevated/40 border-white/[0.06] text-text-dim hover:text-text hover:border-white/[0.14]",
-      ].join(" ")}
-    >
-      <span
-        className={[
-          "h-2 w-2 rounded-full transition-colors",
-          disabled
-            ? "bg-white/[0.08]"
-            : active
-              ? "bg-pri shadow-[0_0_8px_rgb(var(--orion-pri))]"
-              : "bg-white/[0.15]",
-        ].join(" ")}
-      />
-      {label}
-    </button>
   );
 }
