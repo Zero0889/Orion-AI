@@ -37,10 +37,11 @@ def main() -> int:
     # `sort_keys=True` para que el output sea determinista entre runs.
     # Sin esto, la primera regeneración tras un cambio menor mete diff
     # de orden por todo el archivo y CI no puede detectar drift real.
-    OUTPUT_PATH.write_text(
-        json.dumps(schema, indent=2, ensure_ascii=False, sort_keys=True) + "\n",
-        encoding="utf-8",
-    )
+    # `newline="\n"` fuerza LF — sin esto, en Windows el `write_text`
+    # convierte `\n` → `\r\n` y CI Linux ve drift artificial.
+    payload = json.dumps(schema, indent=2, ensure_ascii=False, sort_keys=True) + "\n"
+    with OUTPUT_PATH.open("w", encoding="utf-8", newline="\n") as f:
+        f.write(payload)
 
     paths = len(schema.get("paths", {}))
     schemas = len(schema.get("components", {}).get("schemas", {}))

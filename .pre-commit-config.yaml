@@ -59,24 +59,23 @@ repos:
       - id: gitleaks
 
   # ── Frontend: prettier + eslint ────────────────────────────────────
-  # Solo corre sobre archivos dentro de web/ para evitar tocar JSON de
-  # config Python o archivos de Arduino.
+  # Usamos hooks LOCALES que invocan el prettier/eslint de
+  # web/node_modules (vía `npx --no-install`) en lugar del mirrors-prettier
+  # de pre-commit. Razón: mirrors-prettier publica versiones distintas a
+  # las que tenemos pinneadas en web/package.json, y el formateo difiere
+  # entre versiones de prettier → CI rojo por drift de format que no
+  # se reproduce local. Con hook local garantizamos la MISMA prettier
+  # versión en hook y en `npm run format:check`.
   #
-  # EXCLUDES — `web/src/api/openapi.json` y `web/src/api/generated.ts`
-  # son artifacts generados por `npm run gen:api` (Fase 3D). El JSON
-  # viene del dump Python con `sort_keys=True`, el .ts ya pasa por
-  # prettier dentro del npm script. Si el hook los reformatea con sus
-  # propios defaults, el `gen:api:check` del CI se vuelve loco con
-  # falsos drift.
-  - repo: https://github.com/pre-commit/mirrors-prettier
-    rev: v4.0.0-alpha.8
-    hooks:
-      - id: prettier
-        files: ^web/.*\.(ts|tsx|js|jsx|json|css|md)$
-        exclude: ^web/(node_modules|dist|public)/|^web/src/api/(openapi\.json|generated\.ts)$
-
+  # `web/.prettierignore` ya excluye openapi.json y generated.ts.
   - repo: local
     hooks:
+      - id: prettier-web
+        name: prettier (web)
+        entry: bash -c 'cd web && npx --no-install prettier --write "src/**/*.{ts,tsx,css,json,md}"'
+        language: system
+        files: ^web/src/.*\.(ts|tsx|js|jsx|json|css|md)$
+        pass_filenames: false
       - id: eslint
         name: eslint (web)
         entry: bash -c 'cd web && npx --no-install eslint --max-warnings=0 "src/**/*.{ts,tsx}"'
