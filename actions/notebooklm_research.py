@@ -207,6 +207,74 @@ def _format_ask_result(r: dict[str, Any]) -> str:
     return "\n".join(out)
 
 
+from core.tool_registry import tool
+
+
+@tool(
+    name="notebooklm_research",
+    description=(
+        "Investigación dinámica con Google NotebookLM. SUSTITUYE a web_search "
+        "cuando el usuario pide investigar un tema con MÚLTIPLES fuentes, generar "
+        "un notebook de referencias, o quiere abrir el resultado en notebooklm.google.com. "
+        "Acciones: "
+        "research (default) — crea un notebook nuevo y dispara el research agent "
+        "de Google para buscar fuentes web o Drive y auto-importarlas; "
+        "list — lista los notebooks existentes del usuario; "
+        "ask — hace una pregunta a un notebook ya creado (respuesta grounded con citas); "
+        "delete — elimina un notebook por id. "
+        "Para 'research' devuelve la URL del notebook listo para abrir en el navegador. "
+        "Modo 'fast' (~minutos) vs 'deep' (~10-30 min, fuentes más exhaustivas). "
+        "Source 'web' (default) busca en internet, 'drive' busca en tu Google Drive."
+    ),
+    parameters={
+        "type": "OBJECT",
+        "properties": {
+            "action": {
+                "type": "STRING",
+                "description": "research (default) | list | ask | delete",
+            },
+            "topic": {
+                "type": "STRING",
+                "description": "Tema a investigar (para action=research). Sé específico: incluye fechas, ámbito, idioma si aplica.",
+            },
+            "n_sources": {
+                "type": "INTEGER",
+                "description": "Número objetivo de fuentes a importar (default 20).",
+            },
+            "mode": {
+                "type": "STRING",
+                "description": "fast (default, ~minutos) | deep (búsqueda exhaustiva, ~10-30 min).",
+            },
+            "source": {
+                "type": "STRING",
+                "description": "web (default, busca en internet) | drive (busca en Google Drive del usuario).",
+            },
+            "auto_import": {
+                "type": "BOOLEAN",
+                "description": "Importa automáticamente las fuentes encontradas al notebook (default true).",
+            },
+            "notebook_name": {
+                "type": "STRING",
+                "description": "Título personalizado del notebook. Si se omite, se usa el topic.",
+            },
+            "notebook_id": {
+                "type": "STRING",
+                "description": "ID del notebook (para action=ask o action=delete).",
+            },
+            "question": {"type": "STRING", "description": "Pregunta para action=ask."},
+            "limit": {
+                "type": "INTEGER",
+                "description": "Máximo de notebooks a devolver en action=list (default 30).",
+            },
+            "timeout": {
+                "type": "NUMBER",
+                "description": "Timeout en segundos para esperar el research (default 1800 = 30 min).",
+            },
+        },
+        "required": [],
+    },
+    timeout=1900,
+)
 def notebooklm_research(parameters: dict, *, player=None, **_) -> str:
     action = (parameters.get("action") or "research").strip().lower()
 

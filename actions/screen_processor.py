@@ -390,6 +390,37 @@ def _ensure_session(player=None) -> None:
             _session._player = player
 
 
+from core.tool_registry import tool
+
+
+@tool(
+    name="screen_process",
+    description=(
+        "Captures and analyzes the screen or webcam image. "
+        "MUST be called when user asks what is on screen, what you see, "
+        "analyze my screen, look at camera, etc. "
+        "You have NO visual ability without this tool. "
+        "After calling this tool, stay SILENT — the vision module speaks directly."
+    ),
+    parameters={
+        "type": "OBJECT",
+        "properties": {
+            "angle": {
+                "type": "STRING",
+                "description": "'screen' to capture display, 'camera' for webcam. Default: 'screen'",
+            },
+            "text": {
+                "type": "STRING",
+                "description": "The question or instruction about the captured image",
+            },
+        },
+        "required": ["text"],
+    },
+    runs_in_thread=True,
+    fallback=(
+        "Vision module activated. Stay silent — the vision module will speak directly to the user."
+    ),
+)
 def screen_process(
     parameters: dict,
     response=None,

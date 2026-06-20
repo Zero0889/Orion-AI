@@ -405,6 +405,69 @@ def _dispatch_action(
 # ── Entry point público ─────────────────────────────────────────────────────
 
 
+from core.tool_registry import tool
+
+
+@tool(
+    name="iot_control",
+    description=(
+        "Controls IoT/home-automation devices: lights, dimmers, RGB strips, "
+        "smart plugs, sensors, etc. Devices may be connected via Arduino (serial) "
+        "OR WiFi/MQTT — the tool handles both transparently. "
+        "Use this for ANY home automation request. NEVER use agent_task for IoT. "
+        "When the user says something natural like 'enciende la luz', 'pon la "
+        "tira al 30%', 'luz azul', 'modo película' or 'qué temperatura hay', "
+        "use action=auto and pass the original text as 'description'. "
+        "If you already know the exact device id and action, prefer the explicit "
+        "form (action=on/off/dim/rgb/scene/read_sensor) for lower latency. "
+        "Capabilities are PER DEVICE: dim only works on dimmable devices, rgb "
+        "only on RGB-capable. The tool will tell you if a device doesn't support "
+        "a capability — relay that message to the user."
+    ),
+    parameters={
+        "type": "OBJECT",
+        "properties": {
+            "action": {
+                "type": "STRING",
+                "description": (
+                    "auto — (default) interpret 'description' in natural language | "
+                    "on / off — turn a specific device on/off | "
+                    "all_on / all_off — global on/off across every device | "
+                    "timed — turn a device on for 'duration' seconds then auto-off | "
+                    "dim — set brightness 0-100 (requires the device to be dimmable) | "
+                    "rgb — set RGB color (requires rgb capability) | "
+                    "scene — run a named scene (use 'scene' parameter) | "
+                    "read_sensor — get the latest cached sensor reading for a device | "
+                    "list_devices — return all devices with their capabilities | "
+                    "status — connection status of every configured transport"
+                ),
+            },
+            "device": {
+                "type": "STRING",
+                "description": "Device id (use list_devices to discover). 'all' is a shortcut for all_on/all_off.",
+            },
+            "duration": {
+                "type": "INTEGER",
+                "description": "Seconds for 'timed' (or for 'on' to auto-off later).",
+            },
+            "value": {"type": "INTEGER", "description": "Brightness 0-100 for 'dim'."},
+            "color": {
+                "type": "STRING",
+                "description": "Color for 'rgb' — accepts a name (rojo/azul/...), hex (#ff00aa) or 'r,g,b'.",
+            },
+            "scene": {
+                "type": "STRING",
+                "description": "Scene id or name for action=scene.",
+            },
+            "description": {
+                "type": "STRING",
+                "description": "Natural-language command for action=auto.",
+            },
+        },
+        "required": [],
+    },
+    needs_speak=True,
+)
 def iot_control(parameters: dict, player=None, speak: Callable | None = None) -> str:
     """Punto de entrada que Gemini Live invoca como herramienta.
 

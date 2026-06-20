@@ -1526,6 +1526,112 @@ def get_file_info(path: str, name: str = "") -> str:
         return f"No se pudo obtener la información del archivo: {e}"
 
 
+from core.tool_registry import tool
+
+
+@tool(
+    name="file_controller",
+    description=(
+        "Manages files and folders: list, create, delete, move, copy, rename, read, write, find, disk usage, "
+        "find duplicates, recursive size analysis, BULK DELETE BY CRITERIA. "
+        "Recognizes files by partial/short names (e.g. 'informe teórico' matches both "
+        "'Informe-teorico.pdf' and a folder of the same name). "
+        "If multiple matches are found, the tool returns a disambiguation result — "
+        "ASK the user in natural language which one (or 'all') and call again with "
+        "confirm_all=true if they pick all. "
+        "For 'find duplicate files' use action=duplicates. For 'which folder takes "
+        "the most space' use action=tree_size. "
+        "BULK DELETE SAFETY: actions 'delete_bulk', 'delete_duplicates' and 'delete_empty_folders' "
+        "ALWAYS default to dry_run=true (preview only). You MUST: "
+        "(1) first call with dry_run=true to get the preview, "
+        "(2) tell the user the count/total/sample, "
+        "(3) wait for EXPLICIT verbal confirmation ('sí borrá', 'confirmo'), "
+        "(4) only then call again with dry_run=false AND confirm=true. "
+        "Files go to the recycle bin (send2trash), not permanent. "
+        "These bulk actions are fast in-process scans — DO NOT chain list+delete manually."
+    ),
+    parameters={
+        "type": "OBJECT",
+        "properties": {
+            "action": {
+                "type": "STRING",
+                "description": "list | create_file | create_folder | delete | delete_all | delete_bulk | delete_duplicates | delete_empty_folders | move | copy | rename | read | write | find | largest | duplicates | tree_size | disk_usage | organize_desktop | info",
+            },
+            "path": {
+                "type": "STRING",
+                "description": "File/folder path or shortcut: desktop, downloads, documents, home",
+            },
+            "destination": {"type": "STRING", "description": "Destination path for move/copy"},
+            "new_name": {"type": "STRING", "description": "New name for rename"},
+            "content": {"type": "STRING", "description": "Content for create_file/write"},
+            "name": {
+                "type": "STRING",
+                "description": "File name (partial OK — the tool resolves stems, normalizes accents and matches both files and folders)",
+            },
+            "extension": {
+                "type": "STRING",
+                "description": "Filter by extension for find/largest/duplicates/delete_bulk/delete_duplicates (e.g. .pdf or just pdf)",
+            },
+            "pattern": {
+                "type": "STRING",
+                "description": "Glob pattern for delete_bulk (e.g. '*.tmp', 'Thumbs.db', '*~')",
+            },
+            "older_than_days": {
+                "type": "INTEGER",
+                "description": "delete_bulk: only files older than N days (by mtime)",
+            },
+            "larger_than_mb": {
+                "type": "NUMBER",
+                "description": "delete_bulk: only files > N MB",
+            },
+            "smaller_than_mb": {
+                "type": "NUMBER",
+                "description": "delete_bulk: only files < N MB",
+            },
+            "keep": {
+                "type": "STRING",
+                "description": "delete_duplicates: which copy to keep — shortest_path (default) | oldest | newest | first",
+            },
+            "dry_run": {
+                "type": "BOOLEAN",
+                "description": "Bulk-delete actions: when true (default) returns only a PREVIEW. Set false ONLY after the user explicitly confirmed.",
+            },
+            "confirm": {
+                "type": "BOOLEAN",
+                "description": "Bulk-delete actions: required true when dry_run=false. Extra safety to avoid accidental deletion.",
+            },
+            "count": {
+                "type": "INTEGER",
+                "description": "Number of results for largest (default 10, max 50)",
+            },
+            "min_size_mb": {
+                "type": "NUMBER",
+                "description": "Minimum file size in MB for largest (default 0 = no minimum)",
+            },
+            "min_size_kb": {
+                "type": "NUMBER",
+                "description": "Minimum file size in KB for duplicates/delete_duplicates (default 1 = ignore tiny files)",
+            },
+            "max_groups": {
+                "type": "INTEGER",
+                "description": "Max duplicate groups to return (default 20, max 100)",
+            },
+            "depth": {
+                "type": "INTEGER",
+                "description": "Recursion depth for tree_size (1-4, default 1)",
+            },
+            "top": {
+                "type": "INTEGER",
+                "description": "How many subfolders to list in tree_size (default 20, max 50)",
+            },
+            "confirm_all": {
+                "type": "BOOLEAN",
+                "description": "When true on a delete with multiple matches, delete ALL of them. Use only after the user confirmed 'todos/all'.",
+            },
+        },
+        "required": ["action"],
+    },
+)
 def file_controller(
     parameters: dict = None,
     response=None,

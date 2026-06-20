@@ -327,6 +327,30 @@ def get_desktop_stats() -> str:
     )
 
 
+from core.tool_registry import tool
+
+
+@tool(
+    name="desktop_control",
+    description=(
+        "Controls the desktop with EXPLICIT actions only. "
+        "For file operations use file_controller; for opening apps "
+        "use open_app; for general system control use computer_control."
+    ),
+    parameters={
+        "type": "OBJECT",
+        "properties": {
+            "action": {
+                "type": "STRING",
+                "description": "wallpaper | wallpaper_url | current_wallpaper | organize | clean | list | stats",
+            },
+            "path": {"type": "STRING", "description": "Image path for wallpaper"},
+            "url": {"type": "STRING", "description": "Image URL for wallpaper_url"},
+            "mode": {"type": "STRING", "description": "by_type or by_date for organize"},
+        },
+        "required": ["action"],
+    },
+)
 def desktop_control(
     parameters: dict = None,
     response=None,

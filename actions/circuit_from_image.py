@@ -493,6 +493,42 @@ def _sanitize_filename(name: str) -> str:
     return (safe or "circuit")[:60]
 
 
+from core.tool_registry import tool
+
+
+@tool(
+    name="circuit_from_image",
+    description=(
+        "Analyzes an electronic circuit image (photo, screenshot, hand-drawn "
+        "schematic) and generates a SPICE netlist (.cir importable to Proteus "
+        "via File > Import Section) and a KiCad schematic (.kicad_sch). "
+        "Use this WHENEVER the user uploads a circuit image and asks for a "
+        "netlist, SPICE, Proteus, KiCad, .cir or schematic file. "
+        "Do NOT use file_processor for this — file_processor only describes "
+        "images, it does not generate circuit files."
+    ),
+    parameters={
+        "type": "OBJECT",
+        "properties": {
+            "image_path": {
+                "type": "STRING",
+                "description": "Absolute path to the circuit image. If empty, uses the currently uploaded file.",
+            },
+            "outputs": {
+                "type": "ARRAY",
+                "items": {"type": "STRING"},
+                "description": "Targets to generate: 'spice', 'kicad'. Default: both.",
+            },
+            "output_dir": {
+                "type": "STRING",
+                "description": "Folder where the .cir and .kicad_sch are written. Default: the image's folder.",
+            },
+        },
+        "required": ["image_path"],
+    },
+    timeout=120,
+    needs_current_file=True,
+)
 def circuit_from_image(parameters: dict, player=None, **_kwargs) -> str:
     """Handler invocable como tool por el agente y por el endpoint REST.
 

@@ -250,10 +250,33 @@
     "gmail:19ee2817541d33d0",
     "gmail:19ee2afa31fb35c2",
     "gmail:19ee2ad622738213",
-    "gmail:19ee2a7d740b0830"
+    "gmail:19ee2a7d740b0830",
+    "gmail:19ee2c224e84e1fd",
+    "gmail:19ee2bec67a6478d",
+    "classroom:797171997932:cw:867192782347",
+    "classroom:797903405589:an:798091396518",
+    "classroom:618128281593:cw:866306077719",
+    "classroom:797903405589:cw:866148163766",
+    "classroom:797903405589:an:797903373335",
+    "classroom:797903405589:cw:797903685624",
+    "classroom:591875254277:cw:793145277541",
+    "classroom:790779860247:cw:831378906180",
+    "classroom:790779860247:cw:792550644432",
+    "classroom:412844667369:an:816375322175",
+    "classroom:799122626360:an:805688955231",
+    "classroom:412844667369:an:790626066365",
+    "classroom:412844667369:cw:788724728576",
+    "classroom:412844667369:cw:770298479816",
+    "classroom:618136708176:cw:642827344499",
+    "classroom:618137079652:cw:642725712006",
+    "classroom:618128281593:an:629839461615",
+    "classroom:618128281593:an:629819989784",
+    "classroom:618137079652:an:624937121125",
+    "gmail:19ee2d0e73940047"
   ],
   "unread": [
     "classroom:797171997932:cw:863672616318",
+    "classroom:797171997932:cw:867192782347",
     "classroom:797171997932:cw:868045685955",
     "gmail:19ea2d06e2d8bb91",
     "gmail:19ea3160e891fdb5",
@@ -428,7 +451,10 @@
     "gmail:19ee2817541d33d0",
     "gmail:19ee2a7d740b0830",
     "gmail:19ee2ad622738213",
-    "gmail:19ee2afa31fb35c2"
+    "gmail:19ee2afa31fb35c2",
+    "gmail:19ee2bec67a6478d",
+    "gmail:19ee2c224e84e1fd",
+    "gmail:19ee2d0e73940047"
   ],
   "items": {
     "gmail:19ea1b8ad0baeb51": {
@@ -694,74 +720,6 @@
       "received_ts": 1780750200.0,
       "metadata": {
         "thread_id": "19e9cfbf0f43f483",
-        "labels": [
-          "UNREAD",
-          "CATEGORY_UPDATES",
-          "INBOX"
-        ],
-        "message_count": 1
-      }
-    },
-    "gmail:19e9ac7a970477fe": {
-      "uid": "gmail:19e9ac7a970477fe",
-      "source": "gmail",
-      "title": "✉️ Ollama <hello@ollama.com>: Thank you for joining Ollama",
-      "summary": "",
-      "url": "https://mail.google.com/mail/u/0/#inbox/19e9ac7a970477fe",
-      "received_ts": 1780713180.0,
-      "metadata": {
-        "thread_id": "19e9ac7a970477fe",
-        "labels": [
-          "UNREAD",
-          "CATEGORY_UPDATES",
-          "INBOX"
-        ],
-        "message_count": 1
-      }
-    },
-    "gmail:19e9abae8cda05a3": {
-      "uid": "gmail:19e9abae8cda05a3",
-      "source": "gmail",
-      "title": "✉️ Reddit <noreply@redditmail.com>: \"opus 4.8\"",
-      "summary": "",
-      "url": "https://mail.google.com/mail/u/0/#inbox/19e9abae8cda05a3",
-      "received_ts": 1780712400.0,
-      "metadata": {
-        "thread_id": "19e9abae8cda05a3",
-        "labels": [
-          "UNREAD",
-          "CATEGORY_UPDATES",
-          "INBOX"
-        ],
-        "message_count": 1
-      }
-    },
-    "gmail:19e9a5365ab01860": {
-      "uid": "gmail:19e9a5365ab01860",
-      "source": "gmail",
-      "title": "✉️ \"Augusto Lino rodriguez (Classroom)\" <no-reply@classroom.google.com>: Nueva tarea: \"PARCIAL \"",
-      "summary": "",
-      "url": "https://mail.google.com/mail/u/0/#inbox/19e9a5365ab01860",
-      "received_ts": 1780705560.0,
-      "metadata": {
-        "thread_id": "19e9a5365ab01860",
-        "labels": [
-          "UNREAD",
-          "CATEGORY_UPDATES",
-          "INBOX"
-        ],
-        "message_count": 1
-      }
-    },
-    "gmail:19e9a357ffbdb26b": {
-      "uid": "gmail:19e9a357ffbdb26b",
-      "source": "gmail",
-      "title": "✉️ GitHub <noreply@github.com>: [GitHub] A third-party OAuth application has been added to your account",
-      "summary": "",
-      "url": "https://mail.google.com/mail/u/0/#inbox/19e9a357ffbdb26b",
-      "received_ts": 1780703640.0,
-      "metadata": {
-        "thread_id": "19e9a357ffbdb26b",
         "labels": [
           "UNREAD",
           "CATEGORY_UPDATES",
@@ -3819,6 +3777,70 @@
         "labels": [
           "UNREAD",
           "CATEGORY_UPDATES",
+          "INBOX"
+        ],
+        "message_count": 1
+      }
+    },
+    "gmail:19ee2c224e84e1fd": {
+      "uid": "gmail:19ee2c224e84e1fd",
+      "source": "gmail",
+      "title": "✉️ Zero0889 <notifications@github.com>: [Zero0889/Orion-AI] Run failed: CI - main (9f38218)",
+      "summary": "",
+      "url": "https://mail.google.com/mail/u/0/#inbox/19ee2c224e84e1fd",
+      "received_ts": 1781920800.0,
+      "metadata": {
+        "thread_id": "19ee2c224e84e1fd",
+        "labels": [
+          "UNREAD",
+          "CATEGORY_UPDATES",
+          "INBOX"
+        ],
+        "message_count": 1
+      }
+    },
+    "gmail:19ee2bec67a6478d": {
+      "uid": "gmail:19ee2bec67a6478d",
+      "source": "gmail",
+      "title": "✉️ Zero0889 <notifications@github.com>: [Zero0889/Orion-AI] Run failed: CI - main (fe4aa96)",
+      "summary": "",
+      "url": "https://mail.google.com/mail/u/0/#inbox/19ee2bec67a6478d",
+      "received_ts": 1781920560.0,
+      "metadata": {
+        "thread_id": "19ee2bec67a6478d",
+        "labels": [
+          "UNREAD",
+          "CATEGORY_UPDATES",
+          "INBOX"
+        ],
+        "message_count": 1
+      }
+    },
+    "classroom:797171997932:cw:867192782347": {
+      "uid": "classroom:797171997932:cw:867192782347",
+      "source": "classroom",
+      "title": "📚 Laboratorio_05_CE",
+      "summary": "Circuitos Eléctricos · entrega 22/06/2026 04:59",
+      "url": "https://classroom.google.com/u/2/c/Nzk3MTcxOTk3OTMy/a/ODY3MTkyNzgyMzQ3/details",
+      "received_ts": 1781625317.187,
+      "metadata": {
+        "course_id": "797171997932",
+        "kind": "coursework",
+        "work_type": "ASSIGNMENT"
+      }
+    },
+    "gmail:19ee2d0e73940047": {
+      "uid": "gmail:19ee2d0e73940047",
+      "source": "gmail",
+      "title": "✉️ Mercado Libre <ofertas@a.mercadolibre.com.pe>: Regalo Mundial por el Día del Padre 😍",
+      "summary": "",
+      "url": "https://mail.google.com/mail/u/0/#inbox/19ee2d0e73940047",
+      "received_ts": 1781921760.0,
+      "metadata": {
+        "thread_id": "19ee2d0e73940047",
+        "labels": [
+          "CATEGORY_PROMOTIONS",
+          "UNREAD",
           "INBOX"
         ],
         "message_count": 1

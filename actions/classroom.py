@@ -55,6 +55,36 @@ def _get_chrome_path() -> str | None:
     return shutil.which("chrome") or shutil.which("google-chrome")
 
 
+from core.tool_registry import tool
+
+
+@tool(
+    name="classroom",
+    description=(
+        "Opens Google Classroom in Chrome with the correct account. "
+        "Use this ALWAYS when the user mentions 'classroom', 'Google Classroom', or 'clase'. "
+        "NEVER use browser_control or open_app for Classroom. "
+        "Two accounts available: "
+        "'personal' (default, /u/0/) for the user's main Google account, "
+        "'institucional' (/u/1/) for the university/UNMSM account. "
+        "If the user says 'classroom institucional', 'classroom de la uni', or 'classroom unmsm', "
+        "set account to 'institucional'. Otherwise use 'personal'."
+    ),
+    parameters={
+        "type": "OBJECT",
+        "properties": {
+            "account": {
+                "type": "STRING",
+                "description": "Which account: personal (default, main account /u/0/) | institucional (university account /u/1/)",
+            },
+            "url": {
+                "type": "STRING",
+                "description": "Custom Classroom URL. Leave empty to auto-resolve from account type.",
+            },
+        },
+        "required": [],
+    },
+)
 def classroom(
     parameters: dict = None,
     response=None,

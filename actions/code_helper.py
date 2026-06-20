@@ -551,6 +551,49 @@ Be specific and actionable. If you see an error message, quote it exactly."""
         return f"El análisis de pantalla falló: {e}"
 
 
+from core.tool_registry import tool
+
+
+@tool(
+    name="code_helper",
+    description=(
+        "Writes, edits, explains, runs, or builds SOURCE CODE FILES "
+        "(Python, JavaScript, C++, etc). "
+        "NEVER use this for math questions, integrals, derivatives, "
+        "equations or formulas — answer math DIRECTLY with LaTeX in chat."
+    ),
+    parameters={
+        "type": "OBJECT",
+        "properties": {
+            "action": {
+                "type": "STRING",
+                "description": "write | edit | explain | run | build | auto (default: auto)",
+            },
+            "description": {
+                "type": "STRING",
+                "description": "What the code should do or what change to make",
+            },
+            "language": {
+                "type": "STRING",
+                "description": "Programming language (default: python)",
+            },
+            "output_path": {"type": "STRING", "description": "Where to save the file"},
+            "file_path": {
+                "type": "STRING",
+                "description": "Path to existing file for edit/explain/run/build",
+            },
+            "code": {"type": "STRING", "description": "Raw code string for explain"},
+            "args": {"type": "STRING", "description": "CLI arguments for run/build"},
+            "timeout": {
+                "type": "INTEGER",
+                "description": "Execution timeout in seconds (default: 30)",
+            },
+        },
+        "required": ["action"],
+    },
+    timeout=180,
+    needs_speak=True,
+)
 def code_helper(
     parameters: dict, response=None, player=None, session_memory=None, speak=None
 ) -> str:

@@ -602,6 +602,34 @@ def _build_project(
     return f"{msg}\n\nÚltimo error:\n{last_output[:600]}"
 
 
+from core.tool_registry import tool
+
+
+@tool(
+    name="dev_agent",
+    description="Builds complete multi-file projects from scratch: plans, writes files, installs deps, opens VSCode, runs and fixes errors.",
+    parameters={
+        "type": "OBJECT",
+        "properties": {
+            "description": {"type": "STRING", "description": "What the project should do"},
+            "language": {
+                "type": "STRING",
+                "description": "Programming language (default: python)",
+            },
+            "project_name": {
+                "type": "STRING",
+                "description": "Optional project folder name",
+            },
+            "timeout": {
+                "type": "INTEGER",
+                "description": "Run timeout in seconds (default: 30)",
+            },
+        },
+        "required": ["description"],
+    },
+    timeout=300,
+    needs_speak=True,
+)
 def dev_agent(
     parameters: dict,
     response=None,

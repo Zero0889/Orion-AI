@@ -275,6 +275,23 @@ def _schedule_linux(target_dt: datetime, task_name: str, script_path: Path) -> s
     return ""
 
 
+from core.tool_registry import tool
+
+
+@tool(
+    name="reminder",
+    description="Sets a timed reminder using Task Scheduler.",
+    parameters={
+        "type": "OBJECT",
+        "properties": {
+            "date": {"type": "STRING", "description": "Date in YYYY-MM-DD format"},
+            "time": {"type": "STRING", "description": "Time in HH:MM format (24h)"},
+            "message": {"type": "STRING", "description": "Reminder message text"},
+        },
+        "required": ["date", "time", "message"],
+    },
+    fallback="Recordatorio creado.",
+)
 def reminder(
     parameters: dict,
     response=None,

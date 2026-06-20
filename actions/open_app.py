@@ -334,6 +334,30 @@ def _open_web_app(app_name: str, player=None) -> str | None:
         return None
 
 
+from core.tool_registry import tool
+
+
+@tool(
+    name="open_app",
+    description=(
+        "Opens any application on the computer. "
+        "Use this whenever the user asks to open, launch, or start any app, "
+        "website, or program. Always call this tool — never just say you opened it."
+    ),
+    parameters={
+        "type": "OBJECT",
+        "properties": {
+            "app_name": {
+                "type": "STRING",
+                "description": (
+                    "Exact name of the application (e.g. 'WhatsApp', 'Chrome', 'Spotify')"
+                ),
+            }
+        },
+        "required": ["app_name"],
+    },
+    fallback="Aplicación abierta.",
+)
 def open_app(
     parameters=None,
     response=None,

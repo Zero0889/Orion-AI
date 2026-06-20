@@ -26,8 +26,13 @@ Diseño
 
 from __future__ import annotations
 
+import importlib
+import inspect
+import pkgutil
+import threading
 from collections.abc import Callable
 from dataclasses import dataclass, field
+from typing import Any
 
 # ── Tipos públicos ──────────────────────────────────────────────────────
 
@@ -270,3 +275,246 @@ class ToolRegistry:
                 lines.append(f"  {pname}: {ptype} ({req}) — {pdesc}")
             lines.append("")  # blank line entre tools
         return "\n".join(lines).rstrip() + "\n"
+
+
+# ── Decoradores @tool / @live_only_tool ─────────────────────────────────
+#
+# Reemplazan el patrón viejo de core/tools_bootstrap.py donde 30 bloques
+# `reg.register(ToolDeclaration(...), h_xxx)` vivían en un god-file.
+# Ahora cada tool declara su schema **junto a su handler** en su archivo
+# de actions/, y se auto-registra al importar el módulo.
+#
+# Uso típico (en actions/open_app.py):
+#
+#     from core.tool_registry import tool
+#
+#     @tool(
+#         name="open_app",
+#         description="Opens any application on the computer...",
+#         parameters={
+#             "type": "OBJECT",
+#             "properties": {"app_name": {"type": "STRING", "description": "..."}},
+#             "required": ["app_name"],
+#         },
+#         fallback="Aplicación abierta.",
+#     )
+#     def open_app(parameters, *, player=None, response=None):
+#         ...
+#
+# El decorador:
+#   1. Inspecciona la firma de `open_app` para saber qué kwargs acepta.
+#   2. Cuando el registry invoca, sólo pasa los kwargs que la función
+#      declara (filtra el resto). Esto preserva la heterogeneidad de
+#      firmas que tenían los wrappers viejos sin obligarnos a uniformar.
+#   3. Si la función retorna None o cadena vacía, devuelve `fallback`
+#      (default "Listo.").
+#   4. Si `runs_in_thread=True`, ejecuta en daemon Thread y devuelve
+#      `fallback` inmediatamente (caso screen_processor).
+#   5. La función original queda intacta — se puede seguir llamando
+#      `open_app(parameters={...}, player=...)` directamente.
+
+
+# Cache de pares (decl, handler) que los decoradores vieron en esta
+# corrida del intérprete. Los decoradores se evalúan UNA sola vez (al
+# primer import del módulo), pero `ToolRegistry._reset()` —que usan los
+# tests— vacía el dict interno y los decoradores no se re-disparan.
+# Este cache permite re-poblar el registry sin re-importar módulos.
+_DECORATED_TOOLS: list[tuple[ToolDeclaration, Callable]] = []
+
+
+def tool(
+    *,
+    name: str,
+    description: str,
+    parameters: dict | None = None,
+    timeout: int = 60,
+    needs_player: bool = True,
+    needs_speak: bool = False,
+    needs_current_file: bool = False,
+    runs_in_thread: bool = False,
+    silent: bool = False,
+    include_in_planner: bool = True,
+    fallback: str = "Listo.",
+) -> Callable[[Callable], Callable]:
+    """Decorador que registra la función como tool en el singleton
+    ``ToolRegistry`` al momento del import del módulo.
+    """
+
+    def decorator(func: Callable) -> Callable:
+        # Para tests que usan `patch("module.func", mock)`: resolvemos
+        # la función real en cada invocación (no cacheamos la closure),
+        # y reinspeccionamos su firma para que el filtrado de kwargs
+        # respete el mock — el mock puede tener menos params que la
+        # función original y revienta si le pasamos kwargs que no acepta.
+        module_name = func.__module__
+        func_name = func.__name__
+
+        def _invoke(parameters: dict, *, player=None, speak=None, **_extra: Any) -> str:
+            real_func = getattr(importlib.import_module(module_name), func_name, func)
+            try:
+                sig = inspect.signature(real_func)
+                accepted = set(sig.parameters.keys())
+                accepts_var_kw = any(
+                    p.kind == inspect.Parameter.VAR_KEYWORD for p in sig.parameters.values()
+                )
+            except (ValueError, TypeError):
+                # Built-ins o C-funcs sin signature inspectable: pasar todo.
+                accepted, accepts_var_kw = set(), True
+
+            call_kwargs: dict[str, Any] = {"parameters": parameters}
+            # `available` se arma respetando los flags de la declaración
+            # (needs_player / needs_speak) — son parte del contrato del
+            # registry. Después filtramos por la firma real para no
+            # pasar kwargs que la función no acepta.
+            available: dict[str, Any] = {}
+            if needs_player:
+                available["player"] = player
+            if needs_speak:
+                available["speak"] = speak
+            # Sentinel kwargs legacy que algunos handlers viejos esperan.
+            # No los exponemos si no están explícitamente en la firma.
+            legacy_sentinels = {"response": None, "session_memory": None}
+
+            if accepts_var_kw:
+                call_kwargs.update(available)
+            else:
+                for k, v in available.items():
+                    if k in accepted:
+                        call_kwargs[k] = v
+                for k, v in legacy_sentinels.items():
+                    if k in accepted:
+                        call_kwargs[k] = v
+
+            result = real_func(**call_kwargs)
+            return result if result not in (None, "") else fallback
+
+        if runs_in_thread:
+            # La función real corre en background; el wrapper devuelve
+            # `fallback` (o el `description` apropiado) inmediatamente.
+            sync_invoke = _invoke
+
+            def _threaded(parameters: dict, **kw: Any) -> str:
+                threading.Thread(
+                    target=sync_invoke,
+                    args=(parameters,),
+                    kwargs=kw,
+                    daemon=True,
+                ).start()
+                return fallback
+
+            handler: Callable = _threaded
+        else:
+            handler = _invoke
+
+        decl = ToolDeclaration(
+            name=name,
+            description=description,
+            parameters=parameters or {},
+            timeout=timeout,
+            needs_player=needs_player,
+            needs_speak=needs_speak,
+            needs_current_file=needs_current_file,
+            runs_in_thread=runs_in_thread,
+            silent=silent,
+            include_in_planner=include_in_planner,
+        )
+        _DECORATED_TOOLS.append((decl, handler))
+        ToolRegistry().register(decl, handler)
+
+        # Atributo público por si algún test/caller necesita la decl.
+        func.__orion_tool__ = decl  # type: ignore[attr-defined]
+        return func
+
+    return decorator
+
+
+def live_only_tool(
+    *,
+    name: str,
+    description: str,
+    parameters: dict | None = None,
+    timeout: int = 60,
+    needs_player: bool = True,
+    silent: bool = False,
+    include_in_planner: bool = True,
+) -> Callable[[Callable], Callable]:
+    """Variante de :func:`tool` para las 4 tools que sólo funcionan en
+    modo voz (Gemini Live). El handler registrado es un stub explicativo
+    — ``main.OrionLive.__init__`` lo reemplaza con el handler real que
+    necesita la sesión Live (task queue, ``os._exit``, etc.).
+    """
+
+    def decorator(func: Callable) -> Callable:
+        def _stub(parameters: dict, **_kw: Any) -> str:
+            return f"La herramienta '{name}' solo está disponible en modo voz (Gemini Live)."
+
+        decl = ToolDeclaration(
+            name=name,
+            description=description,
+            parameters=parameters or {},
+            timeout=timeout,
+            needs_player=needs_player,
+            silent=silent,
+            include_in_planner=include_in_planner,
+        )
+        _DECORATED_TOOLS.append((decl, _stub))
+        ToolRegistry().register(decl, _stub)
+        func.__orion_tool__ = decl  # type: ignore[attr-defined]
+        return func
+
+    return decorator
+
+
+# ── Auto-discovery ──────────────────────────────────────────────────────
+
+
+def _replay_decorated() -> None:
+    """Re-registra en el registry todas las tools que algún decorator ya
+    procesó en esta corrida del intérprete.
+
+    Por qué existe: ``ToolRegistry._reset()`` (que los tests usan para
+    aislar) vacía el dict interno. Pero los decoradores Python sólo se
+    evalúan UNA vez por proceso, así que sin esta función las tools
+    decoradas se perderían tras cualquier reset.
+    """
+    reg = ToolRegistry()
+    for decl, handler in _DECORATED_TOOLS:
+        reg.register(decl, handler)
+
+
+def auto_discover_tools(package: str = "actions") -> int:
+    """Importa todos los submódulos de ``package`` para que los
+    decoradores ``@tool`` / ``@live_only_tool`` se disparen y registren
+    sus tools.
+
+    Es idempotente: si los módulos ya están importados, Python reusa el
+    cache y los decoradores no se re-ejecutan (cada decorator corre 1
+    vez por proceso).
+
+    Devuelve la cantidad de submódulos visitados (útil para tests).
+    """
+    pkg = importlib.import_module(package)
+    if not hasattr(pkg, "__path__"):
+        return 0
+
+    count = 0
+    for module_info in pkgutil.walk_packages(pkg.__path__, prefix=f"{package}."):
+        # Saltear los `_pycache_` y módulos privados convencionales.
+        if module_info.name.rsplit(".", 1)[-1].startswith("_"):
+            continue
+        try:
+            importlib.import_module(module_info.name)
+            count += 1
+        except Exception as e:
+            # Un módulo roto no debería tumbar el resto. Log y seguir.
+            import logging
+
+            logging.getLogger("orion.tool_registry").warning(
+                "auto_discover: import de %s falló — %s", module_info.name, e
+            )
+
+    # Re-registrar las tools decoradas que ya estaban en cache (caso típico
+    # tras un ToolRegistry._reset() de tests, donde el import es no-op y
+    # los decoradores no se vuelven a disparar).
+    _replay_decorated()
+    return count

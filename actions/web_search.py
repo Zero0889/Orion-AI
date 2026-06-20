@@ -90,6 +90,27 @@ def _compare(items: list[str], aspect: str) -> str:
     return "\n".join(lines)
 
 
+from core.tool_registry import tool
+
+
+@tool(
+    name="web_search",
+    description="Searches the web for any information.",
+    parameters={
+        "type": "OBJECT",
+        "properties": {
+            "query": {"type": "STRING", "description": "Search query"},
+            "mode": {"type": "STRING", "description": "search (default) or compare"},
+            "items": {
+                "type": "ARRAY",
+                "items": {"type": "STRING"},
+                "description": "Items to compare",
+            },
+            "aspect": {"type": "STRING", "description": "price | specs | reviews"},
+        },
+        "required": ["query"],
+    },
+)
 def web_search(
     parameters: dict,
     response=None,

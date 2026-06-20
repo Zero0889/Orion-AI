@@ -759,6 +759,33 @@ Rules:
         return {"action": description.lower().replace(" ", "_"), "value": None}
 
 
+from core.tool_registry import tool
+
+
+@tool(
+    name="computer_settings",
+    description=(
+        "Controls the computer: volume, brightness, window management, keyboard shortcuts, "
+        "typing text on screen, closing apps, fullscreen, dark mode, WiFi, restart, shutdown, "
+        "scrolling, tab management, zoom, screenshots, lock screen, refresh/reload page. "
+        "Use for ANY single computer control command. NEVER route to agent_task."
+    ),
+    parameters={
+        "type": "OBJECT",
+        "properties": {
+            "action": {"type": "STRING", "description": "The action to perform"},
+            "description": {
+                "type": "STRING",
+                "description": "Natural language description of what to do",
+            },
+            "value": {
+                "type": "STRING",
+                "description": "Optional value: volume level, text to type, etc.",
+            },
+        },
+        "required": [],
+    },
+)
 def computer_settings(
     parameters: dict = None,
     response=None,

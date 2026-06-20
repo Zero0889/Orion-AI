@@ -488,6 +488,35 @@ def _dedupe_libs(components: list[dict[str, Any]]) -> tuple[list[str], list[int]
 # ── Handler público ────────────────────────────────────────────────────
 
 
+from core.tool_registry import tool
+
+
+@tool(
+    name="proteus_autodraw",
+    description=(
+        "Automates Proteus 8 Schematic Capture to add the components "
+        "of a previously generated SPICE netlist (.cir) into Proteus' "
+        "DEVICES panel. The user must have Proteus open in Schematic "
+        "Capture mode and bring it to foreground when prompted. "
+        "Components are added to the panel only — the user still needs "
+        "to drag them onto the canvas and wire them manually."
+    ),
+    parameters={
+        "type": "OBJECT",
+        "properties": {
+            "cir_path": {
+                "type": "STRING",
+                "description": "Absolute path to the .cir file.",
+            },
+            "countdown": {
+                "type": "INTEGER",
+                "description": "Seconds before automation starts (default 3) — gives the user time to focus Proteus.",
+            },
+        },
+        "required": ["cir_path"],
+    },
+    timeout=180,
+)
 def proteus_autodraw(parameters: dict, player=None, **_kwargs) -> str:
     """Handler invocable como tool y por el endpoint REST.
 

@@ -9,6 +9,19 @@ _WEATHER_CACHE: dict[tuple[str, str], float] = {}
 _WEATHER_TTL = 120  # segundos
 
 
+from core.tool_registry import tool
+
+
+@tool(
+    name="weather_report",
+    description="Gives the weather report to user",
+    parameters={
+        "type": "OBJECT",
+        "properties": {"city": {"type": "STRING", "description": "City name"}},
+        "required": ["city"],
+    },
+    fallback="Reporte del clima entregado.",
+)
 def weather_action(
     parameters: dict,
     player=None,
