@@ -39,6 +39,9 @@ BASE_DIR = get_base_dir()
 RESOURCES_DIR = get_resources_dir()
 CONFIG_DIR = BASE_DIR / "config"
 MEMORY_DIR = BASE_DIR / "memory"
+DATA_DIR = (
+    BASE_DIR / "data"
+)  # State runtime (SQLite). Separate from config/ (schema) and memory/ (modules+legacy json).
 CORE_DIR = RESOURCES_DIR / "core"
 PLUGINS_DIR = RESOURCES_DIR / "plugins"
 
@@ -48,6 +51,7 @@ HOTKEYS_CONFIG_PATH = CONFIG_DIR / "hotkeys.json"
 IOT_CONFIG_PATH = CONFIG_DIR / "iot_config.json"
 MEMORY_PATH = MEMORY_DIR / "long_term.json"
 PROMPT_PATH = CORE_DIR / "prompt.txt"
+SQLITE_DB_PATH = DATA_DIR / "orion.sqlite"  # Fase 3B: state migrado a SQLite
 
 
 # Carpetas de runtime overridables por env var. PROJECTS_DIR la usa

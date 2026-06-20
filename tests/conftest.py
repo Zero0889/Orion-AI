@@ -74,3 +74,39 @@ def _testclient_uses_loopback(monkeypatch):
     """
     monkeypatch.setattr(_StarletteTestClient, "__init__", _patched_init)
     yield
+
+
+@pytest.fixture(autouse=True)
+def _isolated_sqlite_db(tmp_path, monkeypatch):
+    """Autouse — apunta el SQLite singleton a un archivo dentro de
+    ``tmp_path`` y resetea las stores que cachean instancias.
+
+    Sin esta fixture, el primer test que importe
+    ``actions.notifications.store`` migra el JSON real del usuario al
+    ``data/orion.sqlite`` real. Acá garantizamos que cada test parte de
+    un DB vacío en tmp y no toca producción.
+    """
+    from storage import override_db_path_for_tests
+
+    db_path = tmp_path / "orion_test.sqlite"
+    override_db_path_for_tests(db_path)
+
+    # Apuntamos el legacy json a algo que NO existe — los tests no
+    # quieren que se importe data real al SQLite de prueba.
+    try:
+        from actions.notifications import store as _notif_store
+
+        monkeypatch.setattr(_notif_store, "_LEGACY_JSON_PATH", tmp_path / "no_legacy.json")
+        _notif_store._reset_for_tests()
+    except ImportError:
+        pass
+
+    yield db_path
+
+    # Cleanup: limpia singletons para que el próximo test arranque limpio.
+    try:
+        from actions.notifications import store as _notif_store
+
+        _notif_store._reset_for_tests()
+    except ImportError:
+        pass

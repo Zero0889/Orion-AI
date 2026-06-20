@@ -51,6 +51,17 @@ config/*.flag
 *.pid
 *.lock
 
+# ── State runtime SQLite (Fase 3B) ──────────────────────────────────────────
+# El DB real vive en data/ — gitignored. Solo el .gitkeep va a git para
+# que la carpeta exista al clonar. Los -wal y -shm son auxiliares de WAL.
+data/*.sqlite
+data/*.sqlite-wal
+data/*.sqlite-shm
+data/*.sqlite.bak
+
+# ── JSON legacy que la migración archiva ────────────────────────────────────
+config/*.migrated_to_sqlite_*.bak
+
 # ── Caches de tooling ───────────────────────────────────────────────────────
 .ruff_cache/
 .mypy_cache/
