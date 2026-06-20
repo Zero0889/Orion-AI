@@ -900,13 +900,17 @@ class OrionLive:
                             if self._turn_done_event:
                                 self._turn_done_event.set()
 
-                            # Cerrar streaming + emitir log con el texto
-                            # completo. Usamos write_log (no persist_log_only)
-                            # como safety-net: si el frontend está cacheado
-                            # con la versión vieja y no procesa chat.stream,
-                            # al menos verá el mensaje completo vía el evento
-                            # `log` tradicional. El frontend nuevo deduplica
-                            # comparando con el último mensaje en streaming.
+                            # Cerrar streaming + persistir el log SIN re-publicarlo
+                            # al WS. Antes acá se usaba `write_log` (que publica
+                            # `log` event) como "safety-net para frontend cacheado
+                            # viejo". El frontend actual SIEMPRE consume
+                            # `chat.stream`, y el dedup contra el `log`
+                            # tradicional falla cuando user+orion comparten turno
+                            # (mira sólo el último mensaje, no encuentra match,
+                            # pushea duplicado). Resultado visible: cada turno
+                            # aparecía dos veces en el chat. Con `persist_log_only`
+                            # el chat ve un solo evento (`chat.stream` final=True)
+                            # y la conversación queda persistida igual.
                             full_in = " ".join(in_buf).strip()
                             if full_in:
                                 if in_turn_id:
@@ -916,7 +920,7 @@ class OrionLive:
                                         turn_id=in_turn_id,
                                         final=True,
                                     )
-                                self.ui.write_log(f"Tú: {full_in}")
+                                self.ui.persist_log_only(f"Tú: {full_in}")
                             in_buf = []
                             in_turn_id = None
 
@@ -929,7 +933,7 @@ class OrionLive:
                                         turn_id=out_turn_id,
                                         final=True,
                                     )
-                                self.ui.write_log(f"ORION: {full_out}")
+                                self.ui.persist_log_only(f"ORION: {full_out}")
                             out_buf = []
                             out_turn_id = None
 

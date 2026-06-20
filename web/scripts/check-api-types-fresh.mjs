@@ -67,6 +67,29 @@ try {
     const files = [jsonDrift && "openapi.json", tsDrift && "generated.ts"]
       .filter(Boolean)
       .join(" + ");
+
+    // Mostrar las primeras N líneas distintas para que el log de CI
+    // diga EXACTAMENTE qué cambió — la primera vez que esto fallaba,
+    // el mensaje genérico "stale" no decía si era LF/CRLF, sort order,
+    // versión de openapi-typescript, etc.
+    const dumpDiff = (label, oldStr, newStr) => {
+      const oldLines = oldStr.split("\n");
+      const newLines = newStr.split("\n");
+      console.error(`\n--- ${label} (- committed / + regenerated) ---`);
+      const max = Math.max(oldLines.length, newLines.length);
+      let shown = 0;
+      for (let i = 0; i < max && shown < 20; i++) {
+        if (oldLines[i] !== newLines[i]) {
+          console.error(`  L${i + 1}-: ${JSON.stringify(oldLines[i] ?? "")}`);
+          console.error(`  L${i + 1}+: ${JSON.stringify(newLines[i] ?? "")}`);
+          shown++;
+        }
+      }
+      if (shown === 20) console.error("  ... (truncado a 20 diffs)");
+    };
+    if (jsonDrift) dumpDiff("openapi.json", oldJson, newJson);
+    if (tsDrift) dumpDiff("generated.ts", oldTs, newTs);
+
     fail(`Tipos API stale — el backend cambió y ${files} no se regeneraron.`);
   }
 

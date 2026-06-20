@@ -22,6 +22,11 @@ export interface ChatMessage {
    *  cuando llegó el chunk final. Útil para mostrar un cursor parpadeante
    *  en la UI durante la transcripción. */
   streaming?: boolean;
+  /** True cuando un evento `log` posterior ya confirmó el texto final.
+   *  El dedup de logs lo usa para no "reconfirmar" el mismo mensaje y
+   *  pushear duplicados. Sólo aplica a mensajes que vinieron por
+   *  `chat.stream` (tienen turnId). */
+  confirmedByLog?: boolean;
 }
 
 export interface ConnectionStatus {

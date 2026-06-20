@@ -147,20 +147,39 @@ export const useOrionStore = create<State>((set, get) => ({
         if (!body) break;
         const ts = Number(payload?.ts ?? Date.now() / 1000);
 
-        // Deduplicación con streaming: si el último mensaje del mismo role
-        // tiene turnId (es decir, vino vía chat.stream), reemplazamos su
-        // texto con el del log (texto completo confirmado del backend) en
-        // lugar de crear un mensaje duplicado. Esto pasa porque el backend
-        // emite write_log al final como safety-net.
+        // Deduplicación con streaming: busca el último mensaje del MISMO
+        // role que vino de chat.stream (tiene turnId) y que aún no fue
+        // confirmado por un `log` previo (`confirmedByLog` falso).
+        //
+        // Bug anterior: solo se chequeaba el último mensaje. En un turno
+        // típico el orden es:
+        //    chat.stream user → chat.stream orion → log user → log orion
+        // Cuando llegaba `log user`, el último mensaje era orion → no
+        // matcheaba → se pusheaba duplicado. Ídem para orion. Resultado:
+        // cada turno aparecía dos veces.
+        //
+        // Hoy el backend usa `persist_log_only` para turnos streameados,
+        // así que este path solo dispara para logs que NO vinieron de
+        // streaming (errores, mensajes de sistema, "ORION en línea", etc).
+        // Igual mantenemos el dedup como defense-in-depth.
         const existing = [...get().messages];
-        const lastIdx = existing.length - 1;
-        if (lastIdx >= 0 && existing[lastIdx].turnId && existing[lastIdx].role === role) {
-          existing[lastIdx] = {
-            ...existing[lastIdx],
+        let matchedIdx = -1;
+        for (let i = existing.length - 1; i >= 0; i--) {
+          const m = existing[i];
+          if (m.role === role && m.turnId && !m.confirmedByLog) {
+            matchedIdx = i;
+            break;
+          }
+        }
+        if (matchedIdx >= 0) {
+          const arr = [...existing];
+          arr[matchedIdx] = {
+            ...arr[matchedIdx],
             text: body,
             streaming: false,
+            confirmedByLog: true,
           };
-          set({ messages: existing });
+          set({ messages: arr });
           break;
         }
 
