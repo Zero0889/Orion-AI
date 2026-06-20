@@ -1,15 +1,38 @@
 /**
  * Cliente REST mínimo. Resuelve la URL del backend igual que ws.ts
  * (Vite dev → :8765 ; prod → mismo origen).
+ *
+ * Tipos auto-generados (Fase 3D): `src/api/generated.ts` se regenera con
+ * `npm run gen:api` desde el OpenAPI del backend. Usalo así para que TS
+ * marque cualquier drift al instante:
+ *
+ *   import type { Schemas } from "@/api/rest";
+ *   type NoteBody = Schemas["NoteCreate"];
+ *
+ * Los `export interface` manuales más abajo se mantienen por
+ * compatibilidad — migrarlos a `Schemas[...]` cuando se toque cada
+ * panel (Fase 3C: god-files frontend).
  */
 
+import type { components, paths } from "@/api/generated";
 import { inferBackendUrl } from "@/api/ws";
 
-async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
+/** Diccionario de schemas Pydantic del backend, tipado. */
+export type Schemas = components["schemas"];
+
+/** Diccionario de paths/endpoints, tipado. Útil para extraer request/response. */
+export type ApiPaths = paths;
+
+async function request<T>(
+  method: string,
+  path: string,
+  body?: unknown,
+): Promise<T> {
   const { http } = inferBackendUrl();
   const res = await fetch(`${http}${path}`, {
     method,
-    headers: body !== undefined ? { "Content-Type": "application/json" } : undefined,
+    headers:
+      body !== undefined ? { "Content-Type": "application/json" } : undefined,
     body: body !== undefined ? JSON.stringify(body) : undefined,
   });
   if (!res.ok) {
@@ -30,8 +53,10 @@ export const api = {
   listNotes: () => request<Array<NoteApi>>("GET", "/api/notes"),
   createNote: (text: string, pinned = false) =>
     request<NoteApi>("POST", "/api/notes", { text, pinned }),
-  updateNote: (id: string, patch: Partial<{ text: string; pinned: boolean; color: string }>) =>
-    request<{ ok: true; id: string }>("PATCH", `/api/notes/${id}`, patch),
+  updateNote: (
+    id: string,
+    patch: Partial<{ text: string; pinned: boolean; color: string }>,
+  ) => request<{ ok: true; id: string }>("PATCH", `/api/notes/${id}`, patch),
   deleteNote: (id: string) => request<void>("DELETE", `/api/notes/${id}`),
 
   // Memory
@@ -42,17 +67,27 @@ export const api = {
     request<void>("DELETE", `/api/memory/${category}/${key}`),
 
   // Conversations
-  listConversations: () => request<Array<ConversationSummary>>("GET", "/api/conversations"),
-  getConversation: (id: string) => request<ConversationDetail>("GET", `/api/conversations/${id}`),
-  deleteConversation: (id: string) => request<void>("DELETE", `/api/conversations/${id}`),
+  listConversations: () =>
+    request<Array<ConversationSummary>>("GET", "/api/conversations"),
+  getConversation: (id: string) =>
+    request<ConversationDetail>("GET", `/api/conversations/${id}`),
+  deleteConversation: (id: string) =>
+    request<void>("DELETE", `/api/conversations/${id}`),
   bulkDeleteConversations: (ids: string[]) =>
-    request<{ deleted: number }>("POST", "/api/conversations/bulk_delete", { ids }),
-  deleteAllConversations: () => request<{ deleted: number }>("DELETE", "/api/conversations"),
+    request<{ deleted: number }>("POST", "/api/conversations/bulk_delete", {
+      ids,
+    }),
+  deleteAllConversations: () =>
+    request<{ deleted: number }>("DELETE", "/api/conversations"),
 
   // NotebookLM auth
-  notebookLMStatus: () => request<NotebookLMStatus>("GET", "/api/notebooklm/status"),
+  notebookLMStatus: () =>
+    request<NotebookLMStatus>("GET", "/api/notebooklm/status"),
   notebookLMLogin: () =>
-    request<{ ok: boolean; pid?: number; message: string }>("POST", "/api/notebooklm/login"),
+    request<{ ok: boolean; pid?: number; message: string }>(
+      "POST",
+      "/api/notebooklm/login",
+    ),
   notebookLMCancel: () =>
     request<{ ok: boolean; message: string }>("POST", "/api/notebooklm/cancel"),
 
@@ -66,20 +101,31 @@ export const api = {
     ),
   getApiKeyStatus: () => request<ApiKeyStatus>("GET", "/api/settings/api_key"),
   setApiKey: (key: string) =>
-    request<{ ok: true; configured: true }>("POST", "/api/settings/api_key", { key }),
+    request<{ ok: true; configured: true }>("POST", "/api/settings/api_key", {
+      key,
+    }),
   getSharing: () => request<SharingState>("GET", "/api/settings/sharing"),
   setSharing: (enabled: boolean) =>
-    request<SharingState & { ok: true }>("POST", "/api/settings/sharing", { enabled }),
+    request<SharingState & { ok: true }>("POST", "/api/settings/sharing", {
+      enabled,
+    }),
 
   // Agent — chat directo + orquesta CRUD
-  listOrchestra: () => request<Array<OrchestraAgent>>("GET", "/api/agent/orchestra"),
-  listProviders: () => request<Array<ProviderCatalog>>("GET", "/api/agent/providers"),
-  createAgent: (spec: AgentSpec) => request<OrchestraAgent>("POST", "/api/agent/orchestra", spec),
+  listOrchestra: () =>
+    request<Array<OrchestraAgent>>("GET", "/api/agent/orchestra"),
+  listProviders: () =>
+    request<Array<ProviderCatalog>>("GET", "/api/agent/providers"),
+  createAgent: (spec: AgentSpec) =>
+    request<OrchestraAgent>("POST", "/api/agent/orchestra", spec),
   updateAgent: (id: string, patch: Partial<AgentSpec>) =>
     request<OrchestraAgent>("PUT", `/api/agent/orchestra/${id}`, patch),
   deleteAgent: (id: string) =>
     request<{ ok: true; id: string }>("DELETE", `/api/agent/orchestra/${id}`),
-  agentChat: (agentId: string, message: string, history?: Array<{ role: string; text: string }>) =>
+  agentChat: (
+    agentId: string,
+    message: string,
+    history?: Array<{ role: string; text: string }>,
+  ) =>
     request<{ agent_id: string; message: string; response: string }>(
       "POST",
       `/api/agent/${agentId}/chat`,
@@ -91,7 +137,10 @@ export const api = {
     const { http } = inferBackendUrl();
     const form = new FormData();
     form.append("file", file);
-    const res = await fetch(`${http}/api/files/upload`, { method: "POST", body: form });
+    const res = await fetch(`${http}/api/files/upload`, {
+      method: "POST",
+      body: form,
+    });
     if (!res.ok) {
       let detail: string;
       try {
@@ -103,13 +152,15 @@ export const api = {
     }
     return (await res.json()) as FileUploadResult;
   },
-  getCurrentFile: () => request<{ current: CurrentFile | null }>("GET", "/api/files/current"),
+  getCurrentFile: () =>
+    request<{ current: CurrentFile | null }>("GET", "/api/files/current"),
   clearCurrentFile: () => request<void>("DELETE", "/api/files/current"),
 
   // IoT
   iotDevices: () => request<Array<IoTDevice>>("GET", "/api/iot/devices"),
   iotScenes: () => request<Array<IoTScene>>("GET", "/api/iot/scenes"),
-  iotSensors: () => request<Record<string, IoTSensor>>("GET", "/api/iot/sensors"),
+  iotSensors: () =>
+    request<Record<string, IoTSensor>>("GET", "/api/iot/sensors"),
   iotAction: (
     deviceId: string,
     body: { action: string; value?: number; color?: string; duration?: number },
@@ -120,64 +171,102 @@ export const api = {
       body,
     ),
   iotRunScene: (sceneId: string) =>
-    request<{ ok: true; scene: string; result: string }>("POST", `/api/iot/scenes/${sceneId}/run`),
+    request<{ ok: true; scene: string; result: string }>(
+      "POST",
+      `/api/iot/scenes/${sceneId}/run`,
+    ),
 
   // ── IoT admin (mutaciones de iot_config.json) ─────────────────────
   iotConfig: () => request<IoTFullConfig>("GET", "/api/iot/config"),
   iotCreateDevice: (body: IoTDeviceBody) =>
     request<{ ok: true; id: string }>("POST", "/api/iot/admin/devices", body),
   iotUpdateDevice: (id: string, body: IoTDeviceBody) =>
-    request<{ ok: true; id: string }>("PUT", `/api/iot/admin/devices/${id}`, body),
+    request<{ ok: true; id: string }>(
+      "PUT",
+      `/api/iot/admin/devices/${id}`,
+      body,
+    ),
   iotDeleteDevice: (id: string) =>
     request<{ ok: true; id: string }>("DELETE", `/api/iot/admin/devices/${id}`),
   iotUpsertTransport: (id: string, body: IoTTransportBody) =>
-    request<{ ok: true; id: string }>("PUT", `/api/iot/admin/transports/${id}`, body),
+    request<{ ok: true; id: string }>(
+      "PUT",
+      `/api/iot/admin/transports/${id}`,
+      body,
+    ),
   iotDeleteTransport: (id: string) =>
-    request<{ ok: true; id: string }>("DELETE", `/api/iot/admin/transports/${id}`),
+    request<{ ok: true; id: string }>(
+      "DELETE",
+      `/api/iot/admin/transports/${id}`,
+    ),
   iotReload: () => request<{ ok: true }>("POST", "/api/iot/admin/reload"),
-  iotPausedStatus: () => request<{ paused: boolean }>("GET", "/api/iot/admin/paused"),
-  iotDisconnect: () => request<{ ok: true; paused: true }>("POST", "/api/iot/admin/disconnect"),
-  iotConnect: () => request<{ ok: true; paused: false }>("POST", "/api/iot/admin/connect"),
+  iotPausedStatus: () =>
+    request<{ paused: boolean }>("GET", "/api/iot/admin/paused"),
+  iotDisconnect: () =>
+    request<{ ok: true; paused: true }>("POST", "/api/iot/admin/disconnect"),
+  iotConnect: () =>
+    request<{ ok: true; paused: false }>("POST", "/api/iot/admin/connect"),
 
   // ── Google Sheets sync ────────────────────────────────────────────
-  iotSheetsStatus: () => request<IoTSheetsState>("GET", "/api/iot/sheets/status"),
+  iotSheetsStatus: () =>
+    request<IoTSheetsState>("GET", "/api/iot/sheets/status"),
   iotSheetsConnect: (body: { account: string; title?: string }) =>
     request<IoTSheetsState>("POST", "/api/iot/sheets/connect", body),
-  iotSheetsDisconnect: () => request<IoTSheetsState>("POST", "/api/iot/sheets/disconnect"),
-  iotSheetsSyncNow: () => request<{ ok: true }>("POST", "/api/iot/sheets/sync_now"),
-  iotSheetsReformat: () => request<{ ok: true }>("POST", "/api/iot/sheets/reformat"),
+  iotSheetsDisconnect: () =>
+    request<IoTSheetsState>("POST", "/api/iot/sheets/disconnect"),
+  iotSheetsSyncNow: () =>
+    request<{ ok: true }>("POST", "/api/iot/sheets/sync_now"),
+  iotSheetsReformat: () =>
+    request<{ ok: true }>("POST", "/api/iot/sheets/reformat"),
   iotSheetsSetInterval: (sync_interval_s: number) =>
-    request<IoTSheetsState>("PUT", "/api/iot/sheets/interval", { sync_interval_s }),
+    request<IoTSheetsState>("PUT", "/api/iot/sheets/interval", {
+      sync_interval_s,
+    }),
 
   // ── Integraciones (gog / Google) ──────────────────────────────────
-  gogAccounts: () => request<GogAccount[]>("GET", "/api/integrations/gog/accounts"),
-  gogServices: () => request<GogService[]>("GET", "/api/integrations/gog/services"),
-  gogFlowStatus: () => request<GogFlowStatus>("GET", "/api/integrations/gog/flow_status"),
-  gogStartAuth: (body: { account: string; services?: string[]; force_consent?: boolean }) =>
+  gogAccounts: () =>
+    request<GogAccount[]>("GET", "/api/integrations/gog/accounts"),
+  gogServices: () =>
+    request<GogService[]>("GET", "/api/integrations/gog/services"),
+  gogFlowStatus: () =>
+    request<GogFlowStatus>("GET", "/api/integrations/gog/flow_status"),
+  gogStartAuth: (body: {
+    account: string;
+    services?: string[];
+    force_consent?: boolean;
+  }) =>
     request<GogFlowStatus>("POST", "/api/integrations/gog/start_auth", body),
-  gogCancelAuth: () => request<GogFlowStatus>("POST", "/api/integrations/gog/cancel"),
-  gogResetAuth: () => request<GogFlowStatus>("POST", "/api/integrations/gog/reset"),
+  gogCancelAuth: () =>
+    request<GogFlowStatus>("POST", "/api/integrations/gog/cancel"),
+  gogResetAuth: () =>
+    request<GogFlowStatus>("POST", "/api/integrations/gog/reset"),
   gogCheckScopes: (body: { account: string; services: string[] }) =>
     request<GogCheckResult>("POST", "/api/integrations/gog/check", body),
 
   // ── MCP (servidores externos) ─────────────────────────────────────
-  mcpListServers: () => request<Array<MCPServerStatus>>("GET", "/api/mcp/servers"),
+  mcpListServers: () =>
+    request<Array<MCPServerStatus>>("GET", "/api/mcp/servers"),
   mcpListTools: () => request<Array<MCPToolInfo>>("GET", "/api/mcp/tools"),
   mcpCreateServer: (body: MCPServerBody & { id: string }) =>
     request<MCPServerStatus>("POST", "/api/mcp/servers", body),
   mcpUpdateServer: (id: string, body: MCPServerBody) =>
     request<MCPServerStatus>("PUT", `/api/mcp/servers/${id}`, body),
-  mcpDeleteServer: (id: string) => request<void>("DELETE", `/api/mcp/servers/${id}`),
+  mcpDeleteServer: (id: string) =>
+    request<void>("DELETE", `/api/mcp/servers/${id}`),
   mcpRestartServer: (id: string) =>
     request<{ ok: true; server_id: string; tool_count: number }>(
       "POST",
       `/api/mcp/servers/${id}/restart`,
     ),
-  mcpReload: () => request<{ ok: true; tool_count: number }>("POST", "/api/mcp/reload"),
+  mcpReload: () =>
+    request<{ ok: true; tool_count: number }>("POST", "/api/mcp/reload"),
   mcpRegistrySearch: (q: string, limit = 20, cursor?: string) => {
     const qs = new URLSearchParams({ q, limit: String(limit) });
     if (cursor) qs.set("cursor", cursor);
-    return request<MCPRegistryPage>("GET", `/api/mcp/registry/search?${qs.toString()}`);
+    return request<MCPRegistryPage>(
+      "GET",
+      `/api/mcp/registry/search?${qs.toString()}`,
+    );
   },
   mcpRegistryStars: (repoUrl: string) => {
     const qs = new URLSearchParams({ repo_url: repoUrl });
@@ -191,18 +280,21 @@ export const api = {
   // ── Skills (formato SKILL.md tipo OpenClaw/Anthropic) ─────────────
   listSkills: () => request<Array<SkillSummary>>("GET", "/api/skills/"),
   getSkill: (id: string) => request<SkillDetail>("GET", `/api/skills/${id}`),
-  reloadSkills: () => request<{ ok: true; count: number }>("POST", "/api/skills/reload"),
+  reloadSkills: () =>
+    request<{ ok: true; count: number }>("POST", "/api/skills/reload"),
   searchSkillRegistry: (q = "") =>
     request<Array<SkillRegistryItem>>(
       "GET",
       `/api/skills/registry/search?q=${encodeURIComponent(q)}`,
     ),
   installSkill: (name: string, source = "openclaw") =>
-    request<{ ok: true; id: string; files: string[]; path: string; loaded: boolean }>(
-      "POST",
-      "/api/skills/install",
-      { name, source },
-    ),
+    request<{
+      ok: true;
+      id: string;
+      files: string[];
+      path: string;
+      loaded: boolean;
+    }>("POST", "/api/skills/install", { name, source }),
   // Legacy aliases (compat con código viejo del panel; usan los genéricos por debajo)
   gogStatus: () => request<CliStatus>("GET", "/api/skills/cli/gog/status"),
   gogInstall: (force = false) =>
@@ -211,7 +303,8 @@ export const api = {
       `/api/skills/cli/gog/install${force ? "?force=true" : ""}`,
     ),
   listCli: () => request<Array<CliInfo>>("GET", "/api/skills/cli"),
-  cliStatus: (name: string) => request<CliStatus>("GET", `/api/skills/cli/${name}/status`),
+  cliStatus: (name: string) =>
+    request<CliStatus>("GET", `/api/skills/cli/${name}/status`),
   cliInstall: (name: string, force = false) =>
     request<{ ok: true; name: string; path: string }>(
       "POST",
@@ -224,23 +317,34 @@ export const api = {
     if (opts.source) q.set("source", opts.source);
     if (opts.unread) q.set("unread", "true");
     const qs = q.toString();
-    return request<Array<NotifItem>>("GET", `/api/notifications${qs ? "?" + qs : ""}`);
+    return request<Array<NotifItem>>(
+      "GET",
+      `/api/notifications${qs ? "?" + qs : ""}`,
+    );
   },
-  notificationsStatus: () => request<NotifPollerStatus>("GET", "/api/notifications/status"),
+  notificationsStatus: () =>
+    request<NotifPollerStatus>("GET", "/api/notifications/status"),
   pollNotifications: (source?: string) =>
     request<Record<string, unknown>>(
       "POST",
       `/api/notifications/poll${source ? "?source=" + encodeURIComponent(source) : ""}`,
     ),
   markNotificationsRead: (uids: string[]) =>
-    request<{ ok: true; marked: number }>("POST", "/api/notifications/mark-read", { uids }),
+    request<{ ok: true; marked: number }>(
+      "POST",
+      "/api/notifications/mark-read",
+      { uids },
+    ),
   markAllNotificationsRead: (source?: string) =>
     request<{ ok: true; marked: number }>(
       "POST",
       `/api/notifications/mark-all-read${source ? "?source=" + encodeURIComponent(source) : ""}`,
     ),
   authorizeClassroom: () =>
-    request<{ ok: true; token_path: string }>("POST", "/api/notifications/classroom/authorize"),
+    request<{ ok: true; token_path: string }>(
+      "POST",
+      "/api/notifications/classroom/authorize",
+    ),
 
   // ── Circuit-from-image ─────────────────────────────────────────────
   circuitFromImage: (imagePath: string, outputs?: Array<"spice" | "kicad">) =>
@@ -248,19 +352,27 @@ export const api = {
       image_path: imagePath,
       outputs,
     }),
-  circuitList: () => request<{ items: CircuitItem[] }>("GET", "/api/circuit/list"),
+  circuitList: () =>
+    request<{ items: CircuitItem[] }>("GET", "/api/circuit/list"),
   circuitDelete: (path: string) =>
-    request<{ ok: true }>("DELETE", `/api/circuit/item?path=${encodeURIComponent(path)}`),
+    request<{ ok: true }>(
+      "DELETE",
+      `/api/circuit/item?path=${encodeURIComponent(path)}`,
+    ),
   circuitProteusAutodraw: (
     cirPath: string,
     opts: { countdown?: number; placeInCanvas?: boolean; cols?: number } = {},
   ) =>
-    request<{ ok: boolean; summary: string }>("POST", "/api/circuit/proteus-autodraw", {
-      cir_path: cirPath,
-      countdown: opts.countdown ?? 3,
-      place_in_canvas: opts.placeInCanvas ?? true,
-      cols: opts.cols ?? 3,
-    }),
+    request<{ ok: boolean; summary: string }>(
+      "POST",
+      "/api/circuit/proteus-autodraw",
+      {
+        cir_path: cirPath,
+        countdown: opts.countdown ?? 3,
+        place_in_canvas: opts.placeInCanvas ?? true,
+        cols: opts.cols ?? 3,
+      },
+    ),
 };
 
 export interface NotifItem {

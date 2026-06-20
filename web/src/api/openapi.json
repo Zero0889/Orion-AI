@@ -1,0 +1,4158 @@
+{
+  "components": {
+    "schemas": {
+      "AgentChatBody": {
+        "properties": {
+          "history": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "History",
+            "type": "array"
+          },
+          "message": {
+            "maxLength": 8000,
+            "minLength": 1,
+            "title": "Message",
+            "type": "string"
+          }
+        },
+        "required": [
+          "message"
+        ],
+        "title": "AgentChatBody",
+        "type": "object"
+      },
+      "AgentSpec": {
+        "description": "Spec que llega del frontend. Todos los campos son opcionales en\nPUT (patch parcial) y la mayoría también en POST (defaults razonables\nsi no se mandan). Solo ``provider`` y ``model`` son obligatorios.",
+        "properties": {
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Enabled"
+          },
+          "fallback_model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fallback Model"
+          },
+          "fallback_provider": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fallback Provider"
+          },
+          "icon": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Icon"
+          },
+          "id": {
+            "anyOf": [
+              {
+                "maxLength": 32,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
+          "provider": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider"
+          },
+          "role": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Role"
+          },
+          "system": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "System"
+          },
+          "temperature": {
+            "anyOf": [
+              {
+                "maximum": 2.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Temperature"
+          },
+          "tools": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tools"
+          }
+        },
+        "title": "AgentSpec",
+        "type": "object"
+      },
+      "ApiKeyBody": {
+        "properties": {
+          "key": {
+            "maxLength": 400,
+            "minLength": 10,
+            "title": "Key",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key"
+        ],
+        "title": "ApiKeyBody",
+        "type": "object"
+      },
+      "Body_upload_file_api_files_upload_post": {
+        "properties": {
+          "file": {
+            "contentMediaType": "application/octet-stream",
+            "title": "File",
+            "type": "string"
+          }
+        },
+        "required": [
+          "file"
+        ],
+        "title": "Body_upload_file_api_files_upload_post",
+        "type": "object"
+      },
+      "BulkDeleteBody": {
+        "properties": {
+          "ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Ids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "ids"
+        ],
+        "title": "BulkDeleteBody",
+        "type": "object"
+      },
+      "CapabilitiesBody": {
+        "properties": {
+          "dimmable": {
+            "default": false,
+            "title": "Dimmable",
+            "type": "boolean"
+          },
+          "on_off": {
+            "default": false,
+            "title": "On Off",
+            "type": "boolean"
+          },
+          "rgb": {
+            "default": false,
+            "title": "Rgb",
+            "type": "boolean"
+          },
+          "sensor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sensor"
+          }
+        },
+        "title": "CapabilitiesBody",
+        "type": "object"
+      },
+      "CheckBody": {
+        "properties": {
+          "account": {
+            "title": "Account",
+            "type": "string"
+          },
+          "services": {
+            "description": "Servicios requeridos",
+            "items": {
+              "type": "string"
+            },
+            "title": "Services",
+            "type": "array"
+          }
+        },
+        "required": [
+          "account",
+          "services"
+        ],
+        "title": "CheckBody",
+        "type": "object"
+      },
+      "DeviceAction": {
+        "properties": {
+          "action": {
+            "description": "on | off | dim | rgb | timed",
+            "title": "Action",
+            "type": "string"
+          },
+          "color": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Color para rgb",
+            "title": "Color"
+          },
+          "duration": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Segundos para timed",
+            "title": "Duration"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "0-100 para dim",
+            "title": "Value"
+          }
+        },
+        "required": [
+          "action"
+        ],
+        "title": "DeviceAction",
+        "type": "object"
+      },
+      "DeviceBody": {
+        "description": "Payload para crear/actualizar un dispositivo en iot_config.json.",
+        "properties": {
+          "capabilities": {
+            "$ref": "#/components/schemas/CapabilitiesBody"
+          },
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "solo en POST",
+            "title": "Id"
+          },
+          "mqtt": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mqtt"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "serial": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Serial"
+          },
+          "transport": {
+            "title": "Transport",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "transport",
+          "capabilities"
+        ],
+        "title": "DeviceBody",
+        "type": "object"
+      },
+      "FromImageRequest": {
+        "properties": {
+          "image_path": {
+            "description": "Ruta absoluta a la imagen del circuito.",
+            "title": "Image Path",
+            "type": "string"
+          },
+          "output_dir": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Carpeta destino. Default: la carpeta de la imagen.",
+            "title": "Output Dir"
+          },
+          "outputs": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Lista con 'spice' y/o 'kicad'. Default: ambos.",
+            "title": "Outputs"
+          }
+        },
+        "required": [
+          "image_path"
+        ],
+        "title": "FromImageRequest",
+        "type": "object"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "title": "Detail",
+            "type": "array"
+          }
+        },
+        "title": "HTTPValidationError",
+        "type": "object"
+      },
+      "InstallBody": {
+        "properties": {
+          "name": {
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "source": {
+            "default": "openclaw",
+            "description": "Por ahora sólo 'openclaw'",
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "InstallBody",
+        "type": "object"
+      },
+      "MarkReadBody": {
+        "properties": {
+          "uids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Uids",
+            "type": "array"
+          }
+        },
+        "title": "MarkReadBody",
+        "type": "object"
+      },
+      "MemoryEntry": {
+        "properties": {
+          "value": {
+            "maxLength": 400,
+            "minLength": 1,
+            "title": "Value",
+            "type": "string"
+          }
+        },
+        "required": [
+          "value"
+        ],
+        "title": "MemoryEntry",
+        "type": "object"
+      },
+      "NoteCreate": {
+        "properties": {
+          "color": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Color"
+          },
+          "pinned": {
+            "default": false,
+            "title": "Pinned",
+            "type": "boolean"
+          },
+          "text": {
+            "maxLength": 4000,
+            "minLength": 1,
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "text"
+        ],
+        "title": "NoteCreate",
+        "type": "object"
+      },
+      "NoteUpdate": {
+        "properties": {
+          "color": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Color"
+          },
+          "pinned": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pinned"
+          },
+          "text": {
+            "anyOf": [
+              {
+                "maxLength": 4000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Text"
+          }
+        },
+        "title": "NoteUpdate",
+        "type": "object"
+      },
+      "ProteusAutodrawRequest": {
+        "properties": {
+          "cir_path": {
+            "description": "Ruta absoluta al .cir generado previamente.",
+            "title": "Cir Path",
+            "type": "string"
+          },
+          "cols": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": 3,
+            "description": "Columnas de la grilla.",
+            "title": "Cols"
+          },
+          "countdown": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": 3,
+            "description": "Segundos antes de empezar (para enfocar Proteus).",
+            "title": "Countdown"
+          },
+          "place_in_canvas": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": true,
+            "description": "Si True, coloca los componentes en el canvas en una grilla.",
+            "title": "Place In Canvas"
+          }
+        },
+        "required": [
+          "cir_path"
+        ],
+        "title": "ProteusAutodrawRequest",
+        "type": "object"
+      },
+      "SharingBody": {
+        "properties": {
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "enabled"
+        ],
+        "title": "SharingBody",
+        "type": "object"
+      },
+      "SheetsConnectBody": {
+        "properties": {
+          "account": {
+            "description": "Email Google asociado a gog",
+            "title": "Account",
+            "type": "string"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Nombre del Sheet (opcional)",
+            "title": "Title"
+          }
+        },
+        "required": [
+          "account"
+        ],
+        "title": "SheetsConnectBody",
+        "type": "object"
+      },
+      "SheetsIntervalBody": {
+        "properties": {
+          "sync_interval_s": {
+            "description": "Segundos entre cada sync (10..3600)",
+            "maximum": 3600.0,
+            "minimum": 10.0,
+            "title": "Sync Interval S",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "sync_interval_s"
+        ],
+        "title": "SheetsIntervalBody",
+        "type": "object"
+      },
+      "StartAuthBody": {
+        "properties": {
+          "account": {
+            "title": "Account",
+            "type": "string"
+          },
+          "force_consent": {
+            "default": true,
+            "title": "Force Consent",
+            "type": "boolean"
+          },
+          "services": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Services"
+          }
+        },
+        "required": [
+          "account"
+        ],
+        "title": "StartAuthBody",
+        "type": "object"
+      },
+      "ThemePatch": {
+        "properties": {
+          "name": {
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "ThemePatch",
+        "type": "object"
+      },
+      "TransportBody": {
+        "description": "Payload para crear/actualizar un transport.",
+        "properties": {
+          "baud": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Baud"
+          },
+          "client_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Client Id"
+          },
+          "host": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Host"
+          },
+          "mqtt_port": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mqtt Port"
+          },
+          "password": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Password"
+          },
+          "port": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Port"
+          },
+          "tls": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tls"
+          },
+          "type": {
+            "description": "'serial' o 'mqtt'",
+            "title": "Type",
+            "type": "string"
+          },
+          "username": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Username"
+          }
+        },
+        "required": [
+          "type"
+        ],
+        "title": "TransportBody",
+        "type": "object"
+      },
+      "ValidationError": {
+        "properties": {
+          "ctx": {
+            "title": "Context",
+            "type": "object"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "title": "Location",
+            "type": "array"
+          },
+          "msg": {
+            "title": "Message",
+            "type": "string"
+          },
+          "type": {
+            "title": "Error Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError",
+        "type": "object"
+      }
+    }
+  },
+  "info": {
+    "description": "Backend FastAPI + WebSocket de Orion. Convive con la UI Qt durante la migración a frontend React (rama migration/web-ui).",
+    "title": "O.R.I.O.N Backend",
+    "version": "0.1.0"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/": {
+      "get": {
+        "operationId": "root_spa__get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Root Spa"
+      }
+    },
+    "/api/agent/orchestra": {
+      "get": {
+        "description": "Lista TODOS los agentes definidos (habilitados e inhabilitados).\n\nLa UI necesita ver también los inhabilitados para poder reactivarlos\no editarlos sin tener que tocar agents.json a mano.",
+        "operationId": "list_orchestra_api_agent_orchestra_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "title": "Response List Orchestra Api Agent Orchestra Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Orchestra",
+        "tags": [
+          "agent"
+        ]
+      },
+      "post": {
+        "operationId": "create_agent_api_agent_orchestra_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AgentSpec"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Create Agent Api Agent Orchestra Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Agent",
+        "tags": [
+          "agent"
+        ]
+      }
+    },
+    "/api/agent/orchestra/{agent_id}": {
+      "delete": {
+        "operationId": "remove_agent_api_agent_orchestra__agent_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "agent_id",
+            "required": true,
+            "schema": {
+              "title": "Agent Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Remove Agent Api Agent Orchestra  Agent Id  Delete",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Remove Agent",
+        "tags": [
+          "agent"
+        ]
+      },
+      "put": {
+        "operationId": "update_agent_api_agent_orchestra__agent_id__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "agent_id",
+            "required": true,
+            "schema": {
+              "title": "Agent Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AgentSpec"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Update Agent Api Agent Orchestra  Agent Id  Put",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Agent",
+        "tags": [
+          "agent"
+        ]
+      }
+    },
+    "/api/agent/providers": {
+      "get": {
+        "description": "Catálogo de proveedores con modelos sugeridos.\n\nEl frontend lo usa para poblar los dropdowns de \"provider\" y \"model\"\nen el editor de agentes. ``available`` indica si la API key está\nconfigurada para ese provider.",
+        "operationId": "list_providers_api_agent_providers_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "title": "Response List Providers Api Agent Providers Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Providers",
+        "tags": [
+          "agent"
+        ]
+      }
+    },
+    "/api/agent/{agent_id}/chat": {
+      "post": {
+        "description": "Envía un mensaje directamente a un agente y devuelve su respuesta\ncomo texto plano. No pasa por la cola de tareas ni por el orquestador\n— es el agente el que responde directamente.\n\nIncluye ``history`` para mantener el contexto de la conversación.",
+        "operationId": "agent_chat_api_agent__agent_id__chat_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "agent_id",
+            "required": true,
+            "schema": {
+              "title": "Agent Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AgentChatBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Agent Chat Api Agent  Agent Id  Chat Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Agent Chat",
+        "tags": [
+          "agent"
+        ]
+      }
+    },
+    "/api/circuit/from-image": {
+      "post": {
+        "description": "Genera SPICE + KiCad a partir de una imagen ya subida al servidor.\n\nEl cliente debe haber subido la imagen primero vía ``POST /api/files/upload``\ny reusar la ruta devuelta. La conversión real se ejecuta en un thread\nporque la llamada a Gemini es bloqueante (~5-10s).",
+        "operationId": "from_image_api_circuit_from_image_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FromImageRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response From Image Api Circuit From Image Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "From Image",
+        "tags": [
+          "circuit"
+        ]
+      }
+    },
+    "/api/circuit/item": {
+      "delete": {
+        "description": "Elimina un .cir o .kicad_sch generado. Solo acepta archivos dentro de uploads/.",
+        "operationId": "delete_item_api_circuit_item_delete",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "path",
+            "required": true,
+            "schema": {
+              "title": "Path",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Delete Item Api Circuit Item Delete",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Item",
+        "tags": [
+          "circuit"
+        ]
+      }
+    },
+    "/api/circuit/list": {
+      "get": {
+        "description": "Lista los .cir y .kicad_sch generados.\n\nBusca recursivamente en ``uploads/`` y en ``BASE_DIR/uploads/`` que es\ndonde la action escribe por defecto si la imagen estaba ahí.",
+        "operationId": "list_circuits_api_circuit_list_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response List Circuits Api Circuit List Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Circuits",
+        "tags": [
+          "circuit"
+        ]
+      }
+    },
+    "/api/circuit/proteus-autodraw": {
+      "post": {
+        "description": "Lanza la automatización de Proteus. El usuario debe tener Proteus\nabierto en Schematic Capture y enfocado antes del fin del countdown.",
+        "operationId": "proteus_autodraw_route_api_circuit_proteus_autodraw_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProteusAutodrawRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Proteus Autodraw Route Api Circuit Proteus Autodraw Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Proteus Autodraw Route",
+        "tags": [
+          "circuit"
+        ]
+      }
+    },
+    "/api/conversations": {
+      "delete": {
+        "description": "Wipe completo del historial.",
+        "operationId": "remove_all_conversations_api_conversations_delete",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Remove All Conversations Api Conversations Delete",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Remove All Conversations",
+        "tags": [
+          "conversations"
+        ]
+      },
+      "get": {
+        "description": "Lista las conversaciones (resumidas, sin el cuerpo de mensajes).\n\n``list_conversations()`` ya devuelve metadata ligera con ``msg_count``;\naquí solo lo re-mapeamos a ``messages`` para que el frontend tenga\nun nombre más natural.",
+        "operationId": "get_all_conversations_api_conversations_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "title": "Response Get All Conversations Api Conversations Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get All Conversations",
+        "tags": [
+          "conversations"
+        ]
+      }
+    },
+    "/api/conversations/bulk_delete": {
+      "post": {
+        "description": "Borra varias conversaciones por id. Devuelve ``{deleted: N}``.",
+        "operationId": "bulk_remove_conversations_api_conversations_bulk_delete_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkDeleteBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Bulk Remove Conversations Api Conversations Bulk Delete Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Bulk Remove Conversations",
+        "tags": [
+          "conversations"
+        ]
+      }
+    },
+    "/api/conversations/{conv_id}": {
+      "delete": {
+        "operationId": "remove_conversation_api_conversations__conv_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conv_id",
+            "required": true,
+            "schema": {
+              "title": "Conv Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Remove Conversation",
+        "tags": [
+          "conversations"
+        ]
+      },
+      "get": {
+        "operationId": "get_one_conversation_api_conversations__conv_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conv_id",
+            "required": true,
+            "schema": {
+              "title": "Conv Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Get One Conversation Api Conversations  Conv Id  Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get One Conversation",
+        "tags": [
+          "conversations"
+        ]
+      }
+    },
+    "/api/files/current": {
+      "delete": {
+        "operationId": "clear_current_file_api_files_current_delete",
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Clear Current File",
+        "tags": [
+          "files"
+        ]
+      },
+      "get": {
+        "operationId": "get_current_file_api_files_current_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Get Current File Api Files Current Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Current File",
+        "tags": [
+          "files"
+        ]
+      }
+    },
+    "/api/files/upload": {
+      "post": {
+        "description": "Sube un archivo y lo deja como ``current_file`` del bus.",
+        "operationId": "upload_file_api_files_upload_post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_upload_file_api_files_upload_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Upload File Api Files Upload Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Upload File",
+        "tags": [
+          "files"
+        ]
+      }
+    },
+    "/api/health": {
+      "get": {
+        "operationId": "health_api_health_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Health"
+      }
+    },
+    "/api/integrations/gog/accounts": {
+      "get": {
+        "operationId": "gog_accounts_api_integrations_gog_accounts_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "title": "Response Gog Accounts Api Integrations Gog Accounts Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Gog Accounts",
+        "tags": [
+          "integrations"
+        ]
+      }
+    },
+    "/api/integrations/gog/cancel": {
+      "post": {
+        "operationId": "gog_cancel_api_integrations_gog_cancel_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Gog Cancel Api Integrations Gog Cancel Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Gog Cancel",
+        "tags": [
+          "integrations"
+        ]
+      }
+    },
+    "/api/integrations/gog/check": {
+      "post": {
+        "description": "¿La cuenta tiene los servicios? Usado por los guards contextuales.",
+        "operationId": "gog_check_api_integrations_gog_check_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CheckBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Gog Check Api Integrations Gog Check Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Gog Check",
+        "tags": [
+          "integrations"
+        ]
+      }
+    },
+    "/api/integrations/gog/flow_status": {
+      "get": {
+        "operationId": "gog_flow_status_api_integrations_gog_flow_status_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Gog Flow Status Api Integrations Gog Flow Status Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Gog Flow Status",
+        "tags": [
+          "integrations"
+        ]
+      }
+    },
+    "/api/integrations/gog/reset": {
+      "post": {
+        "operationId": "gog_reset_api_integrations_gog_reset_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Gog Reset Api Integrations Gog Reset Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Gog Reset",
+        "tags": [
+          "integrations"
+        ]
+      }
+    },
+    "/api/integrations/gog/services": {
+      "get": {
+        "operationId": "gog_services_api_integrations_gog_services_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "title": "Response Gog Services Api Integrations Gog Services Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Gog Services",
+        "tags": [
+          "integrations"
+        ]
+      }
+    },
+    "/api/integrations/gog/start_auth": {
+      "post": {
+        "operationId": "gog_start_auth_api_integrations_gog_start_auth_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StartAuthBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Gog Start Auth Api Integrations Gog Start Auth Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Gog Start Auth",
+        "tags": [
+          "integrations"
+        ]
+      }
+    },
+    "/api/iot/admin/connect": {
+      "post": {
+        "description": "Reanuda los transports. Borra el flag de pausa y reabre.",
+        "operationId": "connect_all_api_iot_admin_connect_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Connect All Api Iot Admin Connect Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Connect All",
+        "tags": [
+          "iot"
+        ]
+      }
+    },
+    "/api/iot/admin/devices": {
+      "post": {
+        "operationId": "create_device_api_iot_admin_devices_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeviceBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Create Device Api Iot Admin Devices Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Device",
+        "tags": [
+          "iot"
+        ]
+      }
+    },
+    "/api/iot/admin/devices/{device_id}": {
+      "delete": {
+        "operationId": "delete_device_api_iot_admin_devices__device_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "device_id",
+            "required": true,
+            "schema": {
+              "title": "Device Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Delete Device Api Iot Admin Devices  Device Id  Delete",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Device",
+        "tags": [
+          "iot"
+        ]
+      },
+      "put": {
+        "operationId": "update_device_api_iot_admin_devices__device_id__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "device_id",
+            "required": true,
+            "schema": {
+              "title": "Device Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeviceBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Update Device Api Iot Admin Devices  Device Id  Put",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Device",
+        "tags": [
+          "iot"
+        ]
+      }
+    },
+    "/api/iot/admin/disconnect": {
+      "post": {
+        "description": "Cierra TODOS los transports IoT (serial + MQTT) sin tocar el config.\nÚtil cuando no querés que ORION conecte al COM o al broker al arrancar.\nPersiste el estado en :file:`config/iot_paused.flag` para que sobreviva\nal reinicio.",
+        "operationId": "disconnect_all_api_iot_admin_disconnect_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Disconnect All Api Iot Admin Disconnect Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Disconnect All",
+        "tags": [
+          "iot"
+        ]
+      }
+    },
+    "/api/iot/admin/paused": {
+      "get": {
+        "description": "Estado actual del flag (true = transports cerrados).",
+        "operationId": "get_paused_api_iot_admin_paused_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Get Paused Api Iot Admin Paused Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Paused",
+        "tags": [
+          "iot"
+        ]
+      }
+    },
+    "/api/iot/admin/reload": {
+      "post": {
+        "description": "Recarga el config desde disco sin escribir nada. Útil si editaste\niot_config.json a mano y quieres aplicar sin reiniciar ORION.",
+        "operationId": "reload_system_api_iot_admin_reload_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Reload System Api Iot Admin Reload Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Reload System",
+        "tags": [
+          "iot"
+        ]
+      }
+    },
+    "/api/iot/admin/transports/{transport_id}": {
+      "delete": {
+        "operationId": "delete_transport_api_iot_admin_transports__transport_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "transport_id",
+            "required": true,
+            "schema": {
+              "title": "Transport Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Delete Transport Api Iot Admin Transports  Transport Id  Delete",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Transport",
+        "tags": [
+          "iot"
+        ]
+      },
+      "put": {
+        "operationId": "upsert_transport_api_iot_admin_transports__transport_id__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "transport_id",
+            "required": true,
+            "schema": {
+              "title": "Transport Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TransportBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Upsert Transport Api Iot Admin Transports  Transport Id  Put",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Upsert Transport",
+        "tags": [
+          "iot"
+        ]
+      }
+    },
+    "/api/iot/config": {
+      "get": {
+        "description": "Devuelve el config completo (transports + devices + scenes).\n\nÚtil para que el frontend muestre los detalles de cada transport\nal editar y al elegir 'a qué transport conectar este dispositivo'.",
+        "operationId": "get_full_config_api_iot_config_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Get Full Config Api Iot Config Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Full Config",
+        "tags": [
+          "iot"
+        ]
+      }
+    },
+    "/api/iot/devices": {
+      "get": {
+        "operationId": "get_devices_api_iot_devices_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "title": "Response Get Devices Api Iot Devices Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Devices",
+        "tags": [
+          "iot"
+        ]
+      }
+    },
+    "/api/iot/devices/{device_id}/action": {
+      "post": {
+        "operationId": "device_action_api_iot_devices__device_id__action_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "device_id",
+            "required": true,
+            "schema": {
+              "title": "Device Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeviceAction"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Device Action Api Iot Devices  Device Id  Action Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Device Action",
+        "tags": [
+          "iot"
+        ]
+      }
+    },
+    "/api/iot/scenes": {
+      "get": {
+        "operationId": "get_scenes_api_iot_scenes_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "title": "Response Get Scenes Api Iot Scenes Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Scenes",
+        "tags": [
+          "iot"
+        ]
+      }
+    },
+    "/api/iot/scenes/{scene_id}/run": {
+      "post": {
+        "operationId": "scene_run_api_iot_scenes__scene_id__run_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "scene_id",
+            "required": true,
+            "schema": {
+              "title": "Scene Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Scene Run Api Iot Scenes  Scene Id  Run Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Scene Run",
+        "tags": [
+          "iot"
+        ]
+      }
+    },
+    "/api/iot/sensor_log/csv": {
+      "get": {
+        "description": "Descarga el log persistente como CSV. Una fila por dispositivo\npor minuto (promedio de las lecturas de ese minuto).",
+        "operationId": "download_sensor_log_csv_api_iot_sensor_log_csv_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Download Sensor Log Csv",
+        "tags": [
+          "iot"
+        ]
+      }
+    },
+    "/api/iot/sensor_log/xlsx": {
+      "get": {
+        "description": "Descarga el log como Excel formateado: hoja `all` con todo +\nuna hoja por dispositivo.",
+        "operationId": "download_sensor_log_xlsx_api_iot_sensor_log_xlsx_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Download Sensor Log Xlsx",
+        "tags": [
+          "iot"
+        ]
+      }
+    },
+    "/api/iot/sensors": {
+      "get": {
+        "operationId": "get_sensors_api_iot_sensors_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Get Sensors Api Iot Sensors Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Sensors",
+        "tags": [
+          "iot"
+        ]
+      }
+    },
+    "/api/iot/sheets/connect": {
+      "post": {
+        "description": "Crea un Sheet nuevo y arranca el sync continuo.",
+        "operationId": "sheets_connect_api_iot_sheets_connect_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SheetsConnectBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Sheets Connect Api Iot Sheets Connect Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Sheets Connect",
+        "tags": [
+          "iot"
+        ]
+      }
+    },
+    "/api/iot/sheets/disconnect": {
+      "post": {
+        "description": "Para el sync. NO borra el Sheet en Drive.",
+        "operationId": "sheets_disconnect_api_iot_sheets_disconnect_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Sheets Disconnect Api Iot Sheets Disconnect Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Sheets Disconnect",
+        "tags": [
+          "iot"
+        ]
+      }
+    },
+    "/api/iot/sheets/interval": {
+      "put": {
+        "description": "Actualiza la cadencia de sync a Sheets. Persiste y despierta el loop.",
+        "operationId": "sheets_set_interval_api_iot_sheets_interval_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SheetsIntervalBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Sheets Set Interval Api Iot Sheets Interval Put",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Sheets Set Interval",
+        "tags": [
+          "iot"
+        ]
+      }
+    },
+    "/api/iot/sheets/reformat": {
+      "post": {
+        "description": "Re-aplica el formato bonito (cabecera, freeze, fechas, bandas) al\nSheet conectado. No mueve datos.",
+        "operationId": "sheets_reformat_api_iot_sheets_reformat_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Sheets Reformat Api Iot Sheets Reformat Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Sheets Reformat",
+        "tags": [
+          "iot"
+        ]
+      }
+    },
+    "/api/iot/sheets/status": {
+      "get": {
+        "description": "Estado actual del sync a Google Sheets.",
+        "operationId": "sheets_status_api_iot_sheets_status_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Sheets Status Api Iot Sheets Status Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Sheets Status",
+        "tags": [
+          "iot"
+        ]
+      }
+    },
+    "/api/iot/sheets/sync_now": {
+      "post": {
+        "description": "Fuerza un sync inmediato sin esperar al próximo tick.",
+        "operationId": "sheets_sync_now_api_iot_sheets_sync_now_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Sheets Sync Now Api Iot Sheets Sync Now Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Sheets Sync Now",
+        "tags": [
+          "iot"
+        ]
+      }
+    },
+    "/api/iot/status": {
+      "get": {
+        "description": "Estado de conexión de los transports configurados.",
+        "operationId": "get_transport_status_api_iot_status_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Get Transport Status Api Iot Status Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Transport Status",
+        "tags": [
+          "iot"
+        ]
+      }
+    },
+    "/api/mcp/recipes": {
+      "get": {
+        "description": "Lista de recetas curadas (servers populares pre-armados).\n\nEl registry público no incluye los reference servers de Anthropic\n(Filesystem, Git, Memory, etc.) — solo están en su monorepo. Acá los\ndevolvemos hardcoded para que la UI pueda mostrarlos en un tab\n'Curados' con instalación de un click.",
+        "operationId": "list_curated_recipes_api_mcp_recipes_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "title": "Response List Curated Recipes Api Mcp Recipes Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Curated Recipes",
+        "tags": [
+          "mcp"
+        ]
+      }
+    },
+    "/api/mcp/registry/search": {
+      "get": {
+        "description": "Proxy al registry oficial. Devuelve servers normalizados +\nnextCursor para paginar.",
+        "operationId": "registry_search_api_mcp_registry_search_get",
+        "parameters": [
+          {
+            "description": "Texto a buscar en nombre/descripción",
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "default": "",
+              "description": "Texto a buscar en nombre/descripción",
+              "title": "Q",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "maximum": 50,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "nextCursor de la página previa",
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "nextCursor de la página previa",
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Registry Search Api Mcp Registry Search Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Registry Search",
+        "tags": [
+          "mcp"
+        ]
+      }
+    },
+    "/api/mcp/registry/stars": {
+      "get": {
+        "description": "Devuelve estrellas de GitHub para un repo. Best-effort, cacheado\n24h. Si falla devuelve ``stars: null`` (no error 502 — la UI debe\nseguir andando sin esta info).",
+        "operationId": "registry_stars_api_mcp_registry_stars_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "repo_url",
+            "required": true,
+            "schema": {
+              "title": "Repo Url",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Registry Stars Api Mcp Registry Stars Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Registry Stars",
+        "tags": [
+          "mcp"
+        ]
+      }
+    },
+    "/api/mcp/reload": {
+      "post": {
+        "description": "Relee config/mcp_servers.json y reaplica. Útil tras editar el\nJSON a mano.",
+        "operationId": "reload_all_api_mcp_reload_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Reload All Api Mcp Reload Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Reload All",
+        "tags": [
+          "mcp"
+        ]
+      }
+    },
+    "/api/mcp/servers": {
+      "get": {
+        "operationId": "list_servers_api_mcp_servers_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "title": "Response List Servers Api Mcp Servers Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Servers",
+        "tags": [
+          "mcp"
+        ]
+      },
+      "post": {
+        "description": "Crea un server nuevo. Body: ``{id, ...MCPServerBody}``.\n\nEl ``id`` lo elige el usuario (no autogenerado) para que coincida\ncon el namespacing de las tools.",
+        "operationId": "create_server_api_mcp_servers_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": true,
+                "title": "Body",
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Create Server Api Mcp Servers Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Server",
+        "tags": [
+          "mcp"
+        ]
+      }
+    },
+    "/api/mcp/servers/{server_id}": {
+      "delete": {
+        "operationId": "delete_server_api_mcp_servers__server_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "server_id",
+            "required": true,
+            "schema": {
+              "title": "Server Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Server",
+        "tags": [
+          "mcp"
+        ]
+      },
+      "put": {
+        "description": "Actualiza un server existente. Para y vuelve a arrancar si está\nenabled. NO permite cambiar el id.",
+        "operationId": "update_server_api_mcp_servers__server_id__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "server_id",
+            "required": true,
+            "schema": {
+              "title": "Server Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": true,
+                "title": "Body",
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Update Server Api Mcp Servers  Server Id  Put",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Server",
+        "tags": [
+          "mcp"
+        ]
+      }
+    },
+    "/api/mcp/servers/{server_id}/restart": {
+      "post": {
+        "operationId": "restart_server_api_mcp_servers__server_id__restart_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "server_id",
+            "required": true,
+            "schema": {
+              "title": "Server Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Restart Server Api Mcp Servers  Server Id  Restart Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Restart Server",
+        "tags": [
+          "mcp"
+        ]
+      }
+    },
+    "/api/mcp/tools": {
+      "get": {
+        "description": "Todas las tools MCP actualmente en el ToolRegistry. Útil para\ndebugging: confirmar que un server registró lo que se espera.",
+        "operationId": "list_mcp_tools_api_mcp_tools_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "title": "Response List Mcp Tools Api Mcp Tools Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Mcp Tools",
+        "tags": [
+          "mcp"
+        ]
+      }
+    },
+    "/api/memory": {
+      "get": {
+        "operationId": "get_all_memory_api_memory_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Get All Memory Api Memory Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get All Memory",
+        "tags": [
+          "memory"
+        ]
+      }
+    },
+    "/api/memory/{category}": {
+      "get": {
+        "operationId": "get_memory_category_api_memory__category__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "category",
+            "required": true,
+            "schema": {
+              "title": "Category",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Get Memory Category Api Memory  Category  Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Memory Category",
+        "tags": [
+          "memory"
+        ]
+      }
+    },
+    "/api/memory/{category}/{key}": {
+      "delete": {
+        "operationId": "delete_memory_entry_api_memory__category___key__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "category",
+            "required": true,
+            "schema": {
+              "title": "Category",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "key",
+            "required": true,
+            "schema": {
+              "title": "Key",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Memory Entry",
+        "tags": [
+          "memory"
+        ]
+      },
+      "put": {
+        "operationId": "put_memory_entry_api_memory__category___key__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "category",
+            "required": true,
+            "schema": {
+              "title": "Category",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "key",
+            "required": true,
+            "schema": {
+              "title": "Key",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MemoryEntry"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Put Memory Entry Api Memory  Category   Key  Put",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Put Memory Entry",
+        "tags": [
+          "memory"
+        ]
+      }
+    },
+    "/api/notebooklm/cancel": {
+      "post": {
+        "description": "Mata el subprocess de login si está corriendo.",
+        "operationId": "cancel_login_api_notebooklm_cancel_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Cancel Login Api Notebooklm Cancel Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Cancel Login",
+        "tags": [
+          "notebooklm"
+        ]
+      }
+    },
+    "/api/notebooklm/login": {
+      "post": {
+        "description": "Spawnea `notebooklm login` en background. Devuelve 409 si ya hay\nun login en progreso. La UI debe pollear /status hasta que\n``login.status`` pase de 'running' a 'success' o 'failed'.",
+        "operationId": "start_login_api_notebooklm_login_post",
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Start Login Api Notebooklm Login Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Start Login",
+        "tags": [
+          "notebooklm"
+        ]
+      }
+    },
+    "/api/notebooklm/status": {
+      "get": {
+        "description": "Estado completo: instalación, sesión, y último intento de login.",
+        "operationId": "get_status_api_notebooklm_status_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Get Status Api Notebooklm Status Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Status",
+        "tags": [
+          "notebooklm"
+        ]
+      }
+    },
+    "/api/notes": {
+      "get": {
+        "operationId": "get_notes_api_notes_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "title": "Response Get Notes Api Notes Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Notes",
+        "tags": [
+          "notes"
+        ]
+      },
+      "post": {
+        "operationId": "create_note_api_notes_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoteCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Create Note Api Notes Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Note",
+        "tags": [
+          "notes"
+        ]
+      }
+    },
+    "/api/notes/count": {
+      "get": {
+        "operationId": "get_notes_count_api_notes_count_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Get Notes Count Api Notes Count Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Notes Count",
+        "tags": [
+          "notes"
+        ]
+      }
+    },
+    "/api/notes/{note_id}": {
+      "delete": {
+        "operationId": "remove_note_api_notes__note_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "note_id",
+            "required": true,
+            "schema": {
+              "title": "Note Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Remove Note",
+        "tags": [
+          "notes"
+        ]
+      },
+      "patch": {
+        "operationId": "patch_note_api_notes__note_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "note_id",
+            "required": true,
+            "schema": {
+              "title": "Note Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoteUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Patch Note Api Notes  Note Id  Patch",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Patch Note",
+        "tags": [
+          "notes"
+        ]
+      }
+    },
+    "/api/notifications": {
+      "get": {
+        "operationId": "list_notifications_api_notifications_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "source",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Source"
+            }
+          },
+          {
+            "in": "query",
+            "name": "unread",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Unread",
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "title": "Response List Notifications Api Notifications Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Notifications",
+        "tags": [
+          "notifications"
+        ]
+      }
+    },
+    "/api/notifications/classroom/authorize": {
+      "post": {
+        "description": "Abre el navegador para el OAuth dance de Classroom.\n\nEl ``InstalledAppFlow`` de google-auth-oauthlib es **estrictamente\nbloqueante** (levanta un webserver efímero en localhost:<random> y\nespera al callback). Para no congelar el event loop de uvicorn durante\nhasta 3 minutos, despachamos la operación al threadpool default de\nasyncio con ``run_in_executor`` y la envolvemos con ``wait_for`` para\nel timeout. Mientras el OAuth corre, otros endpoints REST y el WS\nsiguen respondiendo normalmente.",
+        "operationId": "classroom_authorize_api_notifications_classroom_authorize_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Classroom Authorize Api Notifications Classroom Authorize Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Classroom Authorize",
+        "tags": [
+          "notifications"
+        ]
+      }
+    },
+    "/api/notifications/mark-all-read": {
+      "post": {
+        "operationId": "mark_all_read_api_notifications_mark_all_read_post",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "source",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Source"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Mark All Read Api Notifications Mark All Read Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Mark All Read",
+        "tags": [
+          "notifications"
+        ]
+      }
+    },
+    "/api/notifications/mark-read": {
+      "post": {
+        "operationId": "mark_read_api_notifications_mark_read_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MarkReadBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Mark Read Api Notifications Mark Read Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Mark Read",
+        "tags": [
+          "notifications"
+        ]
+      }
+    },
+    "/api/notifications/poll": {
+      "post": {
+        "operationId": "poll_now_api_notifications_poll_post",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "source",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Source"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Poll Now Api Notifications Poll Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Poll Now",
+        "tags": [
+          "notifications"
+        ]
+      }
+    },
+    "/api/notifications/status": {
+      "get": {
+        "operationId": "poller_status_api_notifications_status_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Poller Status Api Notifications Status Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Poller Status",
+        "tags": [
+          "notifications"
+        ]
+      }
+    },
+    "/api/settings/api_key": {
+      "get": {
+        "description": "No expone la key, sólo si está configurada (en env var o archivo).\n\nEsto es lo que el wizard del frontend usa para decidir si mostrarse\no no.",
+        "operationId": "get_api_key_status_api_settings_api_key_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Get Api Key Status Api Settings Api Key Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Api Key Status",
+        "tags": [
+          "settings"
+        ]
+      },
+      "post": {
+        "description": "Guarda la API key de Gemini en ``config/api_keys.json``.\n\nSi la key entra por env var ``ORION_GEMINI_KEY`` siempre toma\nprioridad sobre el archivo (ver :func:`config.get_api_key`).\nDespués de guardar emite ``system.ready`` por el bus para\ndesbloquear ``wait_for_api_key`` y notificar a la UI.",
+        "operationId": "set_api_key_api_settings_api_key_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiKeyBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Set Api Key Api Settings Api Key Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set Api Key",
+        "tags": [
+          "settings"
+        ]
+      }
+    },
+    "/api/settings/sharing": {
+      "get": {
+        "description": "Devuelve el estado del toggle 'Compartir vía Tailscale' + la IP\nTailscale detectada (si está) para mostrarla en la UI.",
+        "operationId": "get_sharing_endpoint_api_settings_sharing_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Get Sharing Endpoint Api Settings Sharing Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Sharing Endpoint",
+        "tags": [
+          "settings"
+        ]
+      },
+      "post": {
+        "description": "Activa/desactiva el filtro de IP. Persiste en config/sharing.json\ny notifica via bus (settings.sharing) para que el frontend re-renderice.",
+        "operationId": "post_sharing_endpoint_api_settings_sharing_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SharingBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Post Sharing Endpoint Api Settings Sharing Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Post Sharing Endpoint",
+        "tags": [
+          "settings"
+        ]
+      }
+    },
+    "/api/settings/theme": {
+      "get": {
+        "operationId": "get_theme_endpoint_api_settings_theme_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Get Theme Endpoint Api Settings Theme Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Theme Endpoint",
+        "tags": [
+          "settings"
+        ]
+      },
+      "patch": {
+        "operationId": "patch_theme_api_settings_theme_patch",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ThemePatch"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Patch Theme Api Settings Theme Patch",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Patch Theme",
+        "tags": [
+          "settings"
+        ]
+      }
+    },
+    "/api/skills/": {
+      "get": {
+        "operationId": "get_skills_api_skills__get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "title": "Response Get Skills Api Skills  Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Skills",
+        "tags": [
+          "skills"
+        ]
+      }
+    },
+    "/api/skills/cli": {
+      "get": {
+        "description": "Catálogo completo de CLIs conocidos por el installer con su status.",
+        "operationId": "list_cli_api_skills_cli_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "title": "Response List Cli Api Skills Cli Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Cli",
+        "tags": [
+          "skills"
+        ]
+      }
+    },
+    "/api/skills/cli/{name}/install": {
+      "post": {
+        "description": "Descarga la release oficial del CLI a tools/<name>/. Tras instalar,\nel executor lo encuentra automáticamente (se mete tools/<name>/ en el\nPATH del subprocess de generated_code).",
+        "operationId": "cli_install_api_skills_cli__name__install_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "title": "Name",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "force",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Force",
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Cli Install Api Skills Cli  Name  Install Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Cli Install",
+        "tags": [
+          "skills"
+        ]
+      }
+    },
+    "/api/skills/cli/{name}/status": {
+      "get": {
+        "description": "Reporta si un binario está disponible y dónde (tools/ o PATH del sistema).",
+        "operationId": "cli_status_api_skills_cli__name__status_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "title": "Name",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Cli Status Api Skills Cli  Name  Status Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Cli Status",
+        "tags": [
+          "skills"
+        ]
+      }
+    },
+    "/api/skills/install": {
+      "post": {
+        "description": "Descarga ``skills/<name>/`` del repo OpenClaw a ``skills/<name>/``\nen el filesystem de ORION. Tras descargar:\n\n1. Escanea con :mod:`core.skill_scanner` — si hay críticos (prompt\n   injection, pipe-to-shell, crypto-mining), borra y rechaza.\n2. Escribe ``.openclaw-origin.json`` dentro de la carpeta para tracking.\n3. Actualiza ``config/skills.lock.json`` con la nueva instalación.\n4. Fuerza re-escaneo del cache.\n\nIdempotente: si la skill ya existe, sobreescribe archivos (no borra\narchivos extra para no pisar ediciones manuales).",
+        "operationId": "install_skill_api_skills_install_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InstallBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Install Skill Api Skills Install Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Install Skill",
+        "tags": [
+          "skills"
+        ]
+      }
+    },
+    "/api/skills/registry/search": {
+      "get": {
+        "description": "Lista las skills disponibles en el repo OpenClaw. ``q`` filtra por\nsubstring sobre el id (case-insensitive). Devuelve metadata mínima —\ndescripción detallada llega al instalar (lee el SKILL.md).",
+        "operationId": "search_registry_api_skills_registry_search_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Q",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "title": "Response Search Registry Api Skills Registry Search Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Search Registry",
+        "tags": [
+          "skills"
+        ]
+      }
+    },
+    "/api/skills/reload": {
+      "post": {
+        "operationId": "reload_skills_api_skills_reload_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Reload Skills Api Skills Reload Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Reload Skills",
+        "tags": [
+          "skills"
+        ]
+      }
+    },
+    "/api/skills/{skill_id}": {
+      "get": {
+        "operationId": "get_skill_detail_api_skills__skill_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "skill_id",
+            "required": true,
+            "schema": {
+              "title": "Skill Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Get Skill Detail Api Skills  Skill Id  Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Skill Detail",
+        "tags": [
+          "skills"
+        ]
+      }
+    },
+    "/{full_path}": {
+      "get": {
+        "operationId": "spa_fallback__full_path__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "full_path",
+            "required": true,
+            "schema": {
+              "title": "Full Path",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Spa Fallback"
+      }
+    }
+  }
+}

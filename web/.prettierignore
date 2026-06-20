@@ -2,3 +2,9 @@ dist
 node_modules
 public
 package-lock.json
+
+# Generated artifacts — actualizados por `npm run gen:api`. Prettier
+# no debe tocarlos: el .json viene del dump Python (sort_keys + indent=2),
+# el .ts viene de openapi-typescript + prettier YA ejecutado en el npm
+# script. Mantenerlos fuera de format:check evita drift artificial.
+src/api/openapi.json
