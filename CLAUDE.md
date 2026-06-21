@@ -32,17 +32,59 @@ Asistente de IA personal multimodal (voz en tiempo real con Gemini Live + visió
 - Tests de regresión: `tests/test_security_hardening.py` (22 tests), `tests/test_logger_secret_filter.py` (9 tests).
 - **Historial limpio:** `config/api_keys.json`, `config/credentials.json`, `config/gdrive_token.json` removidos del git history via `git filter-repo` + force-push. Keys ya rotadas previamente en Google Cloud Console. SHAs del repo reescritos (commit pre-rewrite era `ed1fabe`, post-rewrite `0ab810f`). **Backup en remoto: branch `backup-pre-filter-repo` @ `ed1fabe49b5ca2b28233eaaf7ee7ccc5922b1a6b`** — preserva el state pre-rewrite por si necesitás restaurar algo. Borrarlo cuando estés seguro: `git push origin --delete backup-pre-filter-repo`.
 
-### ✅ Fase 2 — Deuda técnica visible (cerrado, CI verde)
-- `ruff format` baseline aplicado (~120 archivos Python).
-- `prettier --write` baseline aplicado al frontend.
-- Reescritos 23 sitios `raise X` → `raise X from e` (B904).
-- 65 SIM105 (`try/except/pass` → `contextlib.suppress`).
-- 3 `react-hooks/exhaustive-deps` warnings — 1 bug real fixed en `DeviceFormModal` (`kind` faltaba en deps de `useCallback`), 2 documentados con `eslint-disable-next-line` + razón.
-- 3 archivos de tests rotos por drift reescritos:
-  - `test_tool_registry.py` → invariantes en lugar de listas hardcoded.
-  - `test_event_bus_contract.py::test_subscribe_unsubscribe` → borrado (feature removido).
-  - `test_phase3b_endpoints.py` → 5 tests de `/api/agent/tasks` borrados (reemplazado por Orchestra).
-- `--max-warnings=0` reactivado en `npm run lint`.
+### ✅ Fase 2 — Higiene estructural (cerrado, CI verde, commit `21fda71`)
+
+Reorganización completa del repo según el plan del audit. Antes había 7
+top-level Python dirs sueltos en la raíz; ahora todo el código vive
+bajo `orion/`. Estado actual:
+
+```
+project-root/
+├── orion/                  # paquete principal (python -m orion)
+│   ├── __main__.py         # was main.py (1245 LOC — R3 lo splitea en Fase 3)
+│   ├── actions/  agent/  cli/  config/  core/
+│   ├── domain/memory/      # was memory/*.py
+│   ├── plugins/  server/  storage/  utils/
+├── config/                 # data: .json (api_keys, mcp_servers, etc.)
+├── data/                   # state: SQLite + iot_sensor_log.csv + conversations.json
+├── tests/, scripts/, web/, src-tauri/, packaging/
+```
+
+**Movimientos clave:**
+- 7 dirs Python top-level → `orion/` (actions, agent, core, server, storage, plugins, utils).
+- `config/{__init__,theme,theme_tokens}.py` → `orion/config/` (los `.json` quedan en root `config/` como data).
+- `memory/{__init__,config_manager,conversations,memory_manager,quick_notes}.py` → `orion/domain/memory/`.
+- `memory/iot_sensor_log.csv` + `memory/conversations.json` → `data/`. Resto de `memory/` borrado (incluidos los `.bak.migrated` post-SQLite).
+- `main.py` → `orion/__main__.py`. `run_debug.py` → `orion/cli/debug.py`.
+- `setup.py` borrado (era pip-installer one-shot).
+- `AUDIT_*.md` borrados (ya estaban en `.gitignore` como notes locales).
+
+**Import rewrite:** 354 líneas en 104 archivos. Script one-shot
+(`scripts/_rewrite_imports_oneshot.py`) hecho ad-hoc y borrado tras
+aplicarse. 17 strings `patch("module.X")` en tests también actualizadas.
+
+**Path adjustments críticos:**
+- `orion/config/__init__.py` ahora usa `Path(__file__).parent.parent.parent` (3 niveles, antes eran 2) para que `BASE_DIR` siga apuntando al project root.
+- `CORE_DIR = RESOURCES_DIR / "orion" / "core"`, `PLUGINS_DIR = RESOURCES_DIR / "orion" / "plugins"` para que prompt.txt y plugins se resuelvan post-rename.
+- `MEMORY_DIR` queda como alias de `DATA_DIR` (back-compat para legacy callers).
+- `actions/iot/sensor_log.py` y `sheets_sync.py` ahora usan `DATA_DIR / "iot_sensor_log.csv"`.
+
+**Build/CI/packaging actualizados:**
+- `pyproject.toml`: `packages.find.include = ["orion*"]`, `known-first-party = ["orion"]`, mypy overrides prefijo `orion.`, per-file-ignores `orion/__main__.py`.
+- `.github/workflows/ci.yml`: paths de mypy.
+- `packaging/orion_backend.spec` (PyInstaller): entry point + hidden imports + data files (prompt.txt en `orion/core/`).
+
+**Side-effect:** pre-commit auto-normalizó CRLF→LF en ~10 archivos varios
+(configs JSON, scripts, src-tauri) que tenían drift de line endings.
+Quedó incluido en el mismo commit.
+
+**Sanity:** **333 tests passing** (mismo número que pre-refactor), ruff
+ok, mypy ok, CI verde en los 8 jobs (run [27909820247](https://github.com/Zero0889/Orion-AI/actions/runs/27909820247)).
+
+> Nota histórica: lo que esta sección decía antes ("ruff format baseline,
+> B904, SIM105, exhaustive-deps") era cleanup de lint debt — útil pero
+> NO era la Fase 2 del plan del audit. Ese trabajo está en el historial
+> (commits previos a `21fda71`) y los warnings siguen apagados.
 
 ### ✅ Fase 3A — Decoradores `@tool` (cerrado, CI verde)
 - Nuevo: `core/tool_registry.py` con decoradores `@tool` y `@live_only_tool` + `auto_discover_tools("actions")`.
@@ -230,53 +272,62 @@ mal pasados).
 
 ```
 O.R.I.O.N/
-├── main.py                       # Entry point. Gemini Live session + audio loop.
-│                                 # 1196 LOC, candidato a split en Fase 5.
-├── pyproject.toml                # Config de ruff, mypy, pytest (Fase 1).
+├── pyproject.toml                # Config de ruff, mypy, pytest. packages.find = ["orion*"] (Fase 2).
 ├── .pre-commit-config.yaml       # Hooks: ruff, gitleaks, prettier+eslint locales.
 ├── .github/workflows/ci.yml      # 7 jobs (ver §4 abajo).
 ├── .gitleaks.toml                # Allowlist mínima — NO whitelistear patrones.
 ├── .gitattributes                # `* text=auto eol=lf` — fuerza LF en checkouts.
 │
-├── actions/                      # Tools que Gemini puede invocar.
-│   ├── live_stubs.py             # Stubs Live-only (agent_task, shutdown, quick_note, save_memory).
-│   ├── notifications/store.py    # SQLite-backed (Fase 3B).
-│   ├── iot/control.py            # iot_control() — entry point IoT.
-│   └── *.py                      # Cada uno tiene @tool(...) sobre su entrypoint.
-│
-├── agent/                        # Planner + executor + task queue + orchestra.
-├── core/
-│   ├── tool_registry.py          # @tool, @live_only_tool, auto_discover_tools (Fase 3A).
-│   ├── tools_bootstrap.py        # ~170 LOC — auto-discover + ask_user + use_skill.
-│   ├── logger.py                 # `_SecretFilter` enmascara keys (Fase 1).
-│   ├── llm/*.py                  # Provider abstraction (gemini, openai-compat).
-│   └── mcp_*.py                  # MCP client + recipes.
-│
-├── server/
-│   ├── app.py                    # FastAPI app builder. CORS limitado a localhost+Tailscale.
-│   ├── event_bus.py              # OrionEventBus (in-proc + WS broadcast).
-│   ├── sharing.py                # Middleware: 127/8 + Tailscale 100.64/10.
-│   └── routes/                   # /api/* endpoints.
-│
-├── storage/                      # SQLite layer (Fase 3B).
+├── orion/                        # ← Paquete principal (Fase 2). Entry: `python -m orion`.
 │   ├── __init__.py
-│   └── sqlite_db.py              # get_connection() singleton + override_db_path_for_tests().
+│   ├── __main__.py               # was main.py. 1245 LOC, candidato a split en Fase 3 (R3).
+│   ├── actions/                  # Tools que Gemini puede invocar.
+│   │   ├── live_stubs.py         # Stubs Live-only (agent_task, shutdown, quick_note, save_memory).
+│   │   ├── notifications/store.py # SQLite-backed (Fase 3B).
+│   │   ├── iot/control.py        # iot_control() — entry point IoT.
+│   │   └── *.py                  # Cada uno tiene @tool(...) sobre su entrypoint.
+│   ├── agent/                    # Planner + executor + task queue + orchestra.
+│   ├── cli/
+│   │   └── debug.py              # was run_debug.py. Wrappers logging stdout/stderr.
+│   ├── config/                   # Schema loaders + helpers de OS (sin .json — esos en root config/).
+│   │   ├── __init__.py           # BASE_DIR, MEMORY_PATH, SQLITE_DB_PATH, DATA_DIR. BASE_DIR usa 3 .parent.
+│   │   └── theme*.py
+│   ├── core/
+│   │   ├── tool_registry.py      # @tool, @live_only_tool, auto_discover_tools (Fase 3A).
+│   │   ├── tools_bootstrap.py    # ~170 LOC — auto_discover_tools("orion.actions").
+│   │   ├── logger.py             # `_SecretFilter` enmascara keys (Fase 1).
+│   │   ├── llm/*.py              # Provider abstraction (gemini, openai-compat).
+│   │   └── mcp_*.py              # MCP client + recipes.
+│   ├── domain/
+│   │   └── memory/               # was memory/*.py
+│   │       ├── quick_notes.py    # SQLite (Fase 3B). API: list/add/update/delete/count.
+│   │       ├── conversations.py  # SQLite + ConversationSession.
+│   │       └── memory_manager.py # SQLite. API: load/save/update/format_for_prompt.
+│   ├── plugins/                  # Plugin system (base + example_plugin).
+│   ├── server/
+│   │   ├── app.py                # FastAPI app builder. CORS limitado a localhost+Tailscale.
+│   │   ├── event_bus.py          # OrionEventBus (in-proc + WS broadcast).
+│   │   ├── sharing.py            # Middleware: 127/8 + Tailscale 100.64/10.
+│   │   └── routes/               # /api/* endpoints.
+│   ├── storage/                  # SQLite layer (Fase 3B).
+│   │   └── sqlite_db.py          # get_connection() singleton + override_db_path_for_tests().
+│   └── utils/cache.py            # ttl_cache decorator.
 │
-├── memory/
-│   ├── quick_notes.py            # SQLite (Fase 3B). API: list_notes/add/update/delete/count.
-│   ├── conversations.py          # SQLite (Fase 3B). + ConversationSession (sesión activa).
-│   └── memory_manager.py         # SQLite (Fase 3B). API: load/save/update/format_for_prompt.
+├── config/                       # Solo DATA: .json (api_keys, mcp_servers, etc.). Sin código.
+│   ├── *.example.json            # Templates (gitignored los reales).
+│   ├── api_keys.json             # Secreto — gitignored.
+│   └── credentials.json          # Secreto — gitignored.
 │
-├── config/                       # Schema JSONs + secretos gitignored.
-│   ├── __init__.py               # BASE_DIR, MEMORY_PATH, SQLITE_DB_PATH, DATA_DIR, etc.
-│   └── *.example.json            # Templates de los configs reales (gitignored).
-│
-├── data/                         # State runtime SQLite (gitignored).
+├── data/                         # State runtime (gitignored).
 │   ├── orion.sqlite              # Todas las tablas de Fase 3B.
-│   └── .gitkeep                  # Para que la carpeta exista al clonar.
+│   ├── iot_sensor_log.csv        # was memory/. Sensor datalog.
+│   └── conversations.json        # Legacy pre-SQLite, queda como export.
 │
 ├── scripts/
 │   └── dump_openapi.py           # → web/src/api/openapi.json (Fase 3D).
+│
+├── packaging/
+│   └── orion_backend.spec        # PyInstaller — entry orion/__main__.py.
 │
 ├── tests/
 │   ├── conftest.py               # Fixture autouse: SQLite tmp + mock sounddevice + extend SAFE_ROOTS.
