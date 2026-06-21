@@ -2,5 +2,5 @@
 title O.R.I.O.N
 cd /d "%~dp0"
 call .venv\Scripts\activate.bat
-python main.py
+python -m orion
 pause

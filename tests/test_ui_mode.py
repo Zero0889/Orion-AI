@@ -89,34 +89,38 @@ def test_no_browser_env_var_skips_webbrowser_open(monkeypatch):
     """En modo Tauri / sidecar / servidor remoto, no queremos abrir el
     navegador del SO. La variable ``ORION_NO_BROWSER`` lo desactiva.
     Verificamos que main() respeta el flag — sin llegar a arrancar uvicorn.
+
+    Post Fase 3 (R3): la lógica vive en ``orion.bootstrap``; ``main()``
+    referencia los helpers por nombre local, así que patchear en bootstrap
+    redirige las llamadas reales.
     """
-    import orion.__main__ as main
+    import orion.bootstrap as bootstrap
 
     monkeypatch.setenv("ORION_NO_BROWSER", "1")
 
     # Cortamos antes de que main() bloquee con uvicorn.serve(). Para eso
     # mockeamos _spawn_orion_live, _build_uvicorn_server y asyncio.run.
     with (
-        patch.object(main, "_spawn_orion_live"),
-        patch.object(main, "_build_uvicorn_server", return_value=(_DummyServer(), "h", 1)),
-        patch.object(main.asyncio, "run"),
+        patch.object(bootstrap, "_spawn_orion_live"),
+        patch.object(bootstrap, "_build_uvicorn_server", return_value=(_DummyServer(), "h", 1)),
+        patch.object(bootstrap.asyncio, "run"),
         patch("webbrowser.open") as wb,
     ):
-        main.main()
+        bootstrap.main()
     wb.assert_not_called()
 
 
 def test_browser_opens_by_default(monkeypatch):
     monkeypatch.delenv("ORION_NO_BROWSER", raising=False)
-    import orion.__main__ as main
+    import orion.bootstrap as bootstrap
 
     with (
-        patch.object(main, "_spawn_orion_live"),
-        patch.object(main, "_build_uvicorn_server", return_value=(_DummyServer(), "h", 1)),
-        patch.object(main.asyncio, "run"),
+        patch.object(bootstrap, "_spawn_orion_live"),
+        patch.object(bootstrap, "_build_uvicorn_server", return_value=(_DummyServer(), "h", 1)),
+        patch.object(bootstrap.asyncio, "run"),
         patch("webbrowser.open") as wb,
     ):
-        main.main()
+        bootstrap.main()
     wb.assert_called_once()
 
 
