@@ -30,7 +30,7 @@ Asistente de IA personal multimodal (voz en tiempo real con Gemini Live + visió
 - `.github/workflows/ci.yml`: 7 jobs (Python × matriz, Web × 2 Node, Gitleaks, API drift).
 - `.gitleaks.toml`, `.gitattributes` (LF forzado en checkout).
 - Tests de regresión: `tests/test_security_hardening.py` (22 tests), `tests/test_logger_secret_filter.py` (9 tests).
-- **Acción del user pendiente eventualmente:** rotar 3 keys que están en commits viejos del historial git (commits `e709ef48`, `95fe264e`): `config/api_keys.json`, `config/credentials.json`, `config/gdrive_token.json`. El user ya las rotó manualmente en Google Cloud Console. Si quiere también borrar del historial: `git filter-repo --invert-paths --path ...` (destructivo, requiere force-push).
+- **Historial limpio:** `config/api_keys.json`, `config/credentials.json`, `config/gdrive_token.json` removidos del git history via `git filter-repo` + force-push. Keys ya rotadas previamente en Google Cloud Console. SHAs del repo reescritos (commit pre-rewrite era `ed1fabe`, post-rewrite `0ab810f`). **Backup en remoto: branch `backup-pre-filter-repo` @ `ed1fabe49b5ca2b28233eaaf7ee7ccc5922b1a6b`** — preserva el state pre-rewrite por si necesitás restaurar algo. Borrarlo cuando estés seguro: `git push origin --delete backup-pre-filter-repo`.
 
 ### ✅ Fase 2 — Deuda técnica visible (cerrado, CI verde)
 - `ruff format` baseline aplicado (~120 archivos Python).
@@ -213,25 +213,13 @@ closures, state que no se preserva al cambiar de vista, hook order, props
 mal pasados).
 
 ### 🟡 Pendientes que NECESITAN acción del usuario
-1. **Validación visual de los 4 god-files** post-split. Hacer la primera
-   vez que se reinicie Orion tras pull. Si algo rompe, screenshot + qué
-   panel + qué interacción.
-2. **Limpiar 3 secrets del historial git** (commits `e709ef48`,
-   `95fe264e`): `config/api_keys.json`, `config/credentials.json`,
-   `config/gdrive_token.json`. **Ya fueron rotados** en Google Cloud
-   Console, así que las keys reales no funcionan más — pero los blobs
-   siguen accesibles en el historial. Para borrar:
-   ```bash
-   pip install git-filter-repo
-   git filter-repo --invert-paths \
-     --path config/api_keys.json \
-     --path config/credentials.json \
-     --path config/gdrive_token.json
-   git push --force-with-lease origin main
-   ```
-   ⚠️ Destructivo: reescribe SHAs de toda la historia. Cualquier clone
-   existente queda inválido — hay que borrar y re-clonar. Solo conviene
-   hacerlo si vas a abrir el repo a público o agregar colaboradores.
+1. **Validación visual de los 4 god-files post-split + los 8 paneles
+   migrados a TanStack Query + Eye/CommandPalette en su nueva
+   ubicación.** Hacer en el primer `npm run dev` post-pull. Si algo
+   rompe: screenshot + qué panel + qué interacción.
+2. **Decidir si borrar `backup-pre-filter-repo` del remoto.** Quedó como
+   safety net post-rewrite del history. Cuando estés seguro de que
+   nada se rompió: `git push origin --delete backup-pre-filter-repo`.
 3. **Migrar interfaces manuales en `web/src/api/rest.ts` a `Schemas["..."]`**
    (auto-generados desde OpenAPI por Fase 3D). Hacelo oportunístico cuando
    toques un panel — no vale la pena un PR dedicado.
