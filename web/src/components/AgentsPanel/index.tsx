@@ -18,10 +18,11 @@
  *   - AgentEditorModal.tsx — modal de crear/editar/borrar
  */
 
+import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 
 import { api, type OrchestraAgent, type ProviderCatalog } from "@/api/rest";
-import { useOrionStore } from "@/stores/orion";
+import { QUERY_KEYS } from "@/query/keys";
 import { Icon } from "@/ui/Icon";
 import { Button, Empty, SectionHeader } from "@/ui/primitives";
 
@@ -38,12 +39,32 @@ import {
 } from "./types";
 
 export function AgentsPanel() {
-  const rev = useOrionStore((s) => s.rev.orchestra);
-
-  const [agents, setAgents] = useState<OrchestraAgent[]>([]);
-  const [providers, setProviders] = useState<ProviderCatalog[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const {
+    data: agents = [],
+    isLoading: agentsLoading,
+    error: agentsError,
+  } = useQuery<OrchestraAgent[]>({
+    queryKey: QUERY_KEYS.orchestra,
+    queryFn: () => api.listOrchestra(),
+  });
+  const {
+    data: providers = [],
+    isLoading: providersLoading,
+    error: providersError,
+  } = useQuery<ProviderCatalog[]>({
+    queryKey: ["providers"],
+    queryFn: () => api.listProviders(),
+    // Providers catalog cambia muy poco — cachear más largo evita
+    // refetch en cada navegación al panel.
+    staleTime: 5 * 60_000,
+  });
+  const loading = agentsLoading || providersLoading;
+  const queryError = agentsError ?? providersError;
+  // Errores de mutación (editor modal, etc.) viven aparte de los de
+  // query para que el banner pueda dismissarlos sin afectar el estado
+  // de las queries. El render preferi mutationError si existe.
+  const [mutationError, setMutationError] = useState<string | null>(null);
+  const error = mutationError ?? (queryError ? String(queryError) : null);
 
   // Active chat — null = show grid
   const [activeAgentId, setActiveAgentId] = useState<string | null>(null);
@@ -72,28 +93,6 @@ export function AgentsPanel() {
         ) ?? null)
       : null;
   const currentMessages = (currentSession?.messages as ChatMsg[]) ?? [];
-
-  // Hydrate agents + providers
-  useEffect(() => {
-    let alive = true;
-    setLoading(true);
-    Promise.all([api.listOrchestra(), api.listProviders()])
-      .then(([a, p]) => {
-        if (!alive) return;
-        setAgents(a);
-        setProviders(p);
-        setLoading(false);
-      })
-      .catch((e) => {
-        if (alive) {
-          setError(String(e));
-          setLoading(false);
-        }
-      });
-    return () => {
-      alive = false;
-    };
-  }, [rev]);
 
   // ── Actions ─────────────────────────────────────────────────────────
   function startChat(agent: OrchestraAgent) {
@@ -244,7 +243,7 @@ export function AgentsPanel() {
           <span>{error}</span>
           <button
             className="ml-auto text-danger/70 hover:text-danger"
-            onClick={() => setError(null)}
+            onClick={() => setMutationError(null)}
           >
             <Icon name="close" size={12} />
           </button>
@@ -320,7 +319,7 @@ export function AgentsPanel() {
           setCreatingNew(false);
           setNewDraft(null);
         }}
-        onError={(e) => setError(e)}
+        onError={(e) => setMutationError(e)}
       />
     </div>
   );

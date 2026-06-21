@@ -16,9 +16,10 @@
 
 import { useEffect, useRef } from "react";
 
-import { useEyePulseStore } from "@/stores/eyePulse";
 import { useInteractionStore } from "@/stores/interaction";
 import { useOrionStore } from "@/stores/orion";
+
+import { useEyePulseStore } from "./pulseStore";
 
 const STALE_AFTER_S = 60;
 const STALE_CHECK_MS = 10_000;

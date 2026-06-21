@@ -15,10 +15,11 @@
  *     toasts in-app (no más alerts del browser arriba del layout).
  */
 
-import { useEffect, useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { api, type ConversationDetail, type ConversationSummary } from "@/api/rest";
-import { useOrionStore } from "@/stores/orion";
+import { QUERY_KEYS } from "@/query/keys";
 import { toast } from "@/stores/toast";
 import { Icon } from "@/ui/Icon";
 import { Badge, Button, Empty, SectionHeader, Surface } from "@/ui/primitives";
@@ -37,48 +38,48 @@ function isRealMessage(m: { role: string; text: string }): boolean {
 }
 
 export function HistoryPanel() {
-  const rev = useOrionStore((s) => s.rev.convs);
-  const [list, setList] = useState<ConversationSummary[]>([]);
   const [active, setActive] = useState<string | null>(null);
-  const [detail, setDetail] = useState<ConversationDetail | null>(null);
   // Modo selección múltiple — cuando hay items seleccionados aparecen
   // las acciones de bulk en la toolbar.
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [selectMode, setSelectMode] = useState(false);
 
-  useEffect(() => {
-    let alive = true;
-    api
-      .listConversations()
-      .then((cs) => {
-        if (alive) setList(cs);
-      })
-      .catch((e) => {
-        if (alive) toast.error("No pude cargar el historial", String(e));
-      });
-    return () => {
-      alive = false;
-    };
-  }, [rev]);
+  // Lista de conversaciones. El bridge WS invalida `["conversations"]`
+  // (prefix-match, así que también pega a `["conversations", id]`).
+  const { data: list = [], error: listError } = useQuery<ConversationSummary[]>({
+    queryKey: QUERY_KEYS.conversations,
+    queryFn: () => api.listConversations(),
+  });
 
+  // Detalle de la conversación activa. `enabled: !!active` evita pegarle
+  // al backend cuando no hay nada seleccionado.
+  const { data: detail, error: detailError } = useQuery<ConversationDetail>({
+    queryKey: QUERY_KEYS.conversation(active ?? ""),
+    queryFn: () => api.getConversation(active!),
+    enabled: !!active,
+  });
+
+  // Toasts one-shot por error nuevo (mismo patrón que NotesPanel/MemoryPanel).
+  const lastListErr = useRef<string | null>(null);
   useEffect(() => {
-    if (!active) {
-      setDetail(null);
-      return;
-    }
-    let alive = true;
-    api
-      .getConversation(active)
-      .then((c) => {
-        if (alive) setDetail(c);
-      })
-      .catch((e) => {
-        if (alive) toast.error("No pude abrir la conversación", String(e));
-      });
-    return () => {
-      alive = false;
-    };
-  }, [active, rev]);
+    if (listError) {
+      const m = String(listError);
+      if (lastListErr.current !== m) {
+        toast.error("No pude cargar el historial", m);
+        lastListErr.current = m;
+      }
+    } else lastListErr.current = null;
+  }, [listError]);
+  const lastDetailErr = useRef<string | null>(null);
+  useEffect(() => {
+    if (detailError) {
+      const m = String(detailError);
+      if (lastDetailErr.current !== m) {
+        toast.error("No pude abrir la conversación", m);
+        lastDetailErr.current = m;
+      }
+    } else lastDetailErr.current = null;
+  }, [detailError]);
 
   /* ── Selección ───────────────────────────────────────────────── */
   function toggleSelected(id: string) {
@@ -113,7 +114,7 @@ export function HistoryPanel() {
       await api.deleteConversation(id);
       if (active === id) {
         setActive(null);
-        setDetail(null);
+        // detail se auto-desactiva por enabled:!!active
       }
       setSelected((s) => {
         const n = new Set(s);
@@ -140,7 +141,6 @@ export function HistoryPanel() {
       const { deleted } = await api.bulkDeleteConversations(ids);
       if (active && selected.has(active)) {
         setActive(null);
-        setDetail(null);
       }
       clearSel();
       setSelectMode(false);
@@ -164,7 +164,6 @@ export function HistoryPanel() {
     try {
       const { deleted } = await api.deleteAllConversations();
       setActive(null);
-      setDetail(null);
       clearSel();
       setSelectMode(false);
       toast.success(`Historial limpio · ${deleted} conversaciones borradas`);

@@ -1,0 +1,22 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`StarBadge > snapshot de DOM estable 1`] = `
+<span
+  class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full
+                     text-[10px] border border-white/[0.06] bg-elevated/50 text-text-dim"
+  title="2500 estrellas en GitHub"
+>
+  <svg
+    class="text-warn"
+    fill="currentColor"
+    height="10"
+    viewBox="0 0 24 24"
+    width="10"
+  >
+    <path
+      d="M12 17.27 18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"
+    />
+  </svg>
+  2.5k
+</span>
+`;

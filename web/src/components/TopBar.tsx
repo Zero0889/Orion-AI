@@ -8,13 +8,13 @@
  * Pure presentation — actions come in as props from the shell.
  */
 
-import { useCommandPalette } from "@/components/CommandPalette";
-import { EyeCore, type EyeState } from "@/components/EyeCore";
 import { useInteractionStore } from "@/stores/interaction";
 import { useOrionStore } from "@/stores/orion";
 import { useViewStore, type View } from "@/stores/view";
 import { Icon } from "@/ui/Icon";
 import { Button, Kbd } from "@/ui/primitives";
+import { useCommandPalette } from "@/widgets/command-palette";
+import { EyeCore, type EyeState } from "@/widgets/eye";
 
 const VIEW_TITLE: Record<View, { eyebrow: string; title: string }> = {
   home: { eyebrow: "Espacio", title: "Inicio" },

@@ -6,11 +6,12 @@
  * available theme as a card with a live swatch.
  */
 
+import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 
 import { api, type NotebookLMStatus, type SharingState, type ThemeInfo } from "@/api/rest";
 import { GogAccountsCard } from "@/components/GogAccountsCard";
-import { useOrionStore } from "@/stores/orion";
+import { QUERY_KEYS } from "@/query/keys";
 import { toast } from "@/stores/toast";
 import { Icon, type IconName } from "@/ui/Icon";
 import { Badge, Button, Empty, SectionHeader, Surface, Switch } from "@/ui/primitives";
@@ -34,36 +35,37 @@ const TABS: { id: Tab; label: string; icon: IconName }[] = [
 ];
 
 export function SettingsPanel() {
-  const rev = useOrionStore((s) => s.rev.theme);
   const [tab, setTab] = useState<Tab>("appearance");
-  const [info, setInfo] = useState<ThemeInfo | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [palettes, setPalettes] = useState<Record<string, Palette>>({});
 
+  // Theme info via useQuery. Invalidación del bridge cuando llega
+  // settings.theme por WS.
+  const { data: info = null, error: queryError } = useQuery<ThemeInfo>({
+    queryKey: QUERY_KEYS.settingsTheme,
+    queryFn: () => api.getTheme(),
+  });
+
+  // Cache local de paletas — acumula `{ themeName → palette }` a medida
+  // que el usuario va probando temas, para no refetchear cuando vuelve.
+  // No es server-state: lo va llenando `pick()` con la respuesta de
+  // setTheme. La query del tema activo se sincroniza acá via useEffect.
+  const [palettes, setPalettes] = useState<Record<string, Palette>>({});
   useEffect(() => {
-    let alive = true;
-    api
-      .getTheme()
-      .then((i) => {
-        if (!alive) return;
-        setInfo(i);
-        setPalettes({ [i.name]: i.theme as Palette });
-      })
-      .catch((e) => {
-        if (alive) setError(String(e));
-      });
-    return () => {
-      alive = false;
-    };
-  }, [rev]);
+    if (info) setPalettes((p) => ({ ...p, [info.name]: info.theme as Palette }));
+  }, [info]);
+
+  // Errores: la query expone su propio error; pick() puede fallar aparte.
+  // Unificamos en un único string mostrado en la UI.
+  const [pickError, setPickError] = useState<string | null>(null);
+  const error = pickError ?? (queryError ? String(queryError) : null);
 
   async function pick(name: string) {
     if (!info || info.name === name) return;
     try {
       const r = await api.setTheme(name);
       setPalettes((p) => ({ ...p, [name]: r.theme as Palette }));
+      setPickError(null);
     } catch (e) {
-      setError(String(e));
+      setPickError(String(e));
     }
   }
 
@@ -121,7 +123,7 @@ export function SettingsPanel() {
 
           {tab === "appearance" && <Appearance info={info} palettes={palettes} onPick={pick} />}
 
-          {tab === "network" && <Network onError={setError} />}
+          {tab === "network" && <Network onError={setPickError} />}
 
           {tab === "integrations" && <Integrations />}
 

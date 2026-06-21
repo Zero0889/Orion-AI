@@ -1,4 +1,4 @@
-import { useEyePulseStore } from "@/stores/eyePulse";
+import { useEyePulseStore } from "./pulseStore";
 
 /**
  * EyeCore — el "ojo" cinemático de Orion.

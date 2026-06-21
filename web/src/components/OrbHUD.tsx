@@ -16,9 +16,9 @@
  *   - "mini":           top-bar avatar — mini bolita estilizada
  */
 
-import { EyeCore, type EyeState } from "@/components/EyeCore";
 import { useInteractionStore } from "@/stores/interaction";
 import { useOrionStore } from "@/stores/orion";
+import { EyeCore, type EyeState } from "@/widgets/eye";
 
 export type OrbMode = "idle" | "listening" | "thinking" | "speaking" | "tool" | "agent" | "error";
 

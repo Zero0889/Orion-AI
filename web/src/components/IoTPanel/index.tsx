@@ -18,12 +18,14 @@
  *   - ExportMenu.tsx — dropdown de descarga CSV/XLSX
  */
 
-import { useEffect, useMemo, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMemo, useState } from "react";
 
 import { api, type IoTDevice, type IoTScene, type IoTSensor } from "@/api/rest";
 import { DeviceFormModal } from "@/components/DeviceFormModal";
 import { GogScopeGuard } from "@/components/GogScopeGuard";
 import { useDeviceConfig, type LocalDevice } from "@/hooks/useDeviceConfig";
+import { QUERY_KEYS } from "@/query/keys";
 import { useOrionStore } from "@/stores/orion";
 import { Icon } from "@/ui/Icon";
 import { Badge, Button, Empty, SectionHeader, Surface } from "@/ui/primitives";
@@ -33,50 +35,48 @@ import { ExportMenu } from "./ExportMenu";
 import { SheetsPanel } from "./SheetsPanel";
 
 export function IoTPanel() {
-  const rev = useOrionStore((s) => s.rev.iot);
+  const queryClient = useQueryClient();
+  // `iotSensors` es WS-state (snapshots por evento iot.sensor) y se
+  // queda en Zustand. El resto (devices/scenes/sensors-snapshot/paused)
+  // pasa a useQuery — el bridge invalida QUERY_KEYS.iot.* por evento
+  // iot.action.
   const sensorsLive = useOrionStore((s) => s.iotSensors);
   const cfg = useDeviceConfig();
 
-  const [backendDevices, setBackendDevices] = useState<IoTDevice[]>([]);
-  const [scenes, setScenes] = useState<IoTScene[]>([]);
-  const [sensors, setSensors] = useState<Record<string, IoTSensor>>({});
-  const [error, setError] = useState<string | null>(null);
-  const [paused, setPaused] = useState<boolean>(false);
+  const { data: backendDevices = [], error: devicesError } = useQuery<IoTDevice[]>({
+    queryKey: QUERY_KEYS.iot.devices,
+    queryFn: () => api.iotDevices(),
+  });
+  const { data: scenes = [], error: scenesError } = useQuery<IoTScene[]>({
+    queryKey: QUERY_KEYS.iot.scenes,
+    queryFn: () => api.iotScenes(),
+  });
+  const { data: sensors = {}, error: sensorsError } = useQuery<Record<string, IoTSensor>>({
+    queryKey: QUERY_KEYS.iot.sensors,
+    queryFn: () => api.iotSensors(),
+  });
+  const { data: pausedStatus, error: pausedError } = useQuery<{ paused: boolean }>({
+    queryKey: QUERY_KEYS.iot.paused,
+    queryFn: () => api.iotPausedStatus(),
+  });
+  const paused = pausedStatus?.paused ?? false;
+
   const [pausing, setPausing] = useState<boolean>(false);
+  const [actError, setActError] = useState<string | null>(null);
+  const queryError = devicesError ?? scenesError ?? sensorsError ?? pausedError;
+  const error = actError ?? (queryError ? String(queryError) : null);
 
   // modal
   const [editing, setEditing] = useState<IoTDevice | LocalDevice | undefined>(undefined);
   const [modalOpen, setModalOpen] = useState(false);
-  // bump para forzar refetch tras crear/editar/borrar en backend
-  const [refreshTick, setRefreshTick] = useState(0);
-
-  useEffect(() => {
-    let alive = true;
-    Promise.all([api.iotDevices(), api.iotScenes(), api.iotSensors(), api.iotPausedStatus()])
-      .then(([d, s, se, p]) => {
-        if (!alive) return;
-        setBackendDevices(d);
-        setScenes(s);
-        setSensors(se);
-        setPaused(p.paused);
-        setError(null);
-      })
-      .catch((e) => {
-        if (alive) setError(String(e));
-      });
-    return () => {
-      alive = false;
-    };
-  }, [rev, refreshTick]);
 
   async function togglePause() {
     setPausing(true);
     try {
-      const r = paused ? await api.iotConnect() : await api.iotDisconnect();
-      setPaused(r.paused);
-      setRefreshTick((n) => n + 1);
+      await (paused ? api.iotConnect() : api.iotDisconnect());
+      await queryClient.invalidateQueries({ queryKey: QUERY_KEYS.iot.all });
     } catch (e) {
-      setError(String(e));
+      setActError(String(e));
     } finally {
       setPausing(false);
     }
@@ -97,14 +97,14 @@ export function IoTPanel() {
     try {
       await api.iotAction(deviceId, body);
     } catch (e) {
-      setError(String(e));
+      setActError(String(e));
     }
   }
   async function runScene(sceneId: string) {
     try {
       await api.iotRunScene(sceneId);
     } catch (e) {
-      setError(String(e));
+      setActError(String(e));
     }
   }
 
@@ -277,7 +277,7 @@ export function IoTPanel() {
            entry real — si no, el reset effect del modal se dispararía en
            cada render del panel y reseteamos lo que el usuario escribe. */
         config={editing ? cfg.configs[editing.id] : undefined}
-        onSaved={() => setRefreshTick((n) => n + 1)}
+        onSaved={() => queryClient.invalidateQueries({ queryKey: QUERY_KEYS.iot.all })}
         onSubmitLocal={(dev, c) => cfg.addLocal(dev, c)}
         onSubmitConfig={(id, c) => cfg.setConfig(id, c)}
         onDeleteLocal={cfg.removeLocal}

@@ -12,41 +12,51 @@
  *   - Composer con contador de caracteres + foco mejorado.
  */
 
-import { useEffect, useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { api, type NoteApi } from "@/api/rest";
-import { useOrionStore } from "@/stores/orion";
+import { QUERY_KEYS } from "@/query/keys";
 import { toast } from "@/stores/toast";
 import { Icon } from "@/ui/Icon";
 import { Badge, Button, Empty, SectionHeader, Surface } from "@/ui/primitives";
 
 export function NotesPanel() {
-  const rev = useOrionStore((s) => s.rev.notes);
-  const [notes, setNotes] = useState<NoteApi[]>([]);
-  const [loading, setLoading] = useState(false);
+  // Server-state via TanStack Query — la invalidación viene del bridge WS
+  // en stores/orion.ts (case "note.*"), así que no hace falta leer rev.notes.
+  const {
+    data: notes = [],
+    isFetching,
+    error,
+  } = useQuery<NoteApi[]>({
+    queryKey: QUERY_KEYS.notes,
+    queryFn: () => api.listNotes(),
+  });
+  // El loading skeleton del panel original sólo se mostraba en el primer
+  // fetch (mientras `notes` estaba vacío). Replicamos esa semántica con
+  // `isFetching && notes.length === 0` más abajo.
+  const loading = isFetching;
+
+  // Notificar errores via toast UNA vez por error — el panel anterior lo
+  // hacía en el .catch del effect; acá usamos un ref para no spamear si
+  // hay refetchs sucesivos del mismo error.
+  const lastErrorRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (error) {
+      const msg = String(error);
+      if (lastErrorRef.current !== msg) {
+        toast.error("No pude cargar notas", msg);
+        lastErrorRef.current = msg;
+      }
+    } else {
+      lastErrorRef.current = null;
+    }
+  }, [error]);
+
   const [draft, setDraft] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingText, setEditingText] = useState("");
   const [query, setQuery] = useState("");
-
-  useEffect(() => {
-    let alive = true;
-    setLoading(true);
-    api
-      .listNotes()
-      .then((ns) => {
-        if (alive) setNotes(ns);
-      })
-      .catch((e) => {
-        if (alive) toast.error("No pude cargar notas", String(e));
-      })
-      .finally(() => {
-        if (alive) setLoading(false);
-      });
-    return () => {
-      alive = false;
-    };
-  }, [rev]);
 
   // Filtrado por query + orden: pinned arriba, después por updated desc.
   const { pinned, rest } = useMemo(() => {

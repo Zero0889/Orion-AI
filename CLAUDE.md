@@ -84,7 +84,109 @@ User reportó: cada turno aparecía dos veces en el chat. **Root cause:** `main.
 
 **Fixes:** backend usa `persist_log_only` (persiste sin re-publicar al WS); frontend dedupea con walk-backwards buscando mensaje del mismo role con `turnId` no `confirmedByLog`.
 
-### ✅ Fase 4 — Romper god-files frontend (cerrado, CI verde)
+### ✅ Fase 4 — Modularización frontend (cerrada)
+
+| Sub-item | Estado |
+|---|---|
+| Romper MCPPanel/DeviceFormModal/AgentsPanel/IoTPanel a feature-folders | ✅ commits 822f524, ed8da18, 159b005, e78e8fd |
+| R7 — generar `api/generated.ts` desde OpenAPI | ✅ (cubierto por Fase 3D) |
+| Vitest + RTL — baseline de tests para los paneles | ✅ |
+| TanStack Query — server-state fuera de Zustand | ✅ todos los paneles migrados, `rev.X` removido del store |
+| widgets/eye/ + widgets/command-palette/ | ✅ ambos movidos a `web/src/widgets/` |
+
+#### ✅ Vitest + RTL baseline
+- Stack: `vitest ^2.1.9` + `jsdom ^25` + `@testing-library/react ^16` + `@testing-library/jest-dom ^6` + `@testing-library/user-event ^14`. Sin `globals: true` — los tests importan `describe/it/expect/vi` desde `vitest` explícitamente.
+- Config: el bloque `test` vive en `web/vite.config.ts` (no archivo separado). `setupFiles: ["./src/test/setup.ts"]` registra los matchers de jest-dom + `cleanup()` manual en `afterEach` (sin `globals:true` RTL no auto-registra cleanup → tests acumulan DOM).
+- Scripts: `npm test` (watch) y `npm run test:run` (one-shot, usado en CI).
+- CI: nuevo step `Test (vitest)` en el job `web` entre `Format check` y `Build`. Corre en ambas Node 20/22.
+- **Baseline actual:** 5 archivos de test, 44 tests, foco en helpers puros + componentes pequeños sin deps externas. NO hay tests todavía para los `index.tsx` top-level — esos requieren mockear `api/rest.ts` + `useOrionStore` + hooks custom (`useDeviceConfig`, `useSensorHistory`). Es trabajo de otra pasada.
+- Archivos cubiertos: `DeviceFormModal/constants.test.ts` (slugify, kindFromDevice, isObj), `DeviceFormModal/controls.test.tsx` (NumInput clamp, QuickPick, CapChip, ReadOnlyBackendBadges), `AgentsPanel/types.test.ts` (agentIconTone, useProviderLabel, sessions persist + truncate a 80 msg), `MCPPanel/StarBadge.test.tsx` (k-format + snapshot), `IoTPanel/ExportMenu.test.tsx` (open/close + click-outside + hrefs).
+- **Gotcha registrado:** los snapshots viven en `src/**/__snapshots__/*.snap`. NO están en `.prettierignore` ni `.gitignore` porque el glob de prettier solo cubre `.ts/.tsx/.css/.json/.md`. Quedan versionados como parte del repo.
+- **Inputs controlados:** `userEvent.type()` no funciona como esperado en componentes controlados con `value` prop estático en el test — los keystrokes se acumulan sobre el value original porque el parent del test no re-renderea. Para testear lógica de clamp/validación usar `fireEvent.change(input, { target: { value: "X" } })` directo. Solo usar `user.type` cuando hay un harness con state real arriba.
+
+#### ✅ TanStack Query (todos los paneles migrados)
+**Infraestructura:**
+- `@tanstack/react-query@^5.62.7` en deps. Su propio chunk Vite (`vendor-tanstack`, ~14kB gzip).
+- `web/src/query/client.ts` — `QueryClient` singleton con defaults razonados (staleTime 30s, refetchOnWindowFocus false, retry 1). Razonamiento en el archivo.
+- `web/src/query/keys.ts` — registro central de `QUERY_KEYS` (notes, memory, conversations, conversation(id), settingsTheme, notifications, notificationsList(unread), notificationsStatus, iot.{all,devices,scenes,sensors,paused}, orchestra, mcpServers). Mantener TODAS las keys acá: el bridge WS y los `useQuery` consumen el mismo objeto → renombre seguro.
+- `main.tsx` monta `<QueryClientProvider client={queryClient}>` arriba de `<App />`.
+- **Bridge WS → invalidación** en `stores/orion.ts` (`applyEvent`): cada `case` que afecta server-state cacheado llama `queryClient.invalidateQueries({ queryKey })` con la key correspondiente. Los paneles refetchean automáticamente.
+- `web/src/test/renderWithQuery.tsx` — helper que envuelve un componente en un `QueryClientProvider` con un client fresco por test (retry false, staleTime 0).
+
+**Paneles migrados:**
+| Panel | Notas |
+|---|---|
+| `NotesPanel` | 1 query (`notes`). Sin store global. |
+| `MemoryPanel` | 1 query (`memory`). |
+| `HistoryPanel` | 2 queries — `conversations` (lista) + `conversation(id)` (detalle, `enabled:!!active`). Prefix-match de invalidación: invalidar `["conversations"]` pega también al detalle. `setDetail(null)` se eliminó — `enabled` desactiva la query. |
+| `SettingsPanel` + `App.tsx` | Comparten cache de `settingsTheme` → un solo fetch por sesión. App lee el data y aplica `data-theme` al `<html>` cuando cambia. |
+| `NotificationsPanel` | 2 queries (lista parametrizada por `unread` + status). Mutations (pollNow/markAllRead/authorize) invalidan `["notifications"]` (prefix). |
+| `IoTPanel` | 4 queries (`iot.devices/scenes/sensors/paused`). `iotSensors` live sigue en Zustand (WS-state). togglePause y onSaved invalidan `iot.all`. |
+| `AgentsPanel` | 2 queries (`orchestra` + `providers` con staleTime 5min). `mutationError` separado del `queryError` para que el dismiss del banner no afecte queries. |
+| `MCPPanel` | 1 query (`mcpServers`). Sin bridge WS (no hay eventos MCP) — invalidación solo desde mutations. Toggle enabled optimista via `setQueryData`. |
+
+**Patrón de migración:**
+```ts
+// Antes:
+const rev = useOrionStore((s) => s.rev.notes);
+const [notes, setNotes] = useState<NoteApi[]>([]);
+useEffect(() => {
+  api.listNotes().then(setNotes).catch((e) => toast.error(String(e)));
+}, [rev]);
+
+// Después:
+const { data: notes = [], error } = useQuery({
+  queryKey: QUERY_KEYS.notes,
+  queryFn: () => api.listNotes(),
+});
+// Toast UNA vez por error nuevo via useRef + useEffect (ver NotesPanel).
+```
+
+**Gotchas registrados:**
+- **Errors de query vs mutation:** los paneles con banner dismissable (Agents, IoT, MCP, Notifications, Settings) usan `mutationError` local + `queryError` derivado de la query. El render hace `pickError ?? (queryError ? String(queryError) : null)`. El dismiss solo limpia el local.
+- **Detail queries:** usar `enabled: !!id` y dejar la cache. NO necesitamos limpiar `data` manualmente cuando `id` cambia a null — solo verificar `id` antes de renderear el detalle.
+- **`useProviderLabel` y nombres con `use`-prefix:** aunque empiecen con `use`, NO son hooks (son funciones puras en `AgentsPanel/types.ts`). El compilador no se queja porque no llaman hooks adentro — pero conviene renombrarlas en algún futuro PR para no confundir lectores.
+- **Optimistic updates:** usar `queryClient.setQueryData(key, updater)` antes del API call, luego `invalidateQueries(key)` después. Si el call falla, la invalidación refetchea y revierte (ver MCPPanel.handleToggleEnabled).
+- **Prefix-match:** TanStack Query v5 invalida por defecto con prefix-match — `invalidateQueries({ queryKey: ["conversations"] })` pega a `["conversations"]` Y a `["conversations", id]`. Usar esto en vez de invalidar key por key.
+
+**Test pattern** (ver `NotesPanel.test.tsx`): mockear `@/api/rest` y `@/stores/toast` con `vi.mock` ANTES del import del componente, usar `renderWithQuery`, asertar contenido + estado vacío + que no crashee al rechazar.
+
+#### ✅ widgets/ — Eye y CommandPalette
+Nueva capa estructural `web/src/widgets/` para features cohesivas (vs.
+`components/` para piezas simples reutilizables). Cada widget es una
+carpeta con `index.ts(x)` que expone la API pública via barrel.
+
+```
+web/src/widgets/
+├── eye/
+│   ├── index.ts            # barrel: BackgroundEye, EyeCore, EyeState, EyePalette,
+│   │                       # useEyeState, DerivedEyeState, useEventPulses
+│   ├── BackgroundEye.tsx   # wrapper de fondo ambiental
+│   ├── EyeCore.tsx         # renderer SVG/canvas (459 LOC)
+│   ├── useEyeState.ts      # deriva idle/listening/thinking/speaking del store
+│   ├── useEventPulses.ts   # bridge mundo→pulsos (sensores/notifs/tools)
+│   └── pulseStore.ts       # zustand interno (privado, NO re-exportado)
+└── command-palette/
+    └── index.tsx           # 432 LOC: render + useCommandPalette store + catálogos
+```
+
+**Migración hecha con `git mv`** para preservar blame de los 6 archivos.
+Imports actualizados en 5 consumidores: `App.tsx`, `TopBar.tsx`,
+`OrbHUD.tsx`, `ChatPanel.tsx`, `components/BackgroundEye` (interno al widget).
+
+**Decisión: NO splitear CommandPalette internamente.** Tiene 432 LOC
+pero el componente, sus catálogos (VIEW_ACTIONS/THEMES) y el store
+inline (`useCommandPalette`) están tightly-coupled — splitearlo daría
+3 archivos chicos sin ganancia real. Si supera ~600 LOC en el futuro,
+re-evaluar (extraer `actions.ts` + `store.ts`).
+
+**`pulseStore` queda privado a propósito.** Solo `EyeCore` y
+`useEventPulses` lo consumen (ambos adentro del widget). Mantenerlo
+fuera del barrel evita que consumidores externos disparen pulsos
+saltándose la política de filtrado de `useEventPulses` (reglas: pulso
+≠ tick, solo eventos significativos).
+
+#### ✅ Romper god-files frontend
 Los 4 componentes >900 LOC del audit migrados a feature-folders. Ningún
 archivo nuevo > 1019 LOC, la mayoría < 400. API pública intacta —
 `import { X } from "@/components/X"` sigue resolviendo a `index.tsx`
@@ -196,7 +298,7 @@ O.R.I.O.N/
 │   └── test_*.py                 # 333 total al cierre de Fase 3B.
 │
 └── web/
-    ├── package.json              # scripts: dev, build, lint, format, typecheck, gen:api, gen:api:check.
+    ├── package.json              # scripts: dev, build, lint, format, typecheck, test/test:run, gen:api, gen:api:check.
     ├── eslint.config.js          # ESLint flat config v9.
     ├── .prettierrc.json          # printWidth 100, single line endings (lf), trailing commas (all).
     ├── .prettierignore           # Excluye openapi.json (generado).
@@ -207,8 +309,17 @@ O.R.I.O.N/
         │   ├── ws.ts             # WS client (auto-reconnect).
         │   ├── openapi.json      # Generado — NO editar a mano.
         │   └── generated.ts      # 4538 LOC de tipos TS — NO editar.
-        ├── components/           # MCPPanel/, DeviceFormModal/, IoTPanel/, AgentsPanel/ ahora son carpetas con index.tsx + subarchivos (Fase 4 ✅). El resto siguen siendo .tsx planos.
-        ├── stores/orion.ts       # Zustand store. Dedup de chat (post-fix `8664938`).
+        ├── query/
+        │   ├── client.ts         # QueryClient singleton — montado por main.tsx + importado por el bridge WS.
+        │   └── keys.ts           # QUERY_KEYS central — usado por hooks de paneles y por el bridge.
+        ├── components/           # Piezas reutilizables del shell (Sidebar, TopBar, Toaster, paneles). MCPPanel/, DeviceFormModal/, IoTPanel/, AgentsPanel/ son carpetas con index.tsx + subarchivos. Cada carpeta puede incluir `*.test.ts(x)` y `__snapshots__/`.
+        ├── widgets/              # Features cohesivas auto-contenidas (vs. components/).
+        │   ├── eye/              # Ojo de Orion: BackgroundEye + EyeCore + hooks + pulse store interno.
+        │   └── command-palette/  # Cmd+K palette + useCommandPalette store inline.
+        ├── stores/orion.ts       # Zustand store. Dedup de chat (post-fix `8664938`). Bridge WS→invalidateQueries en applyEvent.
+        ├── test/
+        │   ├── setup.ts          # Vitest setup global — registra matchers de jest-dom + cleanup() de RTL.
+        │   └── renderWithQuery.tsx  # Helper RTL para componentes que usan useQuery (QueryClient fresco por test).
         ├── types.ts              # ChatMessage, ConnectionStatus, etc.
         └── App.tsx
 ```
@@ -225,7 +336,7 @@ El push a `main` dispara `.github/workflows/ci.yml` con 7 jobs:
 | **Python (3.12 / ubuntu-latest)** | idem en Python 3.12 |
 | **Python (3.11 / windows-latest)** | idem cross-platform (captura bugs de `os.replace` cross-volume, etc.) |
 | **Python (3.12 / windows-latest)** | idem |
-| **Web (Node 20)** | tsc, eslint `--max-warnings=0`, prettier `--check`, vite build |
+| **Web (Node 20)** | tsc, eslint `--max-warnings=0`, prettier `--check`, vitest (47 tests), vite build |
 | **Web (Node 22)** | idem |
 | **Gitleaks** | escanea diff por API keys, OAuth tokens, JWTs |
 | **API types fresh** | `gen:api:check` — falla si backend cambió un schema y nadie regeneró `generated.ts` |
@@ -325,6 +436,7 @@ cd web
 npm run typecheck                              # ok
 npm run lint                                   # 0 errors
 npm run format:check                           # All matched files use Prettier code style!
+npm run test:run                               # 47 tests passing en 6 archivos
 npm run gen:api:check                          # API types están al día
 npm run build                                  # built in ~3s
 

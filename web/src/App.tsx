@@ -14,11 +14,8 @@
 
 import { lazy, Suspense, useEffect, useState } from "react";
 
-import { BackgroundEye } from "@/components/BackgroundEye";
-import { CommandPalette } from "@/components/CommandPalette";
 import { DropZone } from "@/components/DropZone";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
-import { EyeCore, type EyePalette } from "@/components/EyeCore";
 import { HomePanel } from "@/components/HomePanel";
 import { NeuralBackground } from "@/components/NeuralBackground";
 import { Onboarding } from "@/components/Onboarding";
@@ -64,14 +61,23 @@ const CircuitPanel = lazy(() =>
 const SettingsPanel = lazy(() =>
   import("@/components/SettingsPanel").then((m) => ({ default: m.SettingsPanel })),
 );
-import { useEventPulses } from "@/hooks/useEventPulses";
-import { useEyeState } from "@/hooks/useEyeState";
+import { useQuery } from "@tanstack/react-query";
+
 import { useOrionSocket } from "@/hooks/useOrionSocket";
 import { useZoomShortcuts } from "@/hooks/useZoomShortcuts";
+import { QUERY_KEYS } from "@/query/keys";
 import { useOrionStore } from "@/stores/orion";
 import { useViewStore } from "@/stores/view";
 import { Icon } from "@/ui/Icon";
-import { api } from "@/api/rest";
+import { CommandPalette } from "@/widgets/command-palette";
+import {
+  BackgroundEye,
+  EyeCore,
+  useEventPulses,
+  useEyeState,
+  type EyePalette,
+} from "@/widgets/eye";
+import { api, type ThemeInfo } from "@/api/rest";
 import { inferBackendUrl } from "@/api/ws";
 
 const RAIL_KEY = "orion.sidebar.collapsed";
@@ -119,7 +125,6 @@ export default function App() {
   const send = useOrionSocket();
   const view = useViewStore((s) => s.view);
   const muted = useOrionStore((s) => s.muted);
-  const revTheme = useOrionStore((s) => s.rev.theme);
   const [version, setVersion] = useState<string>("");
   const [collapsed, setCollapsed] = useState<boolean>(
     () => typeof window !== "undefined" && window.localStorage.getItem(RAIL_KEY) === "1",
@@ -133,20 +138,22 @@ export default function App() {
       .catch(() => setVersion("?"));
   }, []);
 
+  // Theme via useQuery — comparte cache con SettingsPanel: ambos leen
+  // QUERY_KEYS.settingsTheme, así que se fetchea UNA vez por sesión y
+  // se re-fetchea solo cuando el bridge WS invalida (case "settings.theme").
+  const { data: themeInfo } = useQuery<ThemeInfo>({
+    queryKey: QUERY_KEYS.settingsTheme,
+    queryFn: () => api.getTheme(),
+  });
+
   // React to backend theme switches by setting data-theme on <html>.
   useEffect(() => {
-    api
-      .getTheme()
-      .then((info) => {
-        const name = (info?.name ?? "").toLowerCase();
-        const slug = resolveTheme(name);
-        document.documentElement.setAttribute("data-theme", slug);
-        window.localStorage.setItem(THEME_KEY, slug);
-      })
-      .catch(() => {
-        /* leave default */
-      });
-  }, [revTheme]);
+    if (!themeInfo) return;
+    const name = (themeInfo.name ?? "").toLowerCase();
+    const slug = resolveTheme(name);
+    document.documentElement.setAttribute("data-theme", slug);
+    window.localStorage.setItem(THEME_KEY, slug);
+  }, [themeInfo]);
 
   // restore saved light/dark preference on mount
   useEffect(() => {

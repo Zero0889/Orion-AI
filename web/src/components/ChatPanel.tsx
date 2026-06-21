@@ -28,7 +28,6 @@ import { AskUserPrompt } from "@/components/AskUserPrompt";
 import { AttachmentChip } from "@/components/AttachmentChip";
 import { OrbHUD } from "@/components/OrbHUD";
 import { ToolBanner } from "@/components/ToolBanner";
-import { useEyeState } from "@/hooks/useEyeState";
 import { Markdown } from "@/lib/markdown";
 import { prettyToolName } from "@/lib/toolLabels";
 import { useInteractionStore } from "@/stores/interaction";
@@ -36,6 +35,7 @@ import { useOrionStore } from "@/stores/orion";
 import type { ChatMessage, LogRole } from "@/types";
 import { Icon } from "@/ui/Icon";
 import { Button, Kbd } from "@/ui/primitives";
+import { useEyeState } from "@/widgets/eye";
 
 const SUGGESTIONS: { eyebrow: string; prompt: string }[] = [
   { eyebrow: "Sistema", prompt: "¿Cómo está el sistema ahora mismo?" },

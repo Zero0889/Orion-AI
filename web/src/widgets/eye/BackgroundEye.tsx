@@ -10,10 +10,11 @@
  * el usuario nunca pierde feedback visual de qué está haciendo Orion.
  */
 
-import { EyeCore, type EyeState } from "@/components/EyeCore";
 import { useInteractionStore } from "@/stores/interaction";
 import { useOrionStore } from "@/stores/orion";
 import { useViewStore } from "@/stores/view";
+
+import { EyeCore, type EyeState } from "./EyeCore";
 
 export function BackgroundEye() {
   const state = useOrionStore((s) => s.state);

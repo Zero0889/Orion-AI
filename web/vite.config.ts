@@ -1,3 +1,4 @@
+/// <reference types="vitest/config" />
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import path from "node:path";
@@ -33,6 +34,7 @@ export default defineConfig({
           "vendor-react":   ["react", "react-dom"],
           "vendor-katex":   ["katex"],
           "vendor-zustand": ["zustand"],
+          "vendor-tanstack": ["@tanstack/react-query"],
         },
       },
     },
@@ -47,5 +49,15 @@ export default defineConfig({
   esbuild: {
     drop: ["console", "debugger"],
     legalComments: "none",
+  },
+  // Vitest. No usamos `globals: true` a propósito — los tests importan
+  // describe/it/expect/vi desde "vitest" explícitamente. Los matchers de
+  // jest-dom se registran via side-effect en src/test/setup.ts.
+  test: {
+    environment: "jsdom",
+    setupFiles: ["./src/test/setup.ts"],
+    css: false,
+    include: ["src/**/*.{test,spec}.{ts,tsx}"],
+    restoreMocks: true,
   },
 });

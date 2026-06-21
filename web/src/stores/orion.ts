@@ -1,19 +1,34 @@
 /**
- * Store global de Orion (Zustand).
+ * Store global de Orion (Zustand) — solo UI-state y WS-state.
  *
  * Concentra el estado que la UI necesita renderizar a partir de los
  * eventos del bus:
- *   - state:      "ESCUCHANDO" | "PENSANDO" | "HABLANDO"
- *   - muted:      bool
- *   - connected:  conexión WS activa
- *   - messages:   historial reciente (cap defensivo)
+ *   - state:        "ESCUCHANDO" | "PENSANDO" | "HABLANDO"
+ *   - muted:        bool
+ *   - connected:    conexión WS activa
+ *   - messages:     historial reciente del chat (cap defensivo)
+ *   - currentFile:  archivo adjunto activo
+ *   - unreadNotifs: contador para la campana
+ *   - telemetry:    sparklines CPU/RAM/disk
+ *   - iotSensors:   snapshots live de sensores (WS)
  *
- * El despachador ``applyEvent`` traduce cada evento del bus a una
- * mutación del store. Diseñado para ser invocado desde el WS handler.
+ * El despachador `applyEvent` traduce cada evento del bus a una mutación
+ * del store. Además, **funciona como bridge a TanStack Query**: cada
+ * `case` que afecta server-state cacheado (notes, memory, conversations,
+ * iot, orchestra, notifications, settings.theme) llama
+ * `queryClient.invalidateQueries(...)` con la queryKey correspondiente,
+ * y los paneles que usan `useQuery` refetchean automáticamente.
+ *
+ * Antes de la migración a TanStack Query había un objeto `rev` con
+ * contadores por dominio que los paneles observaban como tripwire para
+ * sus `useEffect` de fetch. Se borró cuando todos los paneles pasaron a
+ * useQuery — la invalidación ahora es declarativa en una sola línea.
  */
 
 import { create } from "zustand";
 
+import { queryClient } from "@/query/client";
+import { QUERY_KEYS } from "@/query/keys";
 import { useAskUserStore } from "@/stores/askUser";
 import { useInteractionStore } from "@/stores/interaction";
 import type { ChatMessage, LogRole, OrionState, ServerEvent } from "@/types";
@@ -27,19 +42,6 @@ interface State {
   connected: boolean;
   messages: ChatMessage[];
   currentFile: string | null;
-
-  // Contadores por tipo de evento — los paneles los observan para
-  // refrescar sus datos cuando algo cambia en el backend.
-  rev: {
-    notes: number;
-    memory: number;
-    convs: number;
-    theme: number;
-    agent: number;
-    iot: number;
-    orchestra: number;
-    notifications: number;
-  };
 
   /** Conteo de notificaciones no leídas (Gmail + Classroom + …). Se
    *  actualiza por evento `notification.new`/`notification.read` y al
@@ -113,16 +115,6 @@ export const useOrionStore = create<State>((set, get) => ({
   connected: false,
   messages: [],
   currentFile: null,
-  rev: {
-    notes: 0,
-    memory: 0,
-    convs: 0,
-    theme: 0,
-    agent: 0,
-    iot: 0,
-    orchestra: 0,
-    notifications: 0,
-  },
   unreadNotifs: 0,
   telemetry: { cpu: [], ram: [], disk: [], last: null },
   iotSensors: {},
@@ -236,25 +228,28 @@ export const useOrionStore = create<State>((set, get) => ({
       case "note.created":
       case "note.updated":
       case "note.deleted": {
-        set((s) => ({ rev: { ...s.rev, notes: s.rev.notes + 1 } }));
+        // Bridge WS → TanStack Query. Cada `case` invalida la queryKey
+        // que cubre ese dominio; los paneles que usan useQuery refetchean
+        // automáticamente. Los contadores `rev.X` se quitaron tras
+        // migrar todos los consumidores a useQuery (Fase 4).
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.notes });
         break;
       }
       case "memory.updated":
       case "memory.deleted": {
-        set((s) => ({ rev: { ...s.rev, memory: s.rev.memory + 1 } }));
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.memory });
         break;
       }
       case "conversation.deleted":
       case "conversation.load": {
-        set((s) => ({ rev: { ...s.rev, convs: s.rev.convs + 1 } }));
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.conversations });
         break;
       }
       case "settings.theme": {
-        set((s) => ({ rev: { ...s.rev, theme: s.rev.theme + 1 } }));
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.settingsTheme });
         break;
       }
       case "agent.task": {
-        set((s) => ({ rev: { ...s.rev, agent: s.rev.agent + 1 } }));
         const id = String(payload?.id ?? "");
         const status = String(payload?.status ?? "") as
           | "pending"
@@ -310,30 +305,30 @@ export const useOrionStore = create<State>((set, get) => ({
         break;
       }
       case "orchestra.update": {
-        set((s) => ({ rev: { ...s.rev, orchestra: s.rev.orchestra + 1 } }));
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.orchestra });
         break;
       }
       case "iot.action": {
-        set((s) => ({ rev: { ...s.rev, iot: s.rev.iot + 1 } }));
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.iot.all });
         break;
       }
       case "notification.new": {
         const count = Number(payload?.count ?? 0);
         set((s) => ({
           unreadNotifs: s.unreadNotifs + (count > 0 ? count : 0),
-          rev: { ...s.rev, notifications: s.rev.notifications + 1 },
         }));
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.notifications });
         break;
       }
       case "notification.read": {
         // El backend ya marcó como leídas en el store; el panel hará
-        // refetch via rev. Acá sólo bajamos el contador para que la
-        // campana se actualice instantánea.
+        // refetch via invalidateQueries. Acá sólo bajamos el contador
+        // para que la campana se actualice instantánea.
         const c = Number(payload?.count ?? 0);
         set((s) => ({
           unreadNotifs: Math.max(0, s.unreadNotifs - c),
-          rev: { ...s.rev, notifications: s.rev.notifications + 1 },
         }));
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.notifications });
         break;
       }
       case "iot.sensor": {

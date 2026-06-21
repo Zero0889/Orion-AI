@@ -7,6 +7,7 @@
  * filtro por fuente puntual.
  */
 
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 
 import { api, type NotifItem, type NotifPollerStatus } from "@/api/rest";
@@ -16,6 +17,7 @@ import {
   formatRelative,
   type SourceGroup,
 } from "@/lib/notificationSource";
+import { QUERY_KEYS } from "@/query/keys";
 import { useOrionStore } from "@/stores/orion";
 import { Icon } from "@/ui/Icon";
 import { Badge, Button, Empty, SectionHeader, Surface } from "@/ui/primitives";
@@ -32,72 +34,74 @@ const FILTERS: { id: Filter; label: string }[] = [
 ];
 
 export function NotificationsPanel() {
-  const rev = useOrionStore((s) => s.rev.notifications);
-  const [items, setItems] = useState<NotifItem[]>([]);
-  const [status, setStatus] = useState<NotifPollerStatus | null>(null);
+  const queryClient = useQueryClient();
   const [filter, setFilter] = useState<Filter>("all");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [pickError, setPickError] = useState<string | null>(null);
   const [authorizing, setAuthorizing] = useState(false);
 
-  async function refresh() {
-    setLoading(true);
-    try {
-      // El backend filtra por source/unread; los grupos los filtramos
-      // en el cliente porque combinan varias fuentes.
-      const params = filter === "unread" ? { unread: true } : {};
-      const [list, st] = await Promise.all([
-        api.listNotifications(params),
-        api.notificationsStatus(),
-      ]);
-      setItems(list);
-      setStatus(st);
-      setError(null);
-      useOrionStore.setState({ unreadNotifs: list.length });
-    } catch (e) {
-      setError(String(e));
-    } finally {
-      setLoading(false);
-    }
-  }
+  // Lista filtrada — el backend acepta `unread`. Los grupos (google,
+  // system, etc.) los filtramos client-side abajo porque combinan
+  // múltiples sources.
+  const onlyUnread = filter === "unread";
+  const {
+    data: items = [],
+    isFetching: listFetching,
+    error: listError,
+  } = useQuery<NotifItem[]>({
+    queryKey: QUERY_KEYS.notificationsList(onlyUnread),
+    queryFn: () => api.listNotifications(onlyUnread ? { unread: true } : {}),
+  });
 
+  const {
+    data: status = null,
+    isFetching: statusFetching,
+    error: statusError,
+  } = useQuery<NotifPollerStatus>({
+    queryKey: QUERY_KEYS.notificationsStatus,
+    queryFn: () => api.notificationsStatus(),
+  });
+
+  const loading = listFetching || statusFetching;
+  const queryError = listError ?? statusError;
+  const error = pickError ?? (queryError ? String(queryError) : null);
+
+  // Sync del contador de la campana con la lista visible — el bridge
+  // WS ya mantiene `unreadNotifs` por evento (notification.new/.read),
+  // pero el render del panel también lo refleja por consistencia con
+  // el comportamiento anterior.
   useEffect(() => {
-    void refresh();
-    // `refresh` se recrea en cada render — meterla en deps causa loop infinito.
-    // Sus únicos inputs reales (filter, rev) ya están listados.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filter, rev]);
+    useOrionStore.setState({ unreadNotifs: items.length });
+  }, [items.length]);
+
+  const invalidateAll = () => queryClient.invalidateQueries({ queryKey: QUERY_KEYS.notifications });
 
   async function pollNow(src?: string) {
-    setLoading(true);
     try {
       await api.pollNotifications(src);
-      await refresh();
+      await invalidateAll();
     } catch (e) {
-      setError(String(e));
-    } finally {
-      setLoading(false);
+      setPickError(String(e));
     }
   }
 
   async function markAllRead(src?: string) {
     try {
       await api.markAllNotificationsRead(src);
-      await refresh();
+      await invalidateAll();
     } catch (e) {
-      setError(String(e));
+      setPickError(String(e));
     }
   }
 
   async function authorizeClassroom() {
     setAuthorizing(true);
-    setError(null);
+    setPickError(null);
     try {
       await api.authorizeClassroom();
       await api.pollNotifications("classroom");
-      await refresh();
+      await invalidateAll();
     } catch (e) {
-      setError(String(e));
+      setPickError(String(e));
     } finally {
       setAuthorizing(false);
     }
@@ -210,7 +214,7 @@ export function NotificationsPanel() {
 
         <div className="flex flex-col gap-2">
           {visibleItems.map((it, i) => (
-            <NotifCard key={it.uid} item={it} delay={i * 25} onAfterRead={refresh} />
+            <NotifCard key={it.uid} item={it} delay={i * 25} onAfterRead={invalidateAll} />
           ))}
         </div>
       </div>

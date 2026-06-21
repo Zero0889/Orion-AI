@@ -18,7 +18,8 @@
  *   - ServerFormModal.tsx — modal de crear/editar (compartido)
  */
 
-import { useCallback, useEffect, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useCallback, useState } from "react";
 
 import {
   api,
@@ -26,6 +27,7 @@ import {
   type MCPRegistryServer,
   type MCPServerStatus,
 } from "@/api/rest";
+import { QUERY_KEYS } from "@/query/keys";
 import { Icon } from "@/ui/Icon";
 import { Badge, Button, SectionHeader } from "@/ui/primitives";
 
@@ -36,11 +38,9 @@ import { ServerFormModal } from "./ServerFormModal";
 import type { PrefillFromRegistry, Tab } from "./types";
 
 export function MCPPanel() {
+  const queryClient = useQueryClient();
   const [tab, setTab] = useState<Tab>("installed");
-  const [servers, setServers] = useState<MCPServerStatus[]>([]);
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [refreshTick, setRefreshTick] = useState(0);
+  const [mutationError, setMutationError] = useState<string | null>(null);
 
   // modal
   const [editing, setEditing] = useState<MCPServerStatus | undefined>(undefined);
@@ -57,35 +57,30 @@ export function MCPPanel() {
       return next;
     });
 
-  const refetch = useCallback(() => setRefreshTick((n) => n + 1), []);
+  // Server-state via TanStack Query. MCP no tiene eventos WS (no hay
+  // bridge), así que la invalidación viene SOLO de las mutaciones
+  // (delete/restart/toggle/update).
+  const {
+    data: servers = [],
+    isLoading: loading,
+    error: queryError,
+  } = useQuery<MCPServerStatus[]>({
+    queryKey: QUERY_KEYS.mcpServers,
+    queryFn: () => api.mcpListServers(),
+  });
+  const error = mutationError ?? (queryError ? String(queryError) : null);
+  const setError = setMutationError;
 
-  useEffect(() => {
-    let alive = true;
-    setLoading(true);
-    api
-      .mcpListServers()
-      .then((data) => {
-        if (alive) {
-          setServers(data);
-          setError(null);
-        }
-      })
-      .catch((e) => {
-        if (alive) setError(String(e));
-      })
-      .finally(() => {
-        if (alive) setLoading(false);
-      });
-    return () => {
-      alive = false;
-    };
-  }, [refreshTick]);
+  const refetch = useCallback(
+    () => queryClient.invalidateQueries({ queryKey: QUERY_KEYS.mcpServers }),
+    [queryClient],
+  );
 
   async function handleDelete(id: string) {
     if (!confirm(`¿Borrar el server MCP '${id}'? Se detiene y se quita del config.`)) return;
     try {
       await api.mcpDeleteServer(id);
-      refetch();
+      await refetch();
     } catch (e) {
       setError(String(e));
     }
@@ -94,16 +89,18 @@ export function MCPPanel() {
   async function handleRestart(id: string) {
     try {
       await api.mcpRestartServer(id);
-      refetch();
+      await refetch();
     } catch (e) {
       setError(String(e));
     }
   }
 
   async function handleToggleEnabled(s: MCPServerStatus) {
-    // Optimismo: actualizamos el estado local primero para que el switch
-    // se sienta instantáneo. Si el PUT falla, refetch revierte al real.
-    setServers((prev) => prev.map((x) => (x.id === s.id ? { ...x, enabled: !s.enabled } : x)));
+    // Optimismo: pintamos el switch instantáneo via setQueryData. Si el
+    // PUT falla, invalidateQueries refetchea y revierte al estado real.
+    queryClient.setQueryData<MCPServerStatus[]>(QUERY_KEYS.mcpServers, (prev) =>
+      (prev ?? []).map((x) => (x.id === s.id ? { ...x, enabled: !s.enabled } : x)),
+    );
     try {
       await api.mcpUpdateServer(s.id, {
         command: s.command,
@@ -117,7 +114,7 @@ export function MCPPanel() {
     } catch (e) {
       setError(String(e));
     }
-    refetch();
+    await refetch();
   }
 
   async function handleReloadAll() {

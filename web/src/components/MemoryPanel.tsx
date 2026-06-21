@@ -13,10 +13,11 @@
  *   - Toasts in-app reemplazando alerts/confirms.
  */
 
+import { useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { api, type MemoryShape, type MemoryCategory } from "@/api/rest";
-import { useOrionStore } from "@/stores/orion";
+import { QUERY_KEYS } from "@/query/keys";
 import { toast } from "@/stores/toast";
 import { Icon, type IconName } from "@/ui/Icon";
 import { Badge, Button, Empty, SectionHeader, Surface } from "@/ui/primitives";
@@ -105,28 +106,32 @@ const EMPTY_MEM: MemoryShape = {
 };
 
 export function MemoryPanel() {
-  const rev = useOrionStore((s) => s.rev.memory);
-  const [mem, setMem] = useState<MemoryShape>(EMPTY_MEM);
+  // Server-state vía TanStack Query. Invalidación viene del bridge WS
+  // (case "memory.updated" / "memory.deleted" en stores/orion.ts).
+  const { data: mem = EMPTY_MEM, error } = useQuery<MemoryShape>({
+    queryKey: QUERY_KEYS.memory,
+    queryFn: () => api.getMemory(),
+  });
+
+  // Toast UNA vez por error nuevo (evita spam en refetchs sucesivos).
+  const lastErrorRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (error) {
+      const msg = String(error);
+      if (lastErrorRef.current !== msg) {
+        toast.error("No pude leer memoria", msg);
+        lastErrorRef.current = msg;
+      }
+    } else {
+      lastErrorRef.current = null;
+    }
+  }, [error]);
+
   const [tab, setTab] = useState<MemoryCategory>("identity");
   const [newKey, setNewKey] = useState("");
   const [newVal, setNewVal] = useState("");
   const [query, setQuery] = useState("");
   const valRef = useRef<HTMLInputElement | null>(null);
-
-  useEffect(() => {
-    let alive = true;
-    api
-      .getMemory()
-      .then((m) => {
-        if (alive) setMem(m);
-      })
-      .catch((e) => {
-        if (alive) toast.error("No pude leer memoria", String(e));
-      });
-    return () => {
-      alive = false;
-    };
-  }, [rev]);
 
   const entries = useMemo(
     () => Object.entries(mem[tab] ?? {}).map(([key, entry]) => ({ key, ...entry })),
