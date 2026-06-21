@@ -63,7 +63,7 @@ jobs:
         # funciona en bash pero NO en PowerShell (default del runner
         # Windows), que lo interpreta como path literal `\` → `C:\` y
         # mypy intenta scanear el disco entero. Mantener en single line.
-        run: mypy --follow-imports=silent core/logger.py core/tool_registry.py core/llm/base.py server/app.py server/event_bus.py server/sharing.py server/telemetry.py
+        run: mypy --follow-imports=silent orion/core/logger.py orion/core/tool_registry.py orion/core/llm/base.py orion/server/app.py orion/server/event_bus.py orion/server/sharing.py orion/server/telemetry.py
 
       - name: Pytest
         env:

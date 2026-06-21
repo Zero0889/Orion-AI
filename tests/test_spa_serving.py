@@ -27,8 +27,8 @@ INDEX = DIST / "index.html"
 def client():
     if not INDEX.is_file():
         pytest.skip("web/dist no construido. Ejecuta `npm run build` en web/.")
-    from server.app import build_app
-    from server.event_bus import OrionEventBus
+    from orion.server.app import build_app
+    from orion.server.event_bus import OrionEventBus
 
     bus = OrionEventBus()
     app = build_app(bus)

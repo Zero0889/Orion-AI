@@ -25,15 +25,15 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 
-# ── main.py es web-only y no arrastra Qt ────────────────────────────────
+# ── orion.__main__ es web-only y no arrastra Qt ────────────────────────
 def test_main_module_does_not_import_pyqt():
     for mod in list(sys.modules):
-        if mod == "main" or mod.startswith("PyQt6"):
+        if mod == "orion.__main__" or mod.startswith("PyQt6"):
             sys.modules.pop(mod, None)
-    import main
+    import orion.__main__ as main
 
     assert "PyQt6" not in sys.modules, (
-        "main.py no debe importar PyQt6 — la UI Qt fue eliminada en Fase 7."
+        "orion/__main__.py no debe importar PyQt6 — la UI Qt fue eliminada en Fase 7."
     )
     # Solo queda main() como entry point
     assert callable(main.main)
@@ -41,7 +41,7 @@ def test_main_module_does_not_import_pyqt():
 
 def test_main_has_no_legacy_runners():
     """Fase 7: ya no existen _run_qt / _run_both."""
-    import main
+    import orion.__main__ as main
 
     assert not hasattr(main, "_run_qt"), "_run_qt debe estar eliminado"
     assert not hasattr(main, "_run_both"), "_run_both debe estar eliminado"
@@ -50,9 +50,9 @@ def test_main_has_no_legacy_runners():
 
 def test_no_get_ui_mode_anymore():
     """El helper get_ui_mode se eliminó porque ya no hay multimodo."""
-    import config
+    import orion.config
 
-    assert not hasattr(config, "get_ui_mode")
+    assert not hasattr(orion.config, "get_ui_mode")
 
 
 # ── server.* sigue siendo headless puro ─────────────────────────────────
@@ -60,10 +60,10 @@ def test_server_imports_without_pyqt():
     for mod in list(sys.modules):
         if mod.startswith("PyQt6") or mod.startswith("server"):
             sys.modules.pop(mod, None)
-    import server.app
-    import server.event_bus
-    import server.ws
-    from server.routes import (
+    import orion.server.app
+    import orion.server.event_bus
+    import orion.server.ws
+    from orion.server.routes import (
         agent,
         conversations,
         files,
@@ -71,7 +71,7 @@ def test_server_imports_without_pyqt():
         memory,
         notes,
     )
-    from server.routes import (
+    from orion.server.routes import (
         settings as settings_route,
     )
 
@@ -81,7 +81,7 @@ def test_server_imports_without_pyqt():
 def test_no_fanout_module():
     """server.fanout fue eliminado en Fase 7 (ya no hace falta sin UI Qt)."""
     with pytest.raises(ImportError):
-        import server.fanout
+        import orion.server.fanout
 
 
 # ── ORION_NO_BROWSER desactiva la apertura automática ───────────────────
@@ -90,7 +90,7 @@ def test_no_browser_env_var_skips_webbrowser_open(monkeypatch):
     navegador del SO. La variable ``ORION_NO_BROWSER`` lo desactiva.
     Verificamos que main() respeta el flag — sin llegar a arrancar uvicorn.
     """
-    import main
+    import orion.__main__ as main
 
     monkeypatch.setenv("ORION_NO_BROWSER", "1")
 
@@ -108,7 +108,7 @@ def test_no_browser_env_var_skips_webbrowser_open(monkeypatch):
 
 def test_browser_opens_by_default(monkeypatch):
     monkeypatch.delenv("ORION_NO_BROWSER", raising=False)
-    import main
+    import orion.__main__ as main
 
     with (
         patch.object(main, "_spawn_orion_live"),
@@ -122,7 +122,7 @@ def test_browser_opens_by_default(monkeypatch):
 
 # ── Bus es un player completo (cross-check con el contrato) ─────────────
 def test_event_bus_can_be_player_for_actions():
-    from server.event_bus import OrionEventBus
+    from orion.server.event_bus import OrionEventBus
 
     bus = OrionEventBus()
     for name in (

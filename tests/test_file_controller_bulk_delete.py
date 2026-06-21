@@ -30,7 +30,7 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-import actions.file_controller as fc
+import orion.actions.file_controller as fc
 
 # ── Helpers ─────────────────────────────────────────────────────────────
 
@@ -358,8 +358,8 @@ def test_dispatcher_routes_delete_empty_folders(sandbox, trash_spy):
 
 
 def test_registry_advertises_bulk_delete_actions():
-    from core.tool_registry import ToolRegistry
-    from core.tools_bootstrap import register_builtin_tools
+    from orion.core.tool_registry import ToolRegistry
+    from orion.core.tools_bootstrap import register_builtin_tools
 
     ToolRegistry._reset()
     register_builtin_tools()

@@ -18,7 +18,7 @@ optional-dependencies = { dev = { file = ["requirements-dev.txt"] } }
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["actions*", "agent*", "core*", "config*", "memory*", "plugins*", "server*", "utils*"]
+include = ["orion*"]
 exclude = ["tests*", "web*", "tools*", "arduino*", "wokwi*", "packaging*", "scripts*", "src-tauri*", "docs*", "uploads*", "logs*", "skills*"]
 
 # ─────────────────────────────────────────────────────────────────────────
@@ -92,11 +92,11 @@ ignore = [
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["B", "SIM", "F401", "F841"]  # tests pueden ser desordenados
-"main.py"  = ["E402"]                       # los hacks de PATH/UTF-8 fuerzan imports tardíos
+"orion/__main__.py" = ["E402"]              # los hacks de PATH/UTF-8 fuerzan imports tardíos
 "**/__init__.py" = ["F401"]                 # re-exports OK
 
 [tool.ruff.lint.isort]
-known-first-party = ["actions", "agent", "core", "config", "memory", "plugins", "server", "utils"]
+known-first-party = ["orion"]
 
 [tool.ruff.format]
 quote-style = "double"
@@ -133,13 +133,13 @@ exclude = [
 # quede 100% anotado, mover a la lista "fully_typed" de abajo.
 [[tool.mypy.overrides]]
 module = [
-    "core.logger",
-    "core.tool_registry",
-    "core.llm.base",
-    "server.app",
-    "server.event_bus",
-    "server.sharing",
-    "server.telemetry",
+    "orion.core.logger",
+    "orion.core.tool_registry",
+    "orion.core.llm.base",
+    "orion.server.app",
+    "orion.server.event_bus",
+    "orion.server.sharing",
+    "orion.server.telemetry",
 ]
 check_untyped_defs = true
 warn_return_any = false

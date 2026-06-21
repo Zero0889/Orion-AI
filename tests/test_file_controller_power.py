@@ -25,7 +25,7 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-import actions.file_controller as fc
+import orion.actions.file_controller as fc
 
 # ── Helper: tree builder ───────────────────────────────────────────────
 
@@ -222,8 +222,8 @@ def test_dispatcher_passes_largest_filters(sandbox):
 def test_registry_advertises_new_actions():
     """tools_bootstrap declara las nuevas actions en el schema para
     Gemini y el planner."""
-    from core.tool_registry import ToolRegistry
-    from core.tools_bootstrap import register_builtin_tools
+    from orion.core.tool_registry import ToolRegistry
+    from orion.core.tools_bootstrap import register_builtin_tools
 
     ToolRegistry._reset()
     register_builtin_tools()

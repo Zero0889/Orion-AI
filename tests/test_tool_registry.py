@@ -27,8 +27,8 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from core.tool_registry import ToolDeclaration, ToolRegistry
-from core.tools_bootstrap import register_builtin_tools
+from orion.core.tool_registry import ToolDeclaration, ToolRegistry
+from orion.core.tools_bootstrap import register_builtin_tools
 
 # Tools CORE que el sistema necesita para arrancar — si alguna desaparece,
 # es un bug grave. NO es la lista completa: pueden haber nuevas tools
@@ -145,7 +145,7 @@ def test_call_sync_dispatches_to_handler(fresh_registry):
         assert player is sentinel
         return "MOCKED-OK"
 
-    with patch("actions.open_app.open_app", fake_open_app):
+    with patch("orion.actions.open_app.open_app", fake_open_app):
         result = fresh_registry.call_sync(
             "open_app",
             {"app_name": "Notepad"},
@@ -164,7 +164,7 @@ def test_call_sync_passes_speak_when_declared(fresh_registry):
         assert speak is speak_mock
         return "CODE-OK"
 
-    with patch("actions.code_helper.code_helper", fake_code):
+    with patch("orion.actions.code_helper.code_helper", fake_code):
         result = fresh_registry.call_sync(
             "code_helper",
             {"action": "write", "description": "x"},
@@ -181,7 +181,7 @@ def test_call_sync_omits_speak_when_not_declared(fresh_registry):
         assert "speak" not in kwargs, f"speak no debería pasarse: {kwargs}"
         return "OK"
 
-    with patch("actions.open_app.open_app", fake_open_app):
+    with patch("orion.actions.open_app.open_app", fake_open_app):
         fresh_registry.call_sync(
             "open_app",
             {"app_name": "X"},
@@ -198,7 +198,7 @@ def test_call_sync_injects_current_file(fresh_registry):
         captured["params"] = parameters
         return "FP-OK"
 
-    with patch("actions.file_processor.file_processor", fake_fp):
+    with patch("orion.actions.file_processor.file_processor", fake_fp):
         fresh_registry.call_sync(
             "file_processor",
             {"action": "summarize"},
@@ -215,7 +215,7 @@ def test_call_sync_respects_explicit_file_path(fresh_registry):
         captured["params"] = parameters
         return "FP-OK"
 
-    with patch("actions.file_processor.file_processor", fake_fp):
+    with patch("orion.actions.file_processor.file_processor", fake_fp):
         fresh_registry.call_sync(
             "file_processor",
             {"action": "summarize", "file_path": r"C:\explicit.pdf"},

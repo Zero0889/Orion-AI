@@ -35,9 +35,9 @@ if str(PROJECT_ROOT) not in sys.path:
 @pytest.fixture
 def isolated_data(tmp_path, monkeypatch):
     """Apunta los paths de memoria/notas/convs a tmp_path con datos seed."""
-    import memory.conversations as cv
-    import memory.memory_manager as mm
-    import memory.quick_notes as qn
+    import orion.domain.memory.conversations as cv
+    import orion.domain.memory.memory_manager as mm
+    import orion.domain.memory.quick_notes as qn
 
     mem_file = tmp_path / "long_term.json"
     mem_file.write_text(
@@ -109,8 +109,8 @@ def isolated_data(tmp_path, monkeypatch):
 @pytest.fixture
 def client(isolated_data):
     """TestClient con app + bus reales, datos en tmp_path."""
-    from server.app import build_app
-    from server.event_bus import OrionEventBus
+    from orion.server.app import build_app
+    from orion.server.event_bus import OrionEventBus
 
     bus = OrionEventBus()
     app = build_app(bus)

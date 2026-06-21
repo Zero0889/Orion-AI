@@ -28,8 +28,8 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from fastapi.testclient import TestClient
 
-import server.routes.mcp as mcp_route
-from server.routes.mcp import _normalize_package, _normalize_server
+import orion.server.routes.mcp as mcp_route
+from orion.server.routes.mcp import _normalize_package, _normalize_server
 
 # ── Unit tests de _normalize_package ────────────────────────────────────
 
@@ -238,8 +238,8 @@ def client(monkeypatch, tmp_path, clear_cache):
     mgr.servers.return_value = {}
     monkeypatch.setattr(mcp_route, "get_mcp_manager", lambda: mgr)
 
-    from server.app import build_app
-    from server.event_bus import OrionEventBus
+    from orion.server.app import build_app
+    from orion.server.event_bus import OrionEventBus
 
     bus = OrionEventBus()
     app = build_app(bus)
@@ -280,7 +280,9 @@ def test_registry_search_returns_normalized_servers(client):
         ],
         "metadata": {"nextCursor": "abc", "count": 1},
     }
-    with patch("server.routes.mcp.urllib.request.urlopen", return_value=_mock_urlopen(payload)):
+    with patch(
+        "orion.server.routes.mcp.urllib.request.urlopen", return_value=_mock_urlopen(payload)
+    ):
         r = client.get("/api/mcp/registry/search?q=fs&limit=10")
     assert r.status_code == 200
     data = r.json()
@@ -298,7 +300,7 @@ def test_registry_search_passes_query_to_upstream(client):
         captured["url"] = req.get_full_url()
         return _mock_urlopen({"servers": [], "metadata": {}})
 
-    with patch("server.routes.mcp.urllib.request.urlopen", fake_urlopen):
+    with patch("orion.server.routes.mcp.urllib.request.urlopen", fake_urlopen):
         r = client.get("/api/mcp/registry/search?q=github&limit=5")
     assert r.status_code == 200
     assert "search=github" in captured["url"]
@@ -308,7 +310,7 @@ def test_registry_search_passes_query_to_upstream(client):
 def test_registry_search_uses_cache(client):
     payload = {"servers": [], "metadata": {"count": 0}}
     with patch(
-        "server.routes.mcp.urllib.request.urlopen", return_value=_mock_urlopen(payload)
+        "orion.server.routes.mcp.urllib.request.urlopen", return_value=_mock_urlopen(payload)
     ) as m:
         client.get("/api/mcp/registry/search?q=cached")
         client.get("/api/mcp/registry/search?q=cached")
@@ -321,7 +323,7 @@ def test_registry_search_graceful_when_upstream_down(client):
     def fail(*a, **kw):
         raise urllib.error.URLError("connection refused")
 
-    with patch("server.routes.mcp.urllib.request.urlopen", side_effect=fail):
+    with patch("orion.server.routes.mcp.urllib.request.urlopen", side_effect=fail):
         r = client.get("/api/mcp/registry/search?q=anything")
     assert r.status_code == 502
     assert "no disponible" in r.json()["detail"].lower() or "refused" in r.json()["detail"].lower()
@@ -332,6 +334,6 @@ def test_registry_search_graceful_on_invalid_json(client):
     response.read.return_value = b"<html>not json</html>"
     response.__enter__ = MagicMock(return_value=response)
     response.__exit__ = MagicMock(return_value=False)
-    with patch("server.routes.mcp.urllib.request.urlopen", return_value=response):
+    with patch("orion.server.routes.mcp.urllib.request.urlopen", return_value=response):
         r = client.get("/api/mcp/registry/search?q=x")
     assert r.status_code == 502

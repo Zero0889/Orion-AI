@@ -25,9 +25,9 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from fastapi.testclient import TestClient
 
-import server.routes.mcp as mcp_route
-from core.mcp_recipes import RECIPES, get_recipe, list_recipes
-from server.routes.mcp import _fetch_github_stars, _parse_github_repo
+import orion.server.routes.mcp as mcp_route
+from orion.core.mcp_recipes import RECIPES, get_recipe, list_recipes
+from orion.server.routes.mcp import _fetch_github_stars, _parse_github_repo
 
 # ── Catálogo ────────────────────────────────────────────────────────────
 
@@ -93,8 +93,8 @@ def client(monkeypatch, tmp_path):
     mcp_route._GH_STAR_CACHE.clear()
     mcp_route._REGISTRY_CACHE.clear()
 
-    from server.app import build_app
-    from server.event_bus import OrionEventBus
+    from orion.server.app import build_app
+    from orion.server.event_bus import OrionEventBus
 
     bus = OrionEventBus()
     app = build_app(bus)
@@ -157,7 +157,7 @@ def _mock_urlopen_json(payload: dict):
 def test_fetch_stars_returns_count():
     mcp_route._GH_STAR_CACHE.clear()
     with patch(
-        "server.routes.mcp.urllib.request.urlopen",
+        "orion.server.routes.mcp.urllib.request.urlopen",
         return_value=_mock_urlopen_json({"stargazers_count": 1234}),
     ):
         stars = _fetch_github_stars("https://github.com/foo/bar")
@@ -167,7 +167,7 @@ def test_fetch_stars_returns_count():
 def test_fetch_stars_returns_none_on_network_error():
     mcp_route._GH_STAR_CACHE.clear()
     with patch(
-        "server.routes.mcp.urllib.request.urlopen",
+        "orion.server.routes.mcp.urllib.request.urlopen",
         side_effect=urllib.error.URLError("rate limited"),
     ):
         stars = _fetch_github_stars("https://github.com/foo/bar")
@@ -177,7 +177,7 @@ def test_fetch_stars_returns_none_on_network_error():
 def test_fetch_stars_caches_positive_and_negative(client):
     mcp_route._GH_STAR_CACHE.clear()
     with patch(
-        "server.routes.mcp.urllib.request.urlopen", side_effect=urllib.error.URLError("err")
+        "orion.server.routes.mcp.urllib.request.urlopen", side_effect=urllib.error.URLError("err")
     ) as m:
         _fetch_github_stars("https://github.com/foo/bar")
         _fetch_github_stars("https://github.com/foo/bar")
@@ -189,7 +189,7 @@ def test_fetch_stars_caches_positive_and_negative(client):
 def test_fetch_stars_returns_none_for_non_github_url():
     mcp_route._GH_STAR_CACHE.clear()
     # No debe pegarle a GitHub si la URL es de otro lado
-    with patch("server.routes.mcp.urllib.request.urlopen") as m:
+    with patch("orion.server.routes.mcp.urllib.request.urlopen") as m:
         stars = _fetch_github_stars("https://gitlab.com/foo/bar")
     assert stars is None
     assert m.call_count == 0
@@ -200,7 +200,7 @@ def test_fetch_stars_returns_none_for_non_github_url():
 
 def test_endpoint_stars_returns_count(client):
     with patch(
-        "server.routes.mcp.urllib.request.urlopen",
+        "orion.server.routes.mcp.urllib.request.urlopen",
         return_value=_mock_urlopen_json({"stargazers_count": 999}),
     ):
         r = client.get("/api/mcp/registry/stars?repo_url=https://github.com/foo/bar")
@@ -210,7 +210,8 @@ def test_endpoint_stars_returns_count(client):
 
 def test_endpoint_stars_returns_null_when_unreachable(client):
     with patch(
-        "server.routes.mcp.urllib.request.urlopen", side_effect=urllib.error.URLError("offline")
+        "orion.server.routes.mcp.urllib.request.urlopen",
+        side_effect=urllib.error.URLError("offline"),
     ):
         r = client.get("/api/mcp/registry/stars?repo_url=https://github.com/foo/bar")
     assert r.status_code == 200

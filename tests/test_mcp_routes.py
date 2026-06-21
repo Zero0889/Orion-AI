@@ -44,12 +44,12 @@ def fake_manager(monkeypatch):
     mgr.start_all.return_value = 0
     mgr.reload_all.return_value = 0
     mgr.restart_server.return_value = 0
-    import core.mcp_client as mcp_mod
+    import orion.core.mcp_client as mcp_mod
 
     monkeypatch.setattr(mcp_mod, "_GLOBAL_MANAGER", mgr)
     monkeypatch.setattr(mcp_mod, "get_mcp_manager", lambda: mgr)
     # También parcheamos el import directo en la route
-    import server.routes.mcp as mcp_route
+    import orion.server.routes.mcp as mcp_route
 
     monkeypatch.setattr(mcp_route, "get_mcp_manager", lambda: mgr)
     return mgr
@@ -60,7 +60,7 @@ def isolated_config(monkeypatch, tmp_path):
     """Redirige MCP_CONFIG_PATH al tmp_path para que los POST no tocan
     el archivo real."""
     fake_path = tmp_path / "mcp_servers.json"
-    import server.routes.mcp as mcp_route
+    import orion.server.routes.mcp as mcp_route
 
     monkeypatch.setattr(mcp_route, "MCP_CONFIG_PATH", fake_path)
     return fake_path
@@ -69,8 +69,8 @@ def isolated_config(monkeypatch, tmp_path):
 @pytest.fixture
 def client(fake_manager, isolated_config):
     """TestClient con app real, manager y config mockeados."""
-    from server.app import build_app
-    from server.event_bus import OrionEventBus
+    from orion.server.app import build_app
+    from orion.server.event_bus import OrionEventBus
 
     bus = OrionEventBus()
     app = build_app(bus)

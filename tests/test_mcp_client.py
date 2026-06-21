@@ -31,7 +31,7 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from core.mcp_client import (
+from orion.core.mcp_client import (
     MCPManager,
     MCPServer,
     MCPServerConfig,
@@ -40,7 +40,7 @@ from core.mcp_client import (
     _make_tool_name,
     load_servers_config,
 )
-from core.tool_registry import ToolRegistry
+from orion.core.tool_registry import ToolRegistry
 
 FAKE_SERVER = PROJECT_ROOT / "tests" / "fixtures" / "fake_mcp_server.py"
 
@@ -344,7 +344,7 @@ def test_manager_skips_failed_server_and_continues(tmp_path, clean_registry):
 def test_manager_tool_appears_in_planner_text(tmp_path, clean_registry):
     """Las tools MCP llevan include_in_planner=True por default,
     así que el planner las ve."""
-    from core.tools_bootstrap import register_builtin_tools
+    from orion.core.tools_bootstrap import register_builtin_tools
 
     register_builtin_tools()
 

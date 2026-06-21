@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import logging
 
-from core.logger import _SecretFilter
+from orion.core.logger import _SecretFilter
 
 
 def _apply(msg: str, *args) -> str:

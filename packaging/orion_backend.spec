@@ -40,12 +40,14 @@ ROOT = Path(SPECPATH).parent.resolve()  # noqa: F821 (SPECPATH lo inyecta PyInst
 
 # ── Hidden imports ──────────────────────────────────────────────────────
 # Submódulos cargados dinámicamente (importlib) o que PyInstaller no
-# detecta por análisis estático.
+# detecta por análisis estático. Post Fase 2: todo bajo orion/.
 hidden = []
 for pkg in (
-    "server", "server.routes",
-    "actions", "actions.iot", "actions.iot.transports",
-    "agent", "memory", "plugins", "core", "config", "utils", "tools",
+    "orion",
+    "orion.server", "orion.server.routes",
+    "orion.actions", "orion.actions.iot", "orion.actions.iot.transports",
+    "orion.agent", "orion.domain.memory", "orion.plugins", "orion.core",
+    "orion.config", "orion.utils", "orion.storage",
 ):
     hidden += collect_submodules(pkg)
 
@@ -54,17 +56,20 @@ hidden += collect_submodules("google.genai")
 hidden += collect_submodules("google.api_core")
 
 # ── Data files ──────────────────────────────────────────────────────────
+# Las rutas-destino dentro del bundle conservan la estructura post Fase 2
+# (orion/core/ y orion/plugins/) para que get_resources_dir() las resuelva
+# con el mismo path que en dev.
 datas = [
     # Prompt del sistema
-    (str(ROOT / "core" / "prompt.txt"),         "core"),
+    (str(ROOT / "orion" / "core" / "prompt.txt"),     "orion/core"),
     # Frontend compilado
-    (str(ROOT / "web" / "dist"),                "web/dist"),
-    # Configs por defecto (templates — el usuario los completa)
+    (str(ROOT / "web" / "dist"),                      "web/dist"),
+    # Configs por defecto (templates — el usuario los completa).
+    # `config/` queda en root, no bajo orion/ (es data, no código).
     (str(ROOT / "config" / "api_keys.example.json"),  "config"),
     (str(ROOT / "config" / "iot_config.json"),        "config"),
     (str(ROOT / "config" / "browser.json"),           "config"),
     (str(ROOT / "config" / "hotkeys.json"),           "config"),
-    (str(ROOT / "config" / "theme.json"),             "config"),
     # Nota Fase 7: el asset github-logo.png se movió a web/public/ y va
     # dentro del bundle del frontend (web/dist/).
 ]
@@ -85,7 +90,7 @@ excludes = [
 
 # ── Analysis ────────────────────────────────────────────────────────────
 a = Analysis(  # noqa: F821
-    [str(ROOT / "main.py")],
+    [str(ROOT / "orion" / "__main__.py")],
     pathex=[str(ROOT)],
     binaries=[],
     datas=datas,

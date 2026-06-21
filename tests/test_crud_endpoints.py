@@ -27,9 +27,9 @@ if str(PROJECT_ROOT) not in sys.path:
 
 @pytest.fixture
 def isolated(tmp_path, monkeypatch):
-    import memory.conversations as cv
-    import memory.memory_manager as mm
-    import memory.quick_notes as qn
+    import orion.domain.memory.conversations as cv
+    import orion.domain.memory.memory_manager as mm
+    import orion.domain.memory.quick_notes as qn
 
     mem_file = tmp_path / "long_term.json"
     mem_file.write_text(
@@ -64,7 +64,7 @@ def isolated(tmp_path, monkeypatch):
     monkeypatch.setattr(cv, "_CONVERSATIONS_PATH", convs_file)
 
     theme_file = tmp_path / "theme.json"
-    import config.theme as theme_mod
+    import orion.config.theme as theme_mod
 
     monkeypatch.setattr(theme_mod, "_THEME_CONFIG_PATH", theme_file)
 
@@ -73,8 +73,8 @@ def isolated(tmp_path, monkeypatch):
 
 @pytest.fixture
 def client(isolated):
-    from server.app import build_app
-    from server.event_bus import OrionEventBus
+    from orion.server.app import build_app
+    from orion.server.event_bus import OrionEventBus
 
     bus = OrionEventBus()
     app = build_app(bus)

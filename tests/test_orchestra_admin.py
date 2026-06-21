@@ -11,7 +11,7 @@ import json
 
 import pytest
 
-from agent import orchestra_admin
+from orion.agent import orchestra_admin
 
 
 @pytest.fixture
@@ -21,7 +21,7 @@ def tmp_agents(tmp_path, monkeypatch):
     path.write_text(json.dumps({"agents": {}}), encoding="utf-8")
     monkeypatch.setattr(orchestra_admin, "_AGENTS_PATH", path)
     # Cada test parte de cero — invalidamos el cache del registry también.
-    from agent import registry as reg_mod
+    from orion.agent import registry as reg_mod
 
     reg_mod.reset_cache()
     yield path
@@ -124,7 +124,7 @@ def test_delete_inexistente_devuelve_false(tmp_agents):
 
 
 def test_upsert_invalida_cache_del_registry(tmp_agents):
-    from agent import registry as reg_mod
+    from orion.agent import registry as reg_mod
 
     # Apuntamos el registry al mismo path temporal.
     monkey_path = tmp_agents

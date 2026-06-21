@@ -45,7 +45,7 @@ sys.modules.setdefault("sounddevice", MagicMock())
 # por esto. Solución: extender _SAFE_ROOTS con gettempdir() para tests.
 # Esto NO toca la prod — solo el módulo cargado en este proceso pytest.
 try:
-    from actions import file_controller as _fc
+    from orion.actions import file_controller as _fc
 
     _fc._SAFE_ROOTS = [*_fc._SAFE_ROOTS, Path(tempfile.gettempdir()).resolve()]
 except Exception:
@@ -85,7 +85,7 @@ def _isolated_sqlite_db(tmp_path, monkeypatch):
     JSON real del usuario al ``data/orion.sqlite`` real. Acá garantizamos
     que cada test parte de un DB vacío en tmp y no toca producción.
     """
-    from storage import override_db_path_for_tests
+    from orion.storage import override_db_path_for_tests
 
     db_path = tmp_path / "orion_test.sqlite"
     override_db_path_for_tests(db_path)
@@ -95,7 +95,7 @@ def _isolated_sqlite_db(tmp_path, monkeypatch):
     # el próximo `_init_if_needed()` arme schema contra el nuevo DB.
     _reset_helpers = []
     try:
-        from actions.notifications import store as _notif_store
+        from orion.actions.notifications import store as _notif_store
 
         monkeypatch.setattr(_notif_store, "_LEGACY_JSON_PATH", tmp_path / "no_notif.json")
         _notif_store._reset_for_tests()
@@ -104,7 +104,7 @@ def _isolated_sqlite_db(tmp_path, monkeypatch):
         pass
 
     try:
-        from memory import quick_notes as _qn
+        from orion.domain.memory import quick_notes as _qn
 
         monkeypatch.setattr(_qn, "_NOTES_PATH", tmp_path / "no_qn.json")
         _qn._reset_for_tests()
@@ -113,7 +113,7 @@ def _isolated_sqlite_db(tmp_path, monkeypatch):
         pass
 
     try:
-        from memory import conversations as _cv
+        from orion.domain.memory import conversations as _cv
 
         monkeypatch.setattr(_cv, "_CONVERSATIONS_PATH", tmp_path / "no_conv.json")
         _cv._reset_for_tests()
@@ -122,7 +122,7 @@ def _isolated_sqlite_db(tmp_path, monkeypatch):
         pass
 
     try:
-        from memory import memory_manager as _mm
+        from orion.domain.memory import memory_manager as _mm
 
         # memory_manager mira MEMORY_PATH del config — lo apuntamos a tmp.
         monkeypatch.setattr(_mm, "MEMORY_PATH", tmp_path / "no_long_term.json")

@@ -30,12 +30,12 @@ if str(PROJECT_ROOT) not in sys.path:
 @pytest.fixture
 def client(tmp_path, monkeypatch):
     # Apunta uploads a tmp_path (no contaminar el repo real)
-    import server.routes.files as files_route
+    import orion.server.routes.files as files_route
 
     monkeypatch.setattr(files_route, "UPLOADS_DIR", tmp_path / "uploads")
 
-    from server.app import build_app
-    from server.event_bus import OrionEventBus
+    from orion.server.app import build_app
+    from orion.server.event_bus import OrionEventBus
 
     bus = OrionEventBus()
     app = build_app(bus)
@@ -95,7 +95,7 @@ def test_upload_sanitizes_filename(client):
 
 def test_upload_size_cap_enforced(client, monkeypatch):
     """Forzamos un cap pequeño para no generar 50 MB en RAM."""
-    import server.routes.files as files_route
+    import orion.server.routes.files as files_route
 
     monkeypatch.setattr(files_route, "MAX_BYTES", 10)
 

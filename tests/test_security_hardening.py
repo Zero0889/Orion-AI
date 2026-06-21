@@ -22,7 +22,7 @@ import pytest
 
 def test_desktop_no_codegen_helpers():
     """Las funciones de codegen y ejecución deben haber sido eliminadas."""
-    from actions import desktop
+    from orion.actions import desktop
 
     assert not hasattr(desktop, "_execute_generated_code"), (
         "desktop._execute_generated_code re-aparece; la ejecución de "
@@ -34,7 +34,7 @@ def test_desktop_no_codegen_helpers():
 
 def test_desktop_module_has_no_exec_call():
     """El source de desktop.py no debe contener exec()/compile()/eval()."""
-    from actions import desktop
+    from orion.actions import desktop
 
     source = inspect.getsource(desktop)
     # Buscamos llamadas, no la palabra dentro de comments/docstrings
@@ -47,7 +47,7 @@ def test_desktop_module_has_no_exec_call():
 
 def test_desktop_task_action_returns_safe_message():
     """La rama action='task' ya no ejecuta nada — devuelve mensaje claro."""
-    from actions.desktop import desktop_control
+    from orion.actions.desktop import desktop_control
 
     out = desktop_control(parameters={"action": "task", "task": "borrá todo"})
     assert "ya no" in out.lower() or "no se ejecutan" in out.lower()
@@ -74,7 +74,7 @@ def test_desktop_task_action_returns_safe_message():
     ],
 )
 def test_open_app_sanitizer_rejects_metacharacters(malicious: str):
-    from actions.open_app import _safe_app_name
+    from orion.actions.open_app import _safe_app_name
 
     assert _safe_app_name(malicious) is False, (
         f"_safe_app_name dejó pasar input hostil: {malicious!r}"
@@ -94,14 +94,14 @@ def test_open_app_sanitizer_rejects_metacharacters(malicious: str):
     ],
 )
 def test_open_app_sanitizer_accepts_legit_names(legit: str):
-    from actions.open_app import _safe_app_name
+    from orion.actions.open_app import _safe_app_name
 
     assert _safe_app_name(legit) is True
 
 
 def test_open_app_no_shell_true_with_llm_input():
     """El source de _launch_windows no debe usar shell=True más."""
-    from actions import open_app
+    from orion.actions import open_app
 
     src = _strip_comments_and_strings(inspect.getsource(open_app._launch_windows))
     assert "shell=True" not in src, (
@@ -114,7 +114,7 @@ def test_open_app_no_shell_true_with_llm_input():
 
 
 def test_dev_agent_vscode_no_shell_true():
-    from actions import dev_agent
+    from orion.actions import dev_agent
 
     src = _strip_comments_and_strings(inspect.getsource(dev_agent._open_vscode))
     assert "shell=True" not in src

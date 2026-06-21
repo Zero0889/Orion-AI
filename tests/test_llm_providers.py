@@ -19,8 +19,8 @@ from unittest.mock import patch
 
 import pytest
 
-from core.llm.base import LLMMessage
-from core.llm.openai_compat import OpenAICompatProvider
+from orion.core.llm.base import LLMMessage
+from orion.core.llm.openai_compat import OpenAICompatProvider
 
 # ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -60,7 +60,7 @@ def _openai_response(text: str = "hola") -> dict:
 def provider(monkeypatch):
     """Provider OpenRouter con key fake — no se hace red real."""
     monkeypatch.setenv("OPENROUTER_API_KEY", "sk-test")
-    from core.llm import base as base_mod
+    from orion.core.llm import base as base_mod
 
     base_mod.reset_config_cache()
     return OpenAICompatProvider("openrouter")
@@ -99,7 +99,7 @@ def test_complete_envia_payload_correcto(provider):
 
 def test_is_available_ollama_no_requiere_key(monkeypatch):
     monkeypatch.delenv("OLLAMA_API_KEY", raising=False)
-    from core.llm import base as base_mod
+    from orion.core.llm import base as base_mod
 
     base_mod.reset_config_cache()
     p = OpenAICompatProvider("ollama")
@@ -108,7 +108,7 @@ def test_is_available_ollama_no_requiere_key(monkeypatch):
 
 def test_is_available_openrouter_requiere_key(monkeypatch):
     monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
-    from core.llm import base as base_mod
+    from orion.core.llm import base as base_mod
 
     # Forzamos providers.json vacío para esta llamada.
     monkeypatch.setattr(base_mod, "_providers_file", lambda: {"openrouter": ""})
@@ -168,7 +168,7 @@ def test_4xx_no_reintentable_propaga_runtime(provider, monkeypatch):
 
 def test_provider_sin_credenciales_lanza_runtime(monkeypatch):
     monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
-    from core.llm import base as base_mod
+    from orion.core.llm import base as base_mod
 
     monkeypatch.setattr(base_mod, "_providers_file", lambda: {"openrouter": ""})
     p = OpenAICompatProvider("openrouter")

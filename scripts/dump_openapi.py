@@ -23,8 +23,8 @@ _REPO_ROOT = Path(__file__).resolve().parent.parent
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
-from server.app import build_app
-from server.event_bus import OrionEventBus
+from orion.server.app import build_app
+from orion.server.event_bus import OrionEventBus
 
 OUTPUT_PATH = _REPO_ROOT / "web" / "src" / "api" / "openapi.json"
 

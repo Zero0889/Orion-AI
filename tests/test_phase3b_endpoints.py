@@ -36,10 +36,10 @@ if str(PROJECT_ROOT) not in sys.path:
 @pytest.fixture
 def isolated(tmp_path, monkeypatch):
     """Aisla TODOS los JSONs que pueden mutarse, incluido api_keys."""
-    import config as cfg_pkg
-    import memory.conversations as cv
-    import memory.memory_manager as mm
-    import memory.quick_notes as qn
+    import orion.config as cfg_pkg
+    import orion.domain.memory.conversations as cv
+    import orion.domain.memory.memory_manager as mm
+    import orion.domain.memory.quick_notes as qn
 
     monkeypatch.setattr(mm, "MEMORY_PATH", tmp_path / "long_term.json")
     monkeypatch.setattr(qn, "_NOTES_PATH", tmp_path / "quick_notes.json")
@@ -48,7 +48,7 @@ def isolated(tmp_path, monkeypatch):
     api_path = tmp_path / "api_keys.json"
     monkeypatch.setattr(cfg_pkg, "API_CONFIG_PATH", api_path)
     # Las rutas de settings importaron API_CONFIG_PATH por nombre; refrescar.
-    import server.routes.settings as settings_route
+    import orion.server.routes.settings as settings_route
 
     monkeypatch.setattr(settings_route, "API_CONFIG_PATH", api_path)
     monkeypatch.delenv("ORION_GEMINI_KEY", raising=False)
@@ -58,8 +58,8 @@ def isolated(tmp_path, monkeypatch):
 
 @pytest.fixture
 def client(isolated):
-    from server.app import build_app
-    from server.event_bus import OrionEventBus
+    from orion.server.app import build_app
+    from orion.server.event_bus import OrionEventBus
 
     bus = OrionEventBus()
     app = build_app(bus)
@@ -79,7 +79,7 @@ class _FakeDevice:
         self.id = dev_id
         self.name = name
         self.transport = transport
-        from actions.iot.devices import Capabilities
+        from orion.actions.iot.devices import Capabilities
 
         self.capabilities = Capabilities.from_dict(caps)
         # Campos opcionales que GET /api/iot/devices serializa para el
@@ -120,7 +120,7 @@ class _FakeIoTSystem:
 @pytest.fixture
 def iot_mock(monkeypatch):
     fake = _FakeIoTSystem()
-    import server.routes.iot as iot_route
+    import orion.server.routes.iot as iot_route
 
     monkeypatch.setattr(iot_route, "get_system", lambda: fake)
     # iot_control mockeado para no llamar al hardware real
@@ -234,7 +234,7 @@ def test_api_key_publishes_system_ready(client):
 def test_telemetry_event_arrives(client):
     """Con TICK_INTERVAL_S=2 el primer evento llega a los ~2s. Lo
     aceleramos parcheando el módulo."""
-    import server.telemetry as tel
+    import orion.server.telemetry as tel
 
     with patch.object(tel, "TICK_INTERVAL_S", 0.1):
         # Necesitamos rearrancar el broadcaster con el intervalo nuevo

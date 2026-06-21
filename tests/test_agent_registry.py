@@ -14,8 +14,8 @@ from unittest.mock import patch
 
 import pytest
 
-from agent import registry
-from core.llm.base import LLMResponse
+from orion.agent import registry
+from orion.core.llm.base import LLMResponse
 
 
 @pytest.fixture(autouse=True)
@@ -92,7 +92,7 @@ def test_ask_agent_usa_provider_y_modelo_del_agente():
     coder = registry.get_agent("coder")
     fake = _FakeProvider(coder.provider, text="print('hi')")
 
-    with patch("agent.registry.get_provider", return_value=fake):
+    with patch("orion.agent.registry.get_provider", return_value=fake):
         out = registry.ask_agent("coder", "escribe un print")
 
     assert out == "print('hi')"
@@ -117,7 +117,7 @@ def test_ask_agent_cae_a_fallback_si_primario_no_disponible():
             return fallback
         raise KeyError(name)
 
-    with patch("agent.registry.get_provider", side_effect=fake_get):
+    with patch("orion.agent.registry.get_provider", side_effect=fake_get):
         out = registry.ask_agent("coder", "escribe algo")
 
     assert out == "fallback-said-hi"
