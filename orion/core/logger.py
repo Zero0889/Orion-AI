@@ -29,6 +29,7 @@ from __future__ import annotations
 import logging
 import re
 import sys
+from collections.abc import MutableMapping
 from logging.handlers import RotatingFileHandler
 from typing import Any
 
@@ -97,10 +98,17 @@ class _SecretFilter(logging.Filter):
 
 
 # ── structlog processor: inyectar correlation-id ────────────────────────
-def _add_correlation_id(_logger, _method_name, event_dict: dict) -> dict:
+def _add_correlation_id(
+    _logger: Any,
+    _method_name: str,
+    event_dict: MutableMapping[str, Any],
+) -> MutableMapping[str, Any]:
     """Añade ``corr_id`` al event_dict si hay uno en el ContextVar.
 
     Default `"-"` se omite para no ensuciar logs fuera de requests.
+
+    La firma respeta el ``Processor`` protocol de structlog (mypy lo
+    valida vía el `list-item` de la lista `processors=`).
     """
     cid = get_correlation_id()
     if cid and cid != "-":
