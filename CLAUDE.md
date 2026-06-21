@@ -86,6 +86,49 @@ ok, mypy ok, CI verde en los 8 jobs (run [27909820247](https://github.com/Zero08
 > NO era la Fase 2 del plan del audit. Ese trabajo está en el historial
 > (commits previos a `21fda71`) y los warnings siguen apagados.
 
+### ✅ Fase 3 — Modularización Python (cerrada, CI verde)
+
+Los 5 sub-items del audit cerrados:
+
+| Sub-item | Commit | Notas |
+|---|---|---|
+| **R4** — decoradores `@tool` + auto-discover | (anterior, era "3A") | `core/tools_bootstrap.py` 1209→170 LOC |
+| **R3** — splittear `main.py` | `3310cb0` | 1245 LOC → 6 archivos (max 455) usando mixins |
+| **R5** — `actions/` → `adapters/` por dominio | `fa72186` | 4 dominios: system / google / web / iot |
+| **services/** entre routes y domain | `26959c0` | POC: 3 routes (notes, memory, conversations) + 5 helpers |
+| **structlog + correlation-id** | `11f045c` + `ff1fc84` | Bridge stdlib + `corr_id` por request |
+
+#### R3 — split `orion/__main__.py`
+- `__main__.py`: 1245 → 24 LOC (thin entry `from .bootstrap import main`).
+- `bootstrap.py` (170): UTF-8 fix + PATH + main() + uvicorn + spawn.
+- `runtime.py` (455): `OrionLive(LiveSessionMixin, AudioMixin)`.
+- `audio.py` (269): `AudioMixin` (send/listen/receive/play loops).
+- `live_session.py` (375): `LiveSessionMixin` (config + handlers + watchdog).
+- `_helpers.py` (94): helpers puros (`load_prompt`, `clean_transcript`).
+- Patrón: cada mixin lee `self.<attr>` que setea `OrionLive.__init__`.
+
+#### R5 — `actions/` → `adapters/` por dominio
+- `orion/adapters/system/` — 16 archivos (host PC: files, processes, screen, dev tooling, GOG, electronics).
+- `orion/adapters/google/` — 4 (classroom, drive, notebooklm, notifications/).
+- `orion/adapters/web/` — 5 (browser, search, youtube, flights, weather).
+- `orion/adapters/iot/` — subpaquete entero (devices/scenes/sensors/transports).
+- `auto_discover_tools("orion.adapters")` walking recursivo (pkgutil.walk_packages) — descubre todo sin cambios al registry.
+
+#### services/ POC
+- `orion/services/{notes,memory,conversations}_service.py` + `_bus_publisher.py` helper compartido.
+- Routes thin: parse Pydantic → `Depends(_service)` → call → map errors a `HTTPException`.
+- Excepciones tipadas (`NoteNotFound`, `InvalidCategory`, etc.) — la route hace mapping 1:1 a HTTP codes.
+- Las 10 routes pesadas restantes (iot/mcp/agent/skills/notebooklm/circuit/files/settings/integrations/notifications) siguen el patrón clásico — migrar incrementalmente cuando se toquen.
+
+#### structlog + correlation-id
+- `orion/core/correlation.py`: `ContextVar` `_correlation_id` (default `"-"`).
+- `orion/core/logger.py` reescrito: `structlog.stdlib.BoundLogger` bridge — `log.info("event", k=v)` funciona, también `log.info("Hi %s", x)` printf classic.
+- Processor chain: filter_by_level → positional formatter → `_add_correlation_id` → exc_info → `KeyValueRenderer`.
+- `_SecretFilter` (Fase 1) sigue activo a nivel handler stdlib.
+- Middleware en `server/app.py`: lee `X-Request-Id` inbound o genera UUID8, lo setea en el ContextVar, echo back en response header.
+- Output format: `[orion.x] INFO: event='msg' corr_id='ab12' user='zahir'`.
+- Para reconstruir un request: `grep corr_id=ab12cd34 logs/orion.log`.
+
 ### ✅ Fase 3A — Decoradores `@tool` (cerrado, CI verde)
 - Nuevo: `core/tool_registry.py` con decoradores `@tool` y `@live_only_tool` + `auto_discover_tools("actions")`.
 - 23 tools migradas: la declaración (schema + flags) vive **junto a su handler** en `actions/*.py`. Agregar una tool nueva ahora es **tocar 1 archivo** en lugar de 3.
