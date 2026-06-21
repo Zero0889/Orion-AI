@@ -1,6 +1,5 @@
-"""
-server.routes.notes — Notas rápidas (CRUD en Fase 3)
-=====================================================
+"""server.routes.notes — Notas rápidas (CRUD).
+
 Endpoints:
   GET    /api/notes              → lista completa
   GET    /api/notes/count        → cuántas
@@ -8,25 +7,22 @@ Endpoints:
   PATCH  /api/notes/{id}         → actualiza {text?, pinned?, color?}
   DELETE /api/notes/{id}         → borra
 
-Cada mutación publica ``note.changed`` en el bus para que la UI Qt y
-los clientes WS refresquen sin polling.
+La lógica (call al domain + publish ``note.changed``) vive en
+:class:`~orion.services.notes_service.NotesService`. Esta route quedó
+thin: parse Pydantic → call service → map errores a HTTPException.
 """
 
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 
-from orion.core.logger import get_logger
-from orion.domain.memory.quick_notes import (
-    add_note,
-    count_notes,
-    delete_note,
-    list_notes,
-    update_note,
+from orion.services.notes_service import (
+    NoteCreateFailed,
+    NoteNotFound,
+    NotesService,
 )
 
-log = get_logger("server.routes.notes")
 router = APIRouter()
 
 
@@ -42,56 +38,44 @@ class NoteUpdate(BaseModel):
     color: str | None = None
 
 
+def _service(request: Request) -> NotesService:
+    return NotesService(bus=getattr(request.app.state, "bus", None))
+
+
 @router.get("")
-def get_notes() -> list[dict]:
-    return list_notes()
+def get_notes(svc: NotesService = Depends(_service)) -> list[dict]:
+    return svc.list_all()
 
 
 @router.get("/count")
-def get_notes_count() -> dict:
-    return {"count": count_notes()}
+def get_notes_count(svc: NotesService = Depends(_service)) -> dict:
+    return {"count": svc.count()}
 
 
 @router.post("", status_code=201)
-def create_note(body: NoteCreate, request: Request) -> dict:
-    n = add_note(body.text, color=body.color)
-    if not n:
-        raise HTTPException(status_code=400, detail="Texto vacío")
-    if body.pinned and n.get("id"):
-        update_note(n["id"], pinned=True)
-        n["pinned"] = True
-    _publish_change(request, "created", note_id=n.get("id"))
-    return n
+def create_note(body: NoteCreate, svc: NotesService = Depends(_service)) -> dict:
+    try:
+        return svc.create(body.text, pinned=body.pinned, color=body.color)
+    except NoteCreateFailed as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
 
 
 @router.patch("/{note_id}")
-def patch_note(note_id: str, body: NoteUpdate, request: Request) -> dict:
-    ok = update_note(
-        note_id,
-        text=body.text,
-        color=body.color,
-        pinned=body.pinned,
-    )
-    if not ok:
-        raise HTTPException(status_code=404, detail=f"Nota '{note_id}' no encontrada")
-    _publish_change(request, "updated", note_id=note_id)
+def patch_note(
+    note_id: str,
+    body: NoteUpdate,
+    svc: NotesService = Depends(_service),
+) -> dict:
+    try:
+        svc.update(note_id, text=body.text, pinned=body.pinned, color=body.color)
+    except NoteNotFound as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
     return {"ok": True, "id": note_id}
 
 
 @router.delete("/{note_id}", status_code=204)
-def remove_note(note_id: str, request: Request) -> None:
-    ok = delete_note(note_id)
-    if not ok:
-        raise HTTPException(status_code=404, detail=f"Nota '{note_id}' no encontrada")
-    _publish_change(request, "deleted", note_id=note_id)
-
-
-# ── helpers ─────────────────────────────────────────────────────────────
-def _publish_change(request: Request, op: str, *, note_id: str | None) -> None:
-    bus = getattr(request.app.state, "bus", None)
-    if bus is None:
-        return
+def remove_note(note_id: str, svc: NotesService = Depends(_service)) -> None:
     try:
-        bus.publish("note.changed", {"op": op, "id": note_id})
-    except Exception as e:
-        log.debug("publish note.changed falló: %s", e)
+        svc.delete(note_id)
+    except NoteNotFound as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
