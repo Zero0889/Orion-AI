@@ -128,6 +128,26 @@ def build_app(bus: Any) -> FastAPI:
         allow_headers=["*"],
     )
 
+    # ── Correlation-ID middleware ─────────────────────────────────────────
+    # Setea ``orion.core.correlation`` por request. El logger structlog
+    # lo lee y lo inyecta como `corr_id=...` en cada log line — permite
+    # `grep corr_id=abc12345 logs/orion.log` para reconstruir un request.
+    #
+    # Si el cliente manda `X-Request-Id`, lo respetamos (útil cuando hay
+    # un reverse proxy/CDN que ya genera trace ids). Si no, generamos uno.
+    @app.middleware("http")
+    async def _correlation_middleware(request, call_next):
+        from orion.core.correlation import new_correlation_id, set_correlation_id
+
+        inbound = request.headers.get("X-Request-Id", "").strip()
+        cid = inbound if inbound else new_correlation_id()
+        if inbound:
+            set_correlation_id(inbound)
+        response = await call_next(request)
+        # Devolvemos el header para que el cliente pueda correlacionar.
+        response.headers["X-Request-Id"] = cid
+        return response
+
     # ── Sharing (filtra por IP en cada request) ──────────────────────────
     # Cargado desde config/sharing.json al arrancar; toggleable via API.
     from orion.server.sharing import init_state as init_sharing

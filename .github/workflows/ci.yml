@@ -44,7 +44,7 @@ jobs:
           # para correr los tests unitarios. Sólo lo mínimo.
           pip install \
             fastapi "uvicorn[standard]" python-multipart websockets \
-            requests beautifulsoup4 pillow numpy psutil \
+            requests beautifulsoup4 pillow numpy psutil structlog \
             google-genai google-auth google-auth-oauthlib google-api-python-client \
             pytest ruff mypy
 
@@ -134,7 +134,7 @@ jobs:
           pip install \
             fastapi "uvicorn[standard]" python-multipart websockets \
             requests google-genai google-auth google-auth-oauthlib google-api-python-client \
-            psutil
+            psutil structlog
 
       - name: Set up Node 22
         uses: actions/setup-node@v4

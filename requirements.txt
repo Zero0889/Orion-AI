@@ -32,6 +32,9 @@ uvicorn[standard]
 websockets
 python-multipart
 
+# ── Observabilidad (Fase 3): logs estructurados + correlation-id ──
+structlog
+
 # ── Eliminadas en Fase 7 (UI Qt deprecada): pyqt6, keyboard, matplotlib ──
 # Si necesitas reactivar el modo Qt (no soportado oficialmente desde la
 # Fase 7), restaura estas líneas y revisa el git log de migration/web-ui.
