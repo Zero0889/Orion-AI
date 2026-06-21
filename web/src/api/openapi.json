@@ -1285,7 +1285,6 @@
         ]
       },
       "get": {
-        "description": "Lista las conversaciones (resumidas, sin el cuerpo de mensajes).\n\n``list_conversations()`` ya devuelve metadata ligera con ``msg_count``;\naquí solo lo re-mapeamos a ``messages`` para que el frontend tenga\nun nombre más natural.",
         "operationId": "get_all_conversations_api_conversations_get",
         "responses": {
           "200": {

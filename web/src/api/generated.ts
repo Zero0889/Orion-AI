@@ -189,14 +189,7 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /**
-     * Get All Conversations
-     * @description Lista las conversaciones (resumidas, sin el cuerpo de mensajes).
-     *
-     *     ``list_conversations()`` ya devuelve metadata ligera con ``msg_count``;
-     *     aquí solo lo re-mapeamos a ``messages`` para que el frontend tenga
-     *     un nombre más natural.
-     */
+    /** Get All Conversations */
     get: operations["get_all_conversations_api_conversations_get"];
     put?: never;
     post?: never;
