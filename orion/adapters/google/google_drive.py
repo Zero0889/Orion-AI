@@ -118,7 +118,7 @@ def _resolve_local_upload(file_path: str) -> "Path | str":
     # Si solo tenemos un nombre (no una ruta), buscar en lugares comunes
     name = p.name if p.name else file_path
     try:
-        from orion.actions.file_controller import (
+        from orion.adapters.system.file_controller import (
             _format_disambiguation,
             _resolve_file,
             _resolve_path,
@@ -151,7 +151,7 @@ def _resolve_local_upload(file_path: str) -> "Path | str":
     if len(uniq) == 1:
         return uniq[0]
     if len(uniq) > 1:
-        from orion.actions.file_controller import _build_disambiguation
+        from orion.adapters.system.file_controller import _build_disambiguation
 
         return _format_disambiguation(
             _build_disambiguation(uniq),

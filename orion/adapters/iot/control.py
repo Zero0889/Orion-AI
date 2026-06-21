@@ -55,7 +55,7 @@ class IoTSystem:
     def __init__(self) -> None:
         self.cfg = load_config()
         # Arranca el datalogger (idempotente, también flushea cuando paused)
-        from orion.actions.iot import sensor_log, sheets_sync
+        from orion.adapters.iot import sensor_log, sheets_sync
 
         sensor_log.start()
         sheets_sync.auto_start()  # solo si hay un Sheet ya conectado
@@ -123,7 +123,7 @@ class IoTSystem:
                     val = raw_value.strip()
                     cache.update(d_id, val)
                     # Persistir al datalogger (buffer en memoria, flush 1/min)
-                    from orion.actions.iot import sensor_log
+                    from orion.adapters.iot import sensor_log
 
                     sensor_log.record(d_id, val)
                     from orion.server.event_bus import OrionEventBus

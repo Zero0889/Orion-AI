@@ -22,7 +22,7 @@ from __future__ import annotations
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
-from orion.actions import gog_auth
+from orion.adapters.system import gog_auth
 from orion.core.logger import get_logger
 from orion.server import safe_error_detail
 

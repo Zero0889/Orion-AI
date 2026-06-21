@@ -482,7 +482,7 @@ def _replay_decorated() -> None:
         reg.register(decl, handler)
 
 
-def auto_discover_tools(package: str = "orion.actions") -> int:
+def auto_discover_tools(package: str = "orion.adapters") -> int:
     """Importa todos los submódulos de ``package`` para que los
     decoradores ``@tool`` / ``@live_only_tool`` se disparen y registren
     sus tools.

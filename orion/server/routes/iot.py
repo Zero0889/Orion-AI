@@ -35,16 +35,16 @@ from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import Response
 from pydantic import BaseModel, Field
 
-from orion.actions.iot import get_system, iot_control, sensor_log, sheets_sync
-from orion.actions.iot.config import (
+from orion.adapters.iot import get_system, iot_control, sensor_log, sheets_sync
+from orion.adapters.iot.config import (
     IoTConfig,
     save_config,
     validate_device,
     validate_transport,
 )
-from orion.actions.iot.devices import Device
-from orion.actions.iot.scenes import list_scenes
-from orion.actions.iot.sensors import get_cache
+from orion.adapters.iot.devices import Device
+from orion.adapters.iot.scenes import list_scenes
+from orion.adapters.iot.sensors import get_cache
 from orion.core.logger import get_logger
 from orion.server import safe_error_detail
 
@@ -362,12 +362,12 @@ def disconnect_all(request: Request) -> dict:
     Útil cuando no querés que ORION conecte al COM o al broker al arrancar.
     Persiste el estado en :file:`config/iot_paused.flag` para que sobreviva
     al reinicio."""
-    from orion.actions.iot.transports import close_all
+    from orion.adapters.iot.transports import close_all
     from orion.config import IOT_CONFIG_PATH
 
     close_all()
     # Reset del singleton para que un futuro get_system() respete el flag.
-    import orion.actions.iot.control as _ctrl
+    import orion.adapters.iot.control as _ctrl
 
     with _ctrl._system_lock:
         _ctrl._system = None

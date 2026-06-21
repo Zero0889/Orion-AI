@@ -22,9 +22,9 @@ import time
 import unittest
 from pathlib import Path
 
-from orion.actions.iot.config import IoTConfig, _is_v1, _migrate_v1_to_v2, load_config
-from orion.actions.iot.devices import Capabilities, Device
-from orion.actions.iot.rules import (
+from orion.adapters.iot.config import IoTConfig, _is_v1, _migrate_v1_to_v2, load_config
+from orion.adapters.iot.devices import Capabilities, Device
+from orion.adapters.iot.rules import (
     detect_intent_local,
     find_device,
     normalize,
@@ -32,8 +32,8 @@ from orion.actions.iot.rules import (
     parse_duration,
     parse_percent,
 )
-from orion.actions.iot.scenes import execute_scene, find_scene, list_scenes
-from orion.actions.iot.sensors import SensorCache
+from orion.adapters.iot.scenes import execute_scene, find_scene, list_scenes
+from orion.adapters.iot.sensors import SensorCache
 
 # ── Fixtures ────────────────────────────────────────────────────────────────
 

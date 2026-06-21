@@ -18,7 +18,7 @@ import asyncio
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 
-from orion.actions.notifications import get_poller, get_store
+from orion.adapters.google.notifications import get_poller, get_store
 from orion.core.logger import get_logger
 
 log = get_logger("server.routes.notifications")
@@ -96,7 +96,7 @@ async def classroom_authorize() -> dict:
     el timeout. Mientras el OAuth corre, otros endpoints REST y el WS
     siguen respondiendo normalmente.
     """
-    from orion.actions.notifications.classroom import authorize_interactive
+    from orion.adapters.google.notifications.classroom import authorize_interactive
 
     loop = asyncio.get_running_loop()
     try:

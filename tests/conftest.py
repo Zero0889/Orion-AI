@@ -45,7 +45,7 @@ sys.modules.setdefault("sounddevice", MagicMock())
 # por esto. Solución: extender _SAFE_ROOTS con gettempdir() para tests.
 # Esto NO toca la prod — solo el módulo cargado en este proceso pytest.
 try:
-    from orion.actions import file_controller as _fc
+    from orion.adapters.system import file_controller as _fc
 
     _fc._SAFE_ROOTS = [*_fc._SAFE_ROOTS, Path(tempfile.gettempdir()).resolve()]
 except Exception:
@@ -95,7 +95,7 @@ def _isolated_sqlite_db(tmp_path, monkeypatch):
     # el próximo `_init_if_needed()` arme schema contra el nuevo DB.
     _reset_helpers = []
     try:
-        from orion.actions.notifications import store as _notif_store
+        from orion.adapters.google.notifications import store as _notif_store
 
         monkeypatch.setattr(_notif_store, "_LEGACY_JSON_PATH", tmp_path / "no_notif.json")
         _notif_store._reset_for_tests()

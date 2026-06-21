@@ -142,7 +142,7 @@ def _search_flights_browser(
 ) -> tuple[str, str]:
     import time
 
-    from orion.actions.browser_control import browser_control
+    from orion.adapters.web.browser_control import browser_control
 
     url = _build_google_flights_url(origin, destination, date, return_date, passengers, cabin)
 

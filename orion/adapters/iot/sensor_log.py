@@ -63,7 +63,7 @@ def _resolve_path() -> Path:
 def _resolve_unit(device_id: str) -> str:
     """Mira el config del IoT system para sacar la unidad."""
     try:
-        from orion.actions.iot import get_system
+        from orion.adapters.iot import get_system
 
         sys = get_system()
         dev = sys.cfg.devices.get(device_id)

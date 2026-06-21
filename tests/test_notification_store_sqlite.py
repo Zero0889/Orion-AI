@@ -19,12 +19,12 @@ from pathlib import Path
 
 import pytest
 
-from orion.actions.notifications.base import NotificationItem
+from orion.adapters.google.notifications.base import NotificationItem
 
 
 @pytest.fixture
 def store():
-    from orion.actions.notifications import store as store_mod
+    from orion.adapters.google.notifications import store as store_mod
 
     store_mod._reset_for_tests()
     return store_mod.NotificationStore()
@@ -143,7 +143,7 @@ def test_mark_all_read_by_source(store):
 
 def test_enforce_cap_drops_oldest(store, monkeypatch):
     """Forzamos un cap chico para verificar la lógica sin generar 1000 items."""
-    from orion.actions.notifications import store as store_mod
+    from orion.adapters.google.notifications import store as store_mod
 
     monkeypatch.setattr(store_mod, "_MAX_ITEMS", 3)
     store.add_many([_mk("a", ts=1.0), _mk("b", ts=2.0), _mk("c", ts=3.0)])
@@ -171,7 +171,7 @@ def test_legacy_json_import(tmp_path, monkeypatch):
     """Si el JSON legacy existe en su path canónico, el store lo
     importa una vez al instanciar y luego lo archiva como .bak.
     """
-    from orion.actions.notifications import store as store_mod
+    from orion.adapters.google.notifications import store as store_mod
 
     legacy = tmp_path / "notifications_store.json"
     legacy.write_text(
@@ -225,7 +225,7 @@ def test_legacy_json_import(tmp_path, monkeypatch):
 
 def test_legacy_json_import_skipped_when_table_has_data(tmp_path, monkeypatch):
     """Si la tabla ya tiene datos, NO re-importamos del JSON (idempotencia)."""
-    from orion.actions.notifications import store as store_mod
+    from orion.adapters.google.notifications import store as store_mod
 
     # Primer arranque sin legacy: insertamos algo a mano.
     store_mod._reset_for_tests()
@@ -265,7 +265,7 @@ def test_legacy_json_import_skipped_when_table_has_data(tmp_path, monkeypatch):
 
 def test_legacy_json_missing_is_noop(tmp_path, monkeypatch):
     """Sin JSON legacy en disco, init del store no crashea."""
-    from orion.actions.notifications import store as store_mod
+    from orion.adapters.google.notifications import store as store_mod
 
     monkeypatch.setattr(store_mod, "_LEGACY_JSON_PATH", Path(tmp_path) / "no_such_file.json")
     store_mod._reset_for_tests()

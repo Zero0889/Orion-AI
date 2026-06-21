@@ -79,7 +79,7 @@ class _FakeDevice:
         self.id = dev_id
         self.name = name
         self.transport = transport
-        from orion.actions.iot.devices import Capabilities
+        from orion.adapters.iot.devices import Capabilities
 
         self.capabilities = Capabilities.from_dict(caps)
         # Campos opcionales que GET /api/iot/devices serializa para el

@@ -191,7 +191,7 @@ def build_app(bus: Any) -> FastAPI:
 
     # ── Notification poller (Gmail + Classroom en background) ─────────────
     try:
-        from orion.actions.notifications import get_poller, start_poller
+        from orion.adapters.google.notifications import get_poller, start_poller
 
         get_poller().set_publish(bus.publish)
         start_poller()

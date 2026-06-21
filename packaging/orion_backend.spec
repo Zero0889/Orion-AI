@@ -45,7 +45,15 @@ hidden = []
 for pkg in (
     "orion",
     "orion.server", "orion.server.routes",
-    "orion.actions", "orion.actions.iot", "orion.actions.iot.transports",
+    # Adapters por dominio (Fase 3 R5): system / google / web / iot.
+    # `collect_submodules` es recursivo, así que listar el paquete padre
+    # también funcionaría; los listamos explícitos para que el bundle no
+    # arrastre por error subpkgs futuros que no queramos empacar.
+    "orion.adapters",
+    "orion.adapters.system",
+    "orion.adapters.google", "orion.adapters.google.notifications",
+    "orion.adapters.web",
+    "orion.adapters.iot", "orion.adapters.iot.transports",
     "orion.agent", "orion.domain.memory", "orion.plugins", "orion.core",
     "orion.config", "orion.utils", "orion.storage",
 ):

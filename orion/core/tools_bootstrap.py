@@ -46,7 +46,7 @@ def register_builtin_tools() -> None:
     # auto-registra al importarse.
     from orion.core.tool_registry import auto_discover_tools as _auto_discover_tools
 
-    _auto_discover_tools("orion.actions")
+    _auto_discover_tools("orion.adapters")
 
     # ── ask_user (handler explícito en core/, no en actions/) ───────
     # La validación de options es parte del contrato del tool y vive

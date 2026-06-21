@@ -98,7 +98,7 @@ async def from_image(req: FromImageRequest) -> dict[str, Any]:
         params["output_dir"] = req.output_dir
 
     def _run() -> str:
-        from orion.actions.circuit_from_image import circuit_from_image
+        from orion.adapters.system.circuit_from_image import circuit_from_image
 
         return circuit_from_image(params)
 
@@ -188,7 +188,7 @@ async def proteus_autodraw_route(req: ProteusAutodrawRequest) -> dict[str, Any]:
     }
 
     def _run() -> str:
-        from orion.actions.proteus_autodraw import proteus_autodraw
+        from orion.adapters.system.proteus_autodraw import proteus_autodraw
 
         return proteus_autodraw(params)
 
