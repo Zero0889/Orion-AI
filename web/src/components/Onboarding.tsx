@@ -11,7 +11,7 @@
  * pueden saltear y configurar despues desde Ajustes.
  */
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { api, type OnboardingStatus } from "@/api/rest";
 import { useOrionStore } from "@/stores/orion";
@@ -28,6 +28,16 @@ export function Onboarding() {
   const [status, setStatus] = useState<OnboardingStatus | null>(null);
   const [reachable, setReachable] = useState<boolean | null>(null);
   const [step, setStep] = useState<Step>(0);
+  // Flag explicito: el usuario llego al final del wizard y lo dismisseo.
+  // Hace falta porque no podemos depender solo de status.ready (la key
+  // puede haber estado seteada desde antes y entonces el modal nunca se
+  // mostraria).
+  const [dismissed, setDismissed] = useState(false);
+
+  // Auto-jump al paso 2 si el backend ya tiene API key cuando el wizard se
+  // monta (caso env var). Lo hacemos UNA SOLA VEZ via ref para no pisar al
+  // usuario que va avanzando manualmente.
+  const initialJumpDoneRef = useRef(false);
 
   // Poll del status del backend mientras el modal este montado.
   useEffect(() => {
@@ -40,10 +50,14 @@ export function Onboarding() {
         if (!alive) return;
         setStatus(s);
         setReachable(true);
-        if (s.ready && step < 2) {
-          // Si la key ya estaba (env var por ej.), saltamos al paso final.
+        if (s.ready && !initialJumpDoneRef.current) {
+          // Primera vez que detectamos ready=true: si la key venia ya
+          // configurada (env var), saltamos a Integraciones. Si el user
+          // la pego en el paso 1, este branch tambien dispara pero como
+          // GeminiStep ya hizo setStep(2), el setStep aca es idempotente.
+          initialJumpDoneRef.current = true;
           setConfigured(true);
-          setStep(2);
+          setStep((cur) => (cur < 2 ? 2 : cur));
         }
       } catch {
         if (!alive) return;
@@ -57,16 +71,13 @@ export function Onboarding() {
       alive = false;
       if (timer) clearTimeout(timer);
     };
-    // step intencionalmente NO en deps: el polling no debe reiniciarse al
-    // avanzar de paso. La rama `step < 2` solo afecta el primer ready.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [setConfigured]);
 
   // Modal cerrado si:
-  //   - aun no sabemos el status (primer fetch en curso), o
-  //   - el backend reporta ready Y ya estamos pasados del paso de Gemini.
+  //   - el usuario clickeo "Empezar a usar Orion" en el ultimo paso, o
+  //   - todavia no sabemos el status (primer fetch en curso).
+  if (dismissed) return null;
   if (!status) return null;
-  if (status.ready && step >= 3) return null;
 
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-bg/80 backdrop-blur-md animate-fade-in">
@@ -92,7 +103,7 @@ export function Onboarding() {
           <DoneStep
             onClose={() => {
               setConfigured(true);
-              setStep(3);
+              setDismissed(true);
             }}
           />
         )}
