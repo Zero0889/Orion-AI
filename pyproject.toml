@@ -152,15 +152,6 @@ disallow_untyped_defs = false   # subir a true cuando cada módulo esté anotado
 # disallow_untyped_defs = true
 # warn_return_any = true
 
-# Numpy 2.x usa sintaxis `type X = ...` (PEP 695) en sus stubs, que mypy
-# parsea aunque ignore_missing_imports=true. En CI Python 3.12 + numpy
-# 2.x esto rompe el job con "Type statement is only supported in Python
-# 3.12 and greater" — incluso siendo Python 3.12 — porque python_version
-# del config = "3.11". skip evita que mypy intente leer el stub.
-[[tool.mypy.overrides]]
-module = ["numpy", "numpy.*"]
-follow_imports = "skip"
-
 # ─────────────────────────────────────────────────────────────────────────
 # Pytest
 # ─────────────────────────────────────────────────────────────────────────
