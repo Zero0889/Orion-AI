@@ -107,6 +107,12 @@ export function Onboarding() {
             }}
           />
         )}
+        {/* Marca de version del wizard. Util cuando el .msi se reinstala
+            sobre una version vieja y queremos verificar a simple vista que
+            el bundle nuevo si cargo. */}
+        <div className="mt-4 text-center text-[9px] uppercase tracking-[0.18em] text-muted/60">
+          Wizard v0.1.1
+        </div>
       </div>
     </div>
   );

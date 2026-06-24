@@ -1,6 +1,6 @@
 [package]
 name = "orion"
-version = "0.1.0"
+version = "0.1.1"
 description = "O.R.I.O.N — asistente personal multimodal"
 authors = ["zahirpadilla92@gmail.com"]
 license = ""
