@@ -11,7 +11,7 @@
  * pueden saltear y configurar despues desde Ajustes.
  */
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 
 import { api, type OnboardingStatus } from "@/api/rest";
 import { useOrionStore } from "@/stores/orion";
@@ -27,57 +27,60 @@ export function Onboarding() {
 
   const [status, setStatus] = useState<OnboardingStatus | null>(null);
   const [reachable, setReachable] = useState<boolean | null>(null);
-  const [step, setStep] = useState<Step>(0);
+  // `step` empieza en null para distinguir "no decidido aun" de "paso 0".
+  // Hasta que el primer GET de status responda, el modal no se renderiza.
+  const [step, setStep] = useState<Step | null>(null);
   // Flag explicito: el usuario llego al final del wizard y lo dismisseo.
-  // Hace falta porque no podemos depender solo de status.ready (la key
-  // puede haber estado seteada desde antes y entonces el modal nunca se
-  // mostraria).
   const [dismissed, setDismissed] = useState(false);
 
-  // Auto-jump al paso 2 si el backend ya tiene API key cuando el wizard se
-  // monta (caso env var). Lo hacemos UNA SOLA VEZ via ref para no pisar al
-  // usuario que va avanzando manualmente.
-  const initialJumpDoneRef = useRef(false);
-
-  // Poll del status del backend mientras el modal este montado.
+  // ── Polling del status ──────────────────────────────────────────────
+  // CRITICO: este effect SOLO actualiza `status` y `reachable`. No toca
+  // `step` para nada — eso evita closures stale del polling tirando al
+  // usuario atras. El step lo maneja UN OTRO effect (mas abajo) que
+  // depende del status leido y se ejecuta una vez al inicio.
   useEffect(() => {
     let alive = true;
     let timer: ReturnType<typeof setTimeout> | null = null;
-
     const tick = async () => {
       try {
         const s = await api.onboardingStatus();
         if (!alive) return;
         setStatus(s);
         setReachable(true);
-        if (s.ready && !initialJumpDoneRef.current) {
-          // Primera vez que detectamos ready=true: si la key venia ya
-          // configurada (env var), saltamos a Integraciones. Si el user
-          // la pego en el paso 1, este branch tambien dispara pero como
-          // GeminiStep ya hizo setStep(2), el setStep aca es idempotente.
-          initialJumpDoneRef.current = true;
-          setConfigured(true);
-          setStep((cur) => (cur < 2 ? 2 : cur));
-        }
       } catch {
         if (!alive) return;
         setReachable(false);
       }
       if (alive) timer = setTimeout(tick, STATUS_POLL_MS);
     };
-
     tick();
     return () => {
       alive = false;
       if (timer) clearTimeout(timer);
     };
-  }, [setConfigured]);
+  }, []);
+
+  // ── Decision del step inicial ──────────────────────────────────────
+  // Una sola vez cuando el primer status llega: si la key ya estaba
+  // configurada (env var, o porque el user ya completo el wizard antes)
+  // arrancamos en step 2 (Integraciones). Si no, arrancamos en step 0
+  // (Bienvenida).
+  useEffect(() => {
+    if (status === null) return;
+    if (step !== null) return; // ya decidido — no pisar avance del user
+    if (status.ready) {
+      setConfigured(true);
+      setStep(2);
+    } else {
+      setStep(0);
+    }
+  }, [status, step, setConfigured]);
 
   // Modal cerrado si:
   //   - el usuario clickeo "Empezar a usar Orion" en el ultimo paso, o
-  //   - todavia no sabemos el status (primer fetch en curso).
+  //   - todavia no sabemos el status / step inicial.
   if (dismissed) return null;
-  if (!status) return null;
+  if (status === null || step === null) return null;
 
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-bg/80 backdrop-blur-md animate-fade-in">
@@ -111,7 +114,7 @@ export function Onboarding() {
             sobre una version vieja y queremos verificar a simple vista que
             el bundle nuevo si cargo. */}
         <div className="mt-4 text-center text-[9px] uppercase tracking-[0.18em] text-muted/60">
-          Wizard v0.1.1
+          Wizard v0.1.2 (rediseno)
         </div>
       </div>
     </div>
