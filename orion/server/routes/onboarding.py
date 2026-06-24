@@ -43,16 +43,35 @@ log = get_logger("onboarding")
 router = APIRouter()
 
 
+class OnboardingBrainInfo(BaseModel):
+    """Snapshot del cerebro activo + disponibilidad de su provider.
+
+    El wizard lo usa para decidir si está "ready" por un camino no-Gemini
+    (DeepSeek u Ollama con credenciales) sin obligar al usuario a darle
+    key de Gemini para arrancar.
+    """
+
+    provider: str
+    model: str
+    is_live: bool
+    available: bool
+
+
 class OnboardingStatus(BaseModel):
     ready: bool = Field(
         ...,
-        description=("True si la app puede arrancar sin pasar por el wizard (API key presente)."),
+        description=(
+            "True si la app puede arrancar sin pasar por el wizard: el usuario "
+            "tiene key de Gemini, O el cerebro activo no es Gemini y su provider "
+            "tiene credenciales (ej: DeepSeek con key, Ollama corriendo)."
+        ),
     )
     has_api_key: bool
     base_dir: str
     config_dir: str
     data_dir: str
     api_keys_path: str
+    brain: OnboardingBrainInfo
 
 
 class OnboardingSaveBody(BaseModel):
@@ -84,13 +103,37 @@ def get_status() -> OnboardingStatus:
     # termina el wizard.
     seed_default_configs()
     has_key = has_valid_api_key()
+
+    # Estado del cerebro activo. Si el usuario eligió DeepSeek u Ollama y
+    # configuró su provider correctamente, también está "ready" — no
+    # debería verse el wizard solo porque le falta una key de Gemini.
+    from orion.core.chat_brain import get_active_brain, is_live_brain
+    from orion.core.llm.base import get_provider as _get_provider
+
+    brain_cfg = get_active_brain()
+    try:
+        brain_available = _get_provider(brain_cfg.provider).is_available()
+    except Exception:
+        brain_available = False
+
+    brain_info = OnboardingBrainInfo(
+        provider=brain_cfg.provider,
+        model=brain_cfg.model,
+        is_live=is_live_brain(),
+        available=brain_available,
+    )
+
+    # ready = camino Gemini ya configurado, o el camino alternativo está listo.
+    ready = has_key or (not brain_info.is_live and brain_available)
+
     return OnboardingStatus(
-        ready=has_key,
+        ready=ready,
         has_api_key=has_key,
         base_dir=str(BASE_DIR),
         config_dir=str(CONFIG_DIR),
         data_dir=str(DATA_DIR),
         api_keys_path=str(API_CONFIG_PATH),
+        brain=brain_info,
     )
 
 

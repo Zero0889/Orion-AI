@@ -195,11 +195,17 @@ def build_app(bus: Any) -> FastAPI:
     from orion.server.routes import (
         settings as settings_route,
     )
+    from orion.server.routes import (
+        brain as brain_route,
+    )
 
     app.include_router(memory.router, prefix="/api/memory", tags=["memory"])
     app.include_router(notes.router, prefix="/api/notes", tags=["notes"])
     app.include_router(conversations.router, prefix="/api/conversations", tags=["conversations"])
     app.include_router(settings_route.router, prefix="/api/settings", tags=["settings"])
+    # brain_route monta endpoints bajo /api/settings/brain — los registros
+    # son distintos al settings_route (theme/api_key/sharing) así que no chocan.
+    app.include_router(brain_route.router, prefix="/api/settings", tags=["settings"])
     app.include_router(agent.router, prefix="/api/agent", tags=["agent"])
     app.include_router(iot.router, prefix="/api/iot", tags=["iot"])
     app.include_router(mcp.router, prefix="/api/mcp", tags=["mcp"])

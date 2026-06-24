@@ -175,6 +175,16 @@ export const useOrionStore = create<State>((set, get) => ({
           break;
         }
 
+        // Dedup de mensajes repetidos: si el último mensaje del mismo rol
+        // tiene EXACTAMENTE el mismo texto, no lo duplicamos.  Esto evita
+        // que errores de modelo en bucle inunden el timeline.
+        if (existing.length > 0) {
+          const last = existing[existing.length - 1];
+          if (last.role === role && last.text === body) {
+            break;
+          }
+        }
+
         const msg: ChatMessage = { id: nextId(), role, text: body, ts };
         const msgs = [...existing, msg];
         if (msgs.length > MAX_MESSAGES) msgs.splice(0, msgs.length - MAX_MESSAGES);
@@ -247,6 +257,14 @@ export const useOrionStore = create<State>((set, get) => ({
       }
       case "settings.theme": {
         queryClient.invalidateQueries({ queryKey: QUERY_KEYS.settingsTheme });
+        break;
+      }
+      case "settings.brain":
+      case "settings.brain.provider_key": {
+        // Cambio de cerebro o key de provider — refrescamos el estado
+        // completo para que la sección Cerebro re-renderee con badges
+        // actualizados (available / configured / is_live).
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.settingsBrain });
         break;
       }
       case "agent.task": {

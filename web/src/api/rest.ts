@@ -95,6 +95,31 @@ export const api = {
       enabled,
     }),
 
+  // Brain (LLM provider del chat principal). El switch se aplica en caliente.
+  getBrain: () => request<BrainState>("GET", "/api/settings/brain"),
+  setBrain: (provider: string, model: string) =>
+    request<{ ok: true; active: BrainActive }>("PUT", "/api/settings/brain", {
+      provider,
+      model,
+    }),
+  setBrainProviderKey: (provider: string, key: string) =>
+    request<{ ok: true; provider: string; configured: boolean; available: boolean }>(
+      "PUT",
+      `/api/settings/brain/providers/${provider}/key`,
+      { key },
+    ),
+  getBrainOllamaStatus: () =>
+    request<{ running: boolean; base_url: string; models: BrainOllamaModel[] }>(
+      "GET",
+      "/api/settings/brain/ollama",
+    ),
+  testBrain: (provider: string, model: string, prompt?: string) =>
+    request<BrainTestResult>("POST", "/api/settings/brain/test", {
+      provider,
+      model,
+      ...(prompt ? { prompt } : {}),
+    }),
+
   // Agent — chat directo + orquesta CRUD
   listOrchestra: () => request<Array<OrchestraAgent>>("GET", "/api/agent/orchestra"),
   listProviders: () => request<Array<ProviderCatalog>>("GET", "/api/agent/providers"),
@@ -309,6 +334,61 @@ export const api = {
     }),
 };
 
+// ── Brain (cerebro del chat principal) ──────────────────────────────────
+// El catálogo lo sirve el backend (orion/server/routes/brain.py) para
+// que el frontend no tenga que mantener su propia lista hardcodeada de
+// modelos por provider — si el backend agrega un modelo, aparece solo.
+
+export interface BrainActive {
+  provider: string;
+  model: string;
+  is_live: boolean;
+}
+
+export interface BrainProviderModel {
+  id: string;
+  label: string;
+}
+
+export interface BrainProvider {
+  id: string;
+  label: string;
+  free: boolean;
+  auth_hint: string;
+  models: BrainProviderModel[];
+  default_model: string;
+  available: boolean;
+  needs_key: boolean;
+}
+
+export interface BrainOllamaModel {
+  name: string;
+  size: number;
+  modified_at: string;
+}
+
+export interface BrainOllamaStatus {
+  running: boolean;
+  base_url: string;
+  models: BrainOllamaModel[];
+}
+
+export interface BrainState {
+  active: BrainActive;
+  providers: BrainProvider[];
+  ollama: BrainOllamaStatus;
+  gemini: { configured: boolean };
+}
+
+export interface BrainTestResult {
+  ok: boolean;
+  text?: string;
+  model?: string;
+  provider?: string;
+  error?: string;
+  actionable?: boolean;
+}
+
 export interface OnboardingStatus {
   ready: boolean;
   has_api_key: boolean;
@@ -316,6 +396,15 @@ export interface OnboardingStatus {
   config_dir: string;
   data_dir: string;
   api_keys_path: string;
+  // El cerebro activo + si su provider está disponible. Si el usuario
+  // ya completó el wizard eligiendo DeepSeek/Ollama, `ready` viene true
+  // aunque no haya key Gemini.
+  brain: {
+    provider: string;
+    model: string;
+    is_live: boolean;
+    available: boolean;
+  };
 }
 
 export interface OnboardingSaveResult {

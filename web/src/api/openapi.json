@@ -199,6 +199,53 @@
         "title": "Body_upload_file_api_files_upload_post",
         "type": "object"
       },
+      "BrainPatch": {
+        "properties": {
+          "model": {
+            "minLength": 1,
+            "title": "Model",
+            "type": "string"
+          },
+          "provider": {
+            "minLength": 1,
+            "title": "Provider",
+            "type": "string"
+          }
+        },
+        "required": [
+          "provider",
+          "model"
+        ],
+        "title": "BrainPatch",
+        "type": "object"
+      },
+      "BrainTestBody": {
+        "properties": {
+          "model": {
+            "minLength": 1,
+            "title": "Model",
+            "type": "string"
+          },
+          "prompt": {
+            "default": "Decí 'pong' y nada más.",
+            "description": "Prompt corto para probar el ping. Default razonable para que sea barato.",
+            "maxLength": 400,
+            "title": "Prompt",
+            "type": "string"
+          },
+          "provider": {
+            "minLength": 1,
+            "title": "Provider",
+            "type": "string"
+          }
+        },
+        "required": [
+          "provider",
+          "model"
+        ],
+        "title": "BrainTestBody",
+        "type": "object"
+      },
       "BulkDeleteBody": {
         "properties": {
           "ids": {
@@ -654,6 +701,35 @@
         "title": "NoteUpdate",
         "type": "object"
       },
+      "OnboardingBrainInfo": {
+        "description": "Snapshot del cerebro activo + disponibilidad de su provider.\n\nEl wizard lo usa para decidir si está \"ready\" por un camino no-Gemini\n(DeepSeek u Ollama con credenciales) sin obligar al usuario a darle\nkey de Gemini para arrancar.",
+        "properties": {
+          "available": {
+            "title": "Available",
+            "type": "boolean"
+          },
+          "is_live": {
+            "title": "Is Live",
+            "type": "boolean"
+          },
+          "model": {
+            "title": "Model",
+            "type": "string"
+          },
+          "provider": {
+            "title": "Provider",
+            "type": "string"
+          }
+        },
+        "required": [
+          "provider",
+          "model",
+          "is_live",
+          "available"
+        ],
+        "title": "OnboardingBrainInfo",
+        "type": "object"
+      },
       "OnboardingSaveBody": {
         "properties": {
           "gemini_api_key": {
@@ -714,6 +790,9 @@
             "title": "Base Dir",
             "type": "string"
           },
+          "brain": {
+            "$ref": "#/components/schemas/OnboardingBrainInfo"
+          },
           "config_dir": {
             "title": "Config Dir",
             "type": "string"
@@ -727,7 +806,7 @@
             "type": "boolean"
           },
           "ready": {
-            "description": "True si la app puede arrancar sin pasar por el wizard (API key presente).",
+            "description": "True si la app puede arrancar sin pasar por el wizard: el usuario tiene key de Gemini, O el cerebro activo no es Gemini y su provider tiene credenciales (ej: DeepSeek con key, Ollama corriendo).",
             "title": "Ready",
             "type": "boolean"
           }
@@ -738,7 +817,8 @@
           "base_dir",
           "config_dir",
           "data_dir",
-          "api_keys_path"
+          "api_keys_path",
+          "brain"
         ],
         "title": "OnboardingStatus",
         "type": "object"
@@ -794,6 +874,20 @@
           "cir_path"
         ],
         "title": "ProteusAutodrawRequest",
+        "type": "object"
+      },
+      "ProviderKeyBody": {
+        "properties": {
+          "key": {
+            "maxLength": 400,
+            "title": "Key",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key"
+        ],
+        "title": "ProviderKeyBody",
         "type": "object"
       },
       "SharingBody": {
@@ -3994,6 +4088,194 @@
           }
         },
         "summary": "Set Api Key",
+        "tags": [
+          "settings"
+        ]
+      }
+    },
+    "/api/settings/brain": {
+      "get": {
+        "description": "Estado completo del cerebro: activo + catálogo + ollama + gemini.",
+        "operationId": "get_brain_state_api_settings_brain_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Get Brain State Api Settings Brain Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Brain State",
+        "tags": [
+          "settings"
+        ]
+      },
+      "put": {
+        "operationId": "patch_brain_api_settings_brain_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BrainPatch"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Patch Brain Api Settings Brain Put",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Patch Brain",
+        "tags": [
+          "settings"
+        ]
+      }
+    },
+    "/api/settings/brain/ollama": {
+      "get": {
+        "description": "Endpoint dedicado para que el wizard de onboarding pueda hacer\npolling rápido mientras el usuario instala Ollama.",
+        "operationId": "get_ollama_status_api_settings_brain_ollama_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Get Ollama Status Api Settings Brain Ollama Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Ollama Status",
+        "tags": [
+          "settings"
+        ]
+      }
+    },
+    "/api/settings/brain/providers/{name}/key": {
+      "put": {
+        "description": "Guarda/borra la key del provider en ``config/providers.json``.\n\nEl path param se usa como provider id. Si es un id desconocido\ndevolvemos 400 para evitar guardar basura.",
+        "operationId": "set_brain_provider_key_api_settings_brain_providers__name__key_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "title": "Name",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProviderKeyBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Set Brain Provider Key Api Settings Brain Providers  Name  Key Put",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set Brain Provider Key",
+        "tags": [
+          "settings"
+        ]
+      }
+    },
+    "/api/settings/brain/test": {
+      "post": {
+        "description": "Manda un mensaje breve al provider+model para validar\ncredenciales/conectividad. Devuelve la respuesta truncada o el error.",
+        "operationId": "test_brain_api_settings_brain_test_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BrainTestBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Test Brain Api Settings Brain Test Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Test Brain",
         "tags": [
           "settings"
         ]

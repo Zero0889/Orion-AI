@@ -130,11 +130,26 @@ def main() -> None:
     # Si la API key ya está configurada (env o archivo), desbloquea el
     # wait_for_api_key() del bus de inmediato. Si no, el frontend mostrará
     # el wizard y POST /api/settings/api_key llamará a bus.mark_ready().
+    #
+    # Excepción: si el cerebro activo no es Gemini, el chat principal pasa
+    # por orion.core.chat_brain (no por Live). En ese caso no tiene sentido
+    # bloquear esperando una key de Gemini que el usuario no quiere usar —
+    # el frontend igual permite agregarla después (para activar voz).
+    try:
+        from orion.core.chat_brain import is_live_brain
+
+        live_brain = is_live_brain()
+    except Exception:
+        live_brain = True  # ante la duda, comportamiento histórico
     try:
         get_api_key()
         bus.mark_ready()
     except RuntimeError:
-        log.info("API key no configurada — esperando wizard web")
+        if not live_brain:
+            log.info("Cerebro no-Gemini detectado — desbloqueo bus sin esperar key")
+            bus.mark_ready()
+        else:
+            log.info("API key no configurada — esperando wizard web")
     except Exception:
         pass
 

@@ -10,6 +10,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 
 import { api, type NotebookLMStatus, type SharingState, type ThemeInfo } from "@/api/rest";
+import { BrainSection } from "@/components/BrainSection";
 import { GogAccountsCard } from "@/components/GogAccountsCard";
 import { deriveAccent, extractDominantColor } from "@/lib/imageColor";
 import { QUERY_KEYS } from "@/query/keys";
@@ -19,9 +20,12 @@ import { Icon, type IconName } from "@/ui/Icon";
 import { Badge, Button, Empty, SectionHeader, Surface, Switch } from "@/ui/primitives";
 import { resolveTheme, toggleLightDark, isLightTheme } from "@/App";
 
-type Tab = "appearance" | "network" | "integrations" | "voice" | "data" | "about";
+type Tab = "appearance" | "brain" | "network" | "integrations" | "voice" | "data" | "about";
 const TABS: { id: Tab; label: string; icon: IconName }[] = [
   { id: "appearance", label: "Apariencia", icon: "sun" },
+  // El "cerebro" arriba de Red porque es lo que un usuario nuevo va a
+  // querer tocar primero (elegir Gemini vs DeepSeek vs Ollama).
+  { id: "brain", label: "Cerebro", icon: "orbit" },
   { id: "network", label: "Red", icon: "wifi" },
   { id: "integrations", label: "Integraciones", icon: "plug" },
   { id: "voice", label: "Voz", icon: "mic" },
@@ -29,8 +33,33 @@ const TABS: { id: Tab; label: string; icon: IconName }[] = [
   { id: "about", label: "Acerca de", icon: "info" },
 ];
 
+// Tabs que pueden navegarse via evento custom `orion:settings:tab`. El
+// BrainChip del ChatPanel lo dispara para llevar al usuario directo a
+// la pestaña Cerebro sin que tenga que clickearla manualmente.
+const VALID_TABS = new Set<Tab>([
+  "appearance",
+  "brain",
+  "network",
+  "integrations",
+  "voice",
+  "data",
+  "about",
+]);
+
 export function SettingsPanel() {
   const [tab, setTab] = useState<Tab>("appearance");
+
+  // Escucha "orion:settings:tab" → salta a esa tab si es válida.
+  useEffect(() => {
+    function onTabRequest(e: Event) {
+      const detail = (e as CustomEvent).detail;
+      if (typeof detail === "string" && VALID_TABS.has(detail as Tab)) {
+        setTab(detail as Tab);
+      }
+    }
+    window.addEventListener("orion:settings:tab", onTabRequest);
+    return () => window.removeEventListener("orion:settings:tab", onTabRequest);
+  }, []);
 
   // Theme info via useQuery. Invalidación del bridge cuando llega
   // settings.theme por WS.
@@ -107,6 +136,8 @@ export function SettingsPanel() {
           )}
 
           {tab === "appearance" && <Appearance info={info} onPick={pick} />}
+
+          {tab === "brain" && <BrainSection />}
 
           {tab === "network" && <Network onError={setPickError} />}
 

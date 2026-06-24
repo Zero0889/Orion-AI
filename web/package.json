@@ -1,7 +1,7 @@
 {
   "name": "orion-web",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.2.0",
   "type": "module",
   "description": "Frontend React de O.R.I.O.N (Fase 2 migracion web)",
   "scripts": {

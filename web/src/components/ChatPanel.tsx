@@ -26,6 +26,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { AskUserPrompt } from "@/components/AskUserPrompt";
 import { AttachmentChip } from "@/components/AttachmentChip";
+import { BrainChip } from "@/components/BrainChip";
 import { OrbHUD } from "@/components/OrbHUD";
 import { ToolBanner } from "@/components/ToolBanner";
 import { Markdown } from "@/lib/markdown";
@@ -128,6 +129,9 @@ export function ChatPanel({ send }: Props) {
     <div className="flex flex-col h-full relative">
       {/* ambient atmosphere when empty */}
       {empty && <div className="pointer-events-none absolute inset-0 bg-dots opacity-50" />}
+
+      {/* Indicador del cerebro activo. Discreto arriba a la derecha. */}
+      <BrainChip />
 
       {/* tool / agent activity banner — solo cuando hay actividad real */}
       <ToolBanner />

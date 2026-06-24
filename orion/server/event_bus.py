@@ -113,6 +113,13 @@ class OrionEventBus:
         # ui.root.mainloop()). En modo web no hace nada.
         self.root = _NullRoot()
 
+        # Contexto para el chat_brain path (cuando el cerebro no es Gemini).
+        # OrionLive los enchufa en __init__; si nunca corre (caso "solo
+        # DeepSeek desde primer arranque"), chat_brain.run_text_turn
+        # resuelve el ToolRegistry singleton solo y prescinde de plugins.
+        self._chat_brain_tool_registry: object | None = None
+        self._chat_brain_plugin_registry: object | None = None
+
     # ── Configuración (Fase 1) ───────────────────────────────────────────
     def attach_server_loop(self, loop: asyncio.AbstractEventLoop) -> None:
         """Llamado por FastAPI al arrancar uvicorn. Crea la outbound queue
@@ -283,17 +290,57 @@ class OrionEventBus:
             with contextlib.suppress(Exception):
                 q.put_nowait(msg)
 
+    def attach_chat_brain_context(
+        self,
+        *,
+        tool_registry: object | None = None,
+        plugin_registry: object | None = None,
+    ) -> None:
+        """OrionLive informa los registries que ``chat_brain.run_text_turn``
+        debe usar cuando el cerebro activo no es Gemini.
+
+        Idempotente: pasar ``None`` no borra el contexto previo.
+        """
+        if tool_registry is not None:
+            self._chat_brain_tool_registry = tool_registry
+        if plugin_registry is not None:
+            self._chat_brain_plugin_registry = plugin_registry
+
     def submit_user_text(self, text: str) -> None:
-        """Inyecta texto al modelo Live. Salta de Loop A → Loop B con
-        ``run_coroutine_threadsafe`` como exige el informe (R-15)."""
-        cb = self._on_text_command
-        if cb is None:
-            log.warning("submit_user_text recibido sin on_text_command")
+        """Despacha texto del usuario al cerebro activo.
+
+        - Si brain == Gemini: camino histórico (callback ``on_text_command``
+          que internamente hace ``run_coroutine_threadsafe`` contra el loop
+          de :class:`OrionLive`, ver R-15).
+        - Si brain != Gemini: corre :func:`orion.core.chat_brain.run_text_turn`
+          en un thread daemon, usando el ToolRegistry compartido (sin
+          tocar la sesión Live).
+        """
+        # Import lazy: evita ciclo orion.core.chat_brain → orion.config →
+        # ... → orion.server al cargar el módulo.
+        from orion.core.chat_brain import is_live_brain, run_text_turn
+
+        if is_live_brain():
+            cb = self._on_text_command
+            if cb is None:
+                log.warning("submit_user_text recibido sin on_text_command")
+                return
+            threading.Thread(target=cb, args=(text,), daemon=True).start()
             return
-        # Reusamos el patrón histórico: llamamos al callback en un thread
-        # daemon (igual que hace ui.MainWindow hoy). El callback es el que
-        # internamente hace run_coroutine_threadsafe contra OrionLive._loop.
-        threading.Thread(target=cb, args=(text,), daemon=True).start()
+
+        # Camino agnóstico al provider — no necesita la sesión Live.
+        def _run() -> None:
+            try:
+                run_text_turn(
+                    self,
+                    text,
+                    tool_registry=self._chat_brain_tool_registry,
+                    plugin_registry=self._chat_brain_plugin_registry,
+                )
+            except Exception:
+                log.exception("chat_brain.run_text_turn crasheó")
+
+        threading.Thread(target=_run, daemon=True).start()
 
     def trigger_interrupt(self) -> None:
         cb = self._on_interrupt
@@ -324,8 +371,15 @@ class OrionEventBus:
         return conv
 
     def _persist_log(self, text: str) -> None:
-        if not text or self._conversation is None:
+        if not text:
             return
+        # Auto-init de la sesión activa en el primer log del proceso. Antes
+        # `_conversation` quedaba None salvo que alguien llamara
+        # `new_conversation()` explícito, y nadie lo hacía: el historial
+        # SQLite no se poblaba. Lo arrancamos lazy para que tanto el path
+        # Live como el chat_brain persistan sin necesitar wiring extra.
+        if self._conversation is None:
+            self._conversation = ConversationSession()
         t = text.strip()
         tl = t.lower()
         try:

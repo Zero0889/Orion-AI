@@ -33,4 +33,5 @@ export const QUERY_KEYS = {
   },
   orchestra: ["orchestra"] as const,
   mcpServers: ["mcp", "servers"] as const,
+  settingsBrain: ["settings", "brain"] as const,
 } as const;

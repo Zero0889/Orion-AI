@@ -124,6 +124,18 @@ class OrionLive(LiveSessionMixin, AudioMixin):
 
         get_ask_user().set_publisher(_publish_ask)
 
+        # ── chat_brain context: el bus invoca run_text_turn con estos ──
+        # registries cuando el cerebro activo no es Gemini. Sin esto, el
+        # módulo cae al ToolRegistry singleton igual, pero sin plugins.
+        try:
+            self.ui.attach_chat_brain_context(
+                tool_registry=self._tool_registry,
+                plugin_registry=self._plugin_registry,
+            )
+        except AttributeError:
+            # Bus viejo sin la API: no rompe la inicialización.
+            log.debug("Bus sin attach_chat_brain_context — versión vieja del event_bus")
+
     # ── Callbacks de UI ──────────────────────────────────────────────────
     def _on_text_command(self, text: str):
         """Recibe texto desde la UI (input manual o eventos como archivo cargado).

@@ -1431,6 +1431,92 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/settings/brain": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Brain State
+     * @description Estado completo del cerebro: activo + catálogo + ollama + gemini.
+     */
+    get: operations["get_brain_state_api_settings_brain_get"];
+    /** Patch Brain */
+    put: operations["patch_brain_api_settings_brain_put"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/settings/brain/ollama": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Ollama Status
+     * @description Endpoint dedicado para que el wizard de onboarding pueda hacer
+     *     polling rápido mientras el usuario instala Ollama.
+     */
+    get: operations["get_ollama_status_api_settings_brain_ollama_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/settings/brain/providers/{name}/key": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    /**
+     * Set Brain Provider Key
+     * @description Guarda/borra la key del provider en ``config/providers.json``.
+     *
+     *     El path param se usa como provider id. Si es un id desconocido
+     *     devolvemos 400 para evitar guardar basura.
+     */
+    put: operations["set_brain_provider_key_api_settings_brain_providers__name__key_put"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/settings/brain/test": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Test Brain
+     * @description Manda un mensaje breve al provider+model para validar
+     *     credenciales/conectividad. Devuelve la respuesta truncada o el error.
+     */
+    post: operations["test_brain_api_settings_brain_test_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/settings/sharing": {
     parameters: {
       query?: never;
@@ -1695,6 +1781,26 @@ export interface components {
       /** File */
       file: string;
     };
+    /** BrainPatch */
+    BrainPatch: {
+      /** Model */
+      model: string;
+      /** Provider */
+      provider: string;
+    };
+    /** BrainTestBody */
+    BrainTestBody: {
+      /** Model */
+      model: string;
+      /**
+       * Prompt
+       * @description Prompt corto para probar el ping. Default razonable para que sea barato.
+       * @default Decí 'pong' y nada más.
+       */
+      prompt: string;
+      /** Provider */
+      provider: string;
+    };
     /** BulkDeleteBody */
     BulkDeleteBody: {
       /** Ids */
@@ -1889,6 +1995,24 @@ export interface components {
       /** Text */
       text?: string | null;
     };
+    /**
+     * OnboardingBrainInfo
+     * @description Snapshot del cerebro activo + disponibilidad de su provider.
+     *
+     *     El wizard lo usa para decidir si está "ready" por un camino no-Gemini
+     *     (DeepSeek u Ollama con credenciales) sin obligar al usuario a darle
+     *     key de Gemini para arrancar.
+     */
+    OnboardingBrainInfo: {
+      /** Available */
+      available: boolean;
+      /** Is Live */
+      is_live: boolean;
+      /** Model */
+      model: string;
+      /** Provider */
+      provider: string;
+    };
     /** OnboardingSaveBody */
     OnboardingSaveBody: {
       /**
@@ -1918,6 +2042,7 @@ export interface components {
       api_keys_path: string;
       /** Base Dir */
       base_dir: string;
+      brain: components["schemas"]["OnboardingBrainInfo"];
       /** Config Dir */
       config_dir: string;
       /** Data Dir */
@@ -1926,7 +2051,7 @@ export interface components {
       has_api_key: boolean;
       /**
        * Ready
-       * @description True si la app puede arrancar sin pasar por el wizard (API key presente).
+       * @description True si la app puede arrancar sin pasar por el wizard: el usuario tiene key de Gemini, O el cerebro activo no es Gemini y su provider tiene credenciales (ej: DeepSeek con key, Ollama corriendo).
        */
       ready: boolean;
     };
@@ -1955,6 +2080,11 @@ export interface components {
        * @default true
        */
       place_in_canvas: boolean | null;
+    };
+    /** ProviderKeyBody */
+    ProviderKeyBody: {
+      /** Key */
+      key: string;
     };
     /** SharingBody */
     SharingBody: {
@@ -4383,6 +4513,157 @@ export interface operations {
     requestBody: {
       content: {
         "application/json": components["schemas"]["ApiKeyBody"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            [key: string]: unknown;
+          };
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  get_brain_state_api_settings_brain_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            [key: string]: unknown;
+          };
+        };
+      };
+    };
+  };
+  patch_brain_api_settings_brain_put: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["BrainPatch"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            [key: string]: unknown;
+          };
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  get_ollama_status_api_settings_brain_ollama_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            [key: string]: unknown;
+          };
+        };
+      };
+    };
+  };
+  set_brain_provider_key_api_settings_brain_providers__name__key_put: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        name: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["ProviderKeyBody"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            [key: string]: unknown;
+          };
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  test_brain_api_settings_brain_test_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["BrainTestBody"];
       };
     };
     responses: {

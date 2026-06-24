@@ -166,6 +166,46 @@ def get_base_url(provider: str) -> str:
 def reset_config_cache() -> None:
     """Invalida el cache si editas providers.json en caliente."""
     _providers_file.cache_clear()
+    # También limpiamos los provider singletons: si la key cambió, la nueva
+    # instancia toma el valor nuevo en su constructor (los OpenAICompat
+    # leen la key en __init__). Sin esto, set_provider_key seguía usando
+    # la instancia vieja con la key vacía.
+    _INSTANCES.clear()
+
+
+def set_provider_key(provider: str, key: str) -> None:
+    """Persiste la API key de ``provider`` en ``config/providers.json``.
+
+    Si el archivo no existe lo crea con la estructura mínima (provider
+    como key, valor como key). Preserva el resto de campos. Invalida los
+    caches al terminar para que la próxima llamada a ``get_provider`` use
+    la key nueva sin reiniciar la app.
+
+    Pasar ``key=""`` borra la entrada (no la deja como string vacío).
+    """
+    provider = (provider or "").strip().lower()
+    if not provider:
+        raise ValueError("provider obligatorio")
+    path = BASE_DIR / "config" / "providers.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    data: dict = {}
+    if path.exists():
+        try:
+            raw = json.loads(path.read_text(encoding="utf-8"))
+            if isinstance(raw, dict):
+                data = raw
+        except (json.JSONDecodeError, OSError):
+            data = {}
+    key = (key or "").strip()
+    if key:
+        data[provider] = key
+    else:
+        data.pop(provider, None)
+    path.write_text(
+        json.dumps(data, indent=2, ensure_ascii=False),
+        encoding="utf-8",
+    )
+    reset_config_cache()
 
 
 # ── Registro perezoso ───────────────────────────────────────────────────────
