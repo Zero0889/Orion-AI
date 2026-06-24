@@ -32,11 +32,16 @@ export interface SensorPersonality {
   hint?: string;
 }
 
+// BRIEF · IoT: cada tipo de sensor mantiene un hue fijo. Los hex acá
+// están deliberadamente alineados con los tokens `--iot-*` en styles.css
+// (mismo color exacto) — mantenemos el shape como hex string porque los
+// callsites componen alpha concatenando sufijos hex (`${color}55`); no
+// vale la pena migrar a `rgb(var(--iot-…) / 0.X)` por un cambio cosmético.
 const PRESETS: Record<SensorKind, SensorPersonality> = {
   temperature: {
     label: "Temperatura",
     icon: "thermometer",
-    color: "#FF7A5C",
+    color: "#FB923C", // --iot-temp · naranja
     unit: " °C",
     range: [0, 40],
     decimals: 1,
@@ -45,7 +50,7 @@ const PRESETS: Record<SensorKind, SensorPersonality> = {
   humidity: {
     label: "Humedad",
     icon: "droplet",
-    color: "#5BCBF5",
+    color: "#38BDF8", // --iot-humidity · azul
     unit: " %",
     range: [0, 100],
     decimals: 0,
@@ -54,7 +59,7 @@ const PRESETS: Record<SensorKind, SensorPersonality> = {
   light: {
     label: "Luz",
     icon: "sun",
-    color: "#F5C04F",
+    color: "#FACC15", // --iot-light · amarillo
     unit: " lx",
     range: [0, 1000],
     decimals: 0,

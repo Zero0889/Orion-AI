@@ -15,6 +15,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { api, type CircuitGenerateResult, type CircuitItem } from "@/api/rest";
+import { humanizeTime } from "@/lib/humanTime";
 import { toast } from "@/stores/toast";
 import { Icon } from "@/ui/Icon";
 import { Badge, Button, Empty, SectionHeader, Surface } from "@/ui/primitives";
@@ -190,7 +191,13 @@ export function CircuitPanel() {
           </div>
         )}
 
-        {/* Drop zone */}
+        {/* Drop zone — BRIEF · Circuitos:
+            · Borde "scan" en loop: línea del color acento recorre el
+              perímetro sin parar (conic-gradient rotando dentro de una
+              máscara de padding fino — clásico glow border de cabina).
+            · Ícono PCB en SVG con trazas + chip central, no el genérico.
+            · drag-over: escala 1.02, glow verde-vivo, "Suéltalo aquí".
+            · prefers-reduced-motion: corta la rotación. */}
         <section className="p-6">
           <div
             onDragOver={(e) => {
@@ -201,22 +208,58 @@ export function CircuitPanel() {
             onDrop={onDrop}
             onClick={() => !processing && inputRef.current?.click()}
             className={[
-              "relative flex flex-col items-center justify-center gap-3 p-10 rounded-xl border-2 border-dashed cursor-pointer transition-all duration-200",
+              "circuit-dropzone relative flex flex-col items-center justify-center gap-4",
+              "px-10 py-14 rounded-2xl cursor-pointer overflow-hidden",
+              "bg-elevated/30 backdrop-blur-sm",
+              "transition-all duration-300 ease-spring",
               dragOver
-                ? "border-pri bg-pri/5"
-                : "border-white/10 bg-white/[0.02] hover:border-white/20 hover:bg-white/[0.04]",
-              processing ? "opacity-60 cursor-wait" : "",
+                ? "scale-[1.02] bg-sem-success/[0.06] shadow-[0_0_40px_-8px_rgb(var(--sem-success)/0.5)]"
+                : "hover:bg-elevated/55",
+              processing ? "opacity-70 cursor-wait" : "",
             ].join(" ")}
+            data-dragging={dragOver ? "true" : undefined}
+            data-processing={processing ? "true" : undefined}
           >
-            <Icon name="cpu" size={32} className="text-pri" />
-            <div className="text-sm text-text font-medium">
-              {processing
-                ? "Analizando circuito con Gemini Vision…"
-                : "Arrastra una imagen o haz click para elegir"}
+            {/* Borde animado — el ::before del .circuit-dropzone lo dibuja
+                con un conic-gradient rotando. Sin contenido aquí, solo
+                deja que el CSS haga su trabajo. */}
+
+            {/* PCB-style icon */}
+            <div className="relative" aria-hidden>
+              <span
+                className="absolute inset-0 -m-2 rounded-2xl blur-2xl"
+                style={{
+                  background: dragOver
+                    ? "radial-gradient(circle, rgb(var(--sem-success)/0.4), transparent 70%)"
+                    : "radial-gradient(circle, rgb(var(--orion-pri)/0.32), transparent 70%)",
+                  transition: "background 220ms ease",
+                }}
+              />
+              <PCBIcon
+                size={56}
+                accent={dragOver ? "rgb(var(--sem-success))" : "rgb(var(--orion-pri))"}
+              />
             </div>
-            <div className="text-xs text-text-dim">
-              Formatos soportados: PNG, JPG, WEBP, BMP. Foto, screenshot o esquemático dibujado.
+
+            <div className="text-center relative z-10">
+              <div className="text-sm font-medium text-text">
+                {processing
+                  ? "Analizando circuito con Gemini Vision…"
+                  : dragOver
+                    ? "Suéltalo aquí"
+                    : "Arrastrá una imagen o tocá para elegir"}
+              </div>
+              <div className="text-[11px] text-text-dim mt-1 max-w-sm mx-auto">
+                Foto, screenshot o esquemático dibujado. Acepto PNG, JPG, WEBP y BMP.
+              </div>
             </div>
+
+            {/* Spinner overlay durante el procesamiento */}
+            {processing && (
+              <div className="absolute inset-0 grid place-items-center pointer-events-none">
+                <span className="h-8 w-8 rounded-full border-2 border-pri/30 border-t-pri animate-spin-fast" />
+              </div>
+            )}
           </div>
         </section>
 
@@ -259,7 +302,7 @@ export function CircuitPanel() {
             <Empty
               icon="cpu"
               title="Sin circuitos todavía"
-              hint="Sube tu primera imagen para generar el .cir y el .kicad_sch."
+              hint="Subí un esquemático o una foto del circuito y lo analizo: genero el .cir y el .kicad_sch."
             />
           ) : (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
@@ -317,7 +360,9 @@ function CircuitCard({
           <div className="text-sm font-medium text-text truncate" title={base}>
             {base}
           </div>
-          <div className="text-xs text-text-dim">{date.toLocaleString()}</div>
+          <div className="text-xs text-text-dim" title={date.toISOString()}>
+            {humanizeTime(date)}
+          </div>
         </div>
         <Icon name="cpu" size={18} className="text-text-dim shrink-0" />
       </div>
@@ -398,5 +443,64 @@ function FileRow({
         />
       </div>
     </div>
+  );
+}
+
+/* ── PCBIcon — ícono SVG estilo PCB esquemático ───────────────────────
+   Trazas eléctricas + pads + chip central. Más "real" que el genérico
+   crosshair que estaba antes. Stroke = `currentColor` para teñir según
+   el estado (acento por defecto, verde live en drag-over). */
+function PCBIcon({ size = 48, accent }: { size?: number; accent: string }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 64 64"
+      fill="none"
+      style={{ color: accent }}
+      aria-hidden
+    >
+      {/* trazas horizontales/verticales */}
+      <g stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeOpacity="0.7">
+        <path d="M4 16 L20 16 L20 28" />
+        <path d="M60 22 L48 22 L48 32" />
+        <path d="M4 48 L20 48 L20 36 L26 36" />
+        <path d="M60 50 L44 50 L44 40" />
+        <path d="M32 4 L32 14" />
+        <path d="M32 50 L32 60" />
+      </g>
+      {/* pads en los bordes */}
+      <g fill="currentColor" fillOpacity="0.9">
+        <circle cx="4" cy="16" r="1.6" />
+        <circle cx="4" cy="48" r="1.6" />
+        <circle cx="60" cy="22" r="1.6" />
+        <circle cx="60" cy="50" r="1.6" />
+        <circle cx="32" cy="4" r="1.6" />
+        <circle cx="32" cy="60" r="1.6" />
+      </g>
+      {/* Chip central */}
+      <rect
+        x="22"
+        y="22"
+        width="20"
+        height="20"
+        rx="3"
+        fill="currentColor"
+        fillOpacity="0.12"
+        stroke="currentColor"
+        strokeWidth="1.4"
+      />
+      {/* Patitas del chip */}
+      <g stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeOpacity="0.85">
+        <path d="M22 27 L18 27" />
+        <path d="M22 32 L18 32" />
+        <path d="M22 37 L18 37" />
+        <path d="M42 27 L46 27" />
+        <path d="M42 32 L46 32" />
+        <path d="M42 37 L46 37" />
+      </g>
+      {/* Marca del pin 1 */}
+      <circle cx="25" cy="25" r="1.2" fill="currentColor" />
+    </svg>
   );
 }

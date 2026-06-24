@@ -52,9 +52,19 @@ DEFAULT_SERVICES = ["gmail", "classroom", "sheets", "drive", "docs", "slides", "
 
 
 def _gog_exe() -> Path:
-    from orion.config import IOT_CONFIG_PATH
+    """Resuelve la ruta del binario gog priorizando tools/ user-writable
+    y cayendo a la copia bundled del .exe. Mantenemos el alias por
+    compat con tests existentes."""
+    from orion.core.cli_installer import cli_path
 
-    return IOT_CONFIG_PATH.parent.parent / "tools" / "gog" / "gog.exe"
+    found = cli_path("gog")
+    if found:
+        return Path(found)
+    # Si no se encontró, devolvemos el path "esperado" en BASE_DIR/tools
+    # para que el error de _run_gog_json sea autoexplicativo.
+    from orion.config import BASE_DIR
+
+    return BASE_DIR / "tools" / "gog" / "gog.exe"
 
 
 # ── Lectura sincrónica (rápida) ────────────────────────────────────────

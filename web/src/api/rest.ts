@@ -273,6 +273,21 @@ export const api = {
   authorizeClassroom: () =>
     request<{ ok: true; token_path: string }>("POST", "/api/notifications/classroom/authorize"),
 
+  // ── Onboarding (primer arranque) ───────────────────────────────────
+  onboardingStatus: () => request<OnboardingStatus>("GET", "/api/onboarding/status"),
+  onboardingSave: (geminiApiKey: string, validateRemote = true) =>
+    request<OnboardingSaveResult>("POST", "/api/onboarding/save", {
+      gemini_api_key: geminiApiKey,
+      validate_remote: validateRemote,
+    }),
+
+  // ── Diagnóstico (panel de logs / paths / runtime info) ─────────────
+  diagnosticsInfo: () => request<DiagnosticsInfo>("GET", "/api/diagnostics/info"),
+  diagnosticsLogTail: (lines = 200) =>
+    request<LogTailResult>("GET", `/api/diagnostics/log/tail?lines=${lines}`),
+  diagnosticsOpenLogFolder: () =>
+    request<{ ok: true; path: string }>("POST", "/api/diagnostics/log/open-folder"),
+
   // ── Circuit-from-image ─────────────────────────────────────────────
   circuitFromImage: (imagePath: string, outputs?: Array<"spice" | "kicad">) =>
     request<CircuitGenerateResult>("POST", "/api/circuit/from-image", {
@@ -294,6 +309,43 @@ export const api = {
     }),
 };
 
+export interface OnboardingStatus {
+  ready: boolean;
+  has_api_key: boolean;
+  base_dir: string;
+  config_dir: string;
+  data_dir: string;
+  api_keys_path: string;
+}
+
+export interface OnboardingSaveResult {
+  ok: boolean;
+  message: string;
+  api_keys_path: string | null;
+}
+
+export interface DiagnosticsInfo {
+  base_dir: string;
+  resources_dir: string;
+  config_dir: string;
+  data_dir: string;
+  api_keys_path: string;
+  log_path: string;
+  log_dir: string;
+  python_version: string;
+  platform: string;
+  frozen: boolean;
+  sys_executable: string;
+}
+
+export interface LogTailResult {
+  path: string;
+  exists: boolean;
+  size_bytes: number;
+  lines: string[];
+  truncated: boolean;
+}
+
 export interface NotifItem {
   uid: string;
   source: string;
@@ -306,9 +358,22 @@ export interface NotifItem {
 
 export interface NotifPollerStatus {
   running: boolean;
-  last_status: Record<string, { ok: boolean; ts: number; error?: string }>;
-  // Opcional para tolerar backends viejos que no expongan este campo.
+  last_status: Record<
+    string,
+    {
+      ok: boolean;
+      ts: number;
+      error?: string;
+      // Backend clasifica el error: setup_required (OAuth client borrado en
+      // GCP), auth_required (falta autorizar la cuenta), transient (red/5xx).
+      error_kind?: "setup_required" | "auth_required" | "transient";
+      user_message?: string;
+      doc?: string | null;
+    }
+  >;
+  // Opcional para tolerar backends viejos que no expongan estos campos.
   is_configured?: Record<string, boolean>;
+  setup_required?: Record<string, boolean>;
   config: {
     enabled: boolean;
     interval_seconds: number;

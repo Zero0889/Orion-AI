@@ -150,7 +150,7 @@ export function ReadOnlyBackendBadges({
         {device.capabilities.dimmable && <Badge tone="accent">dim</Badge>}
         {device.capabilities.rgb && <Badge tone="neutral">rgb</Badge>}
         {device.capabilities.sensor && (
-          <Badge tone="warn">sensor · {device.capabilities.sensor}</Badge>
+          <Badge tone="info">sensor · {device.capabilities.sensor}</Badge>
         )}
       </div>
     </Field>

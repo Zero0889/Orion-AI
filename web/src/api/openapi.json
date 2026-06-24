@@ -378,6 +378,71 @@
         "title": "DeviceBody",
         "type": "object"
       },
+      "DiagnosticsInfo": {
+        "properties": {
+          "api_keys_path": {
+            "title": "Api Keys Path",
+            "type": "string"
+          },
+          "base_dir": {
+            "description": "Raiz user-writable (APPDATA en prod).",
+            "title": "Base Dir",
+            "type": "string"
+          },
+          "config_dir": {
+            "title": "Config Dir",
+            "type": "string"
+          },
+          "data_dir": {
+            "title": "Data Dir",
+            "type": "string"
+          },
+          "frozen": {
+            "title": "Frozen",
+            "type": "boolean"
+          },
+          "log_dir": {
+            "title": "Log Dir",
+            "type": "string"
+          },
+          "log_path": {
+            "title": "Log Path",
+            "type": "string"
+          },
+          "platform": {
+            "title": "Platform",
+            "type": "string"
+          },
+          "python_version": {
+            "title": "Python Version",
+            "type": "string"
+          },
+          "resources_dir": {
+            "description": "Raiz read-only (assets bundled en prod).",
+            "title": "Resources Dir",
+            "type": "string"
+          },
+          "sys_executable": {
+            "title": "Sys Executable",
+            "type": "string"
+          }
+        },
+        "required": [
+          "base_dir",
+          "resources_dir",
+          "config_dir",
+          "data_dir",
+          "api_keys_path",
+          "log_path",
+          "log_dir",
+          "python_version",
+          "platform",
+          "frozen",
+          "sys_executable"
+        ],
+        "title": "DiagnosticsInfo",
+        "type": "object"
+      },
       "FromImageRequest": {
         "properties": {
           "image_path": {
@@ -451,6 +516,43 @@
           "name"
         ],
         "title": "InstallBody",
+        "type": "object"
+      },
+      "LogTailResult": {
+        "properties": {
+          "exists": {
+            "title": "Exists",
+            "type": "boolean"
+          },
+          "lines": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Lines",
+            "type": "array"
+          },
+          "path": {
+            "title": "Path",
+            "type": "string"
+          },
+          "size_bytes": {
+            "title": "Size Bytes",
+            "type": "integer"
+          },
+          "truncated": {
+            "description": "True si pedimos mas lineas de las que el archivo tiene.",
+            "title": "Truncated",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "path",
+          "exists",
+          "size_bytes",
+          "lines",
+          "truncated"
+        ],
+        "title": "LogTailResult",
         "type": "object"
       },
       "MarkReadBody": {
@@ -550,6 +652,95 @@
           }
         },
         "title": "NoteUpdate",
+        "type": "object"
+      },
+      "OnboardingSaveBody": {
+        "properties": {
+          "gemini_api_key": {
+            "description": "API key de Google AI Studio. Formato típico: 'AIza…'.",
+            "minLength": 10,
+            "title": "Gemini Api Key",
+            "type": "string"
+          },
+          "validate_remote": {
+            "default": true,
+            "description": "Hace un round-trip a Gemini para validar la key antes de persistir. Si está en False solo se chequea formato.",
+            "title": "Validate Remote",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "gemini_api_key"
+        ],
+        "title": "OnboardingSaveBody",
+        "type": "object"
+      },
+      "OnboardingSaveResult": {
+        "properties": {
+          "api_keys_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Api Keys Path"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok",
+          "message"
+        ],
+        "title": "OnboardingSaveResult",
+        "type": "object"
+      },
+      "OnboardingStatus": {
+        "properties": {
+          "api_keys_path": {
+            "title": "Api Keys Path",
+            "type": "string"
+          },
+          "base_dir": {
+            "title": "Base Dir",
+            "type": "string"
+          },
+          "config_dir": {
+            "title": "Config Dir",
+            "type": "string"
+          },
+          "data_dir": {
+            "title": "Data Dir",
+            "type": "string"
+          },
+          "has_api_key": {
+            "title": "Has Api Key",
+            "type": "boolean"
+          },
+          "ready": {
+            "description": "True si la app puede arrancar sin pasar por el wizard (API key presente).",
+            "title": "Ready",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ready",
+          "has_api_key",
+          "base_dir",
+          "config_dir",
+          "data_dir",
+          "api_keys_path"
+        ],
+        "title": "OnboardingStatus",
         "type": "object"
       },
       "ProteusAutodrawRequest": {
@@ -1427,6 +1618,95 @@
         "summary": "Get One Conversation",
         "tags": [
           "conversations"
+        ]
+      }
+    },
+    "/api/diagnostics/info": {
+      "get": {
+        "operationId": "get_info_api_diagnostics_info_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DiagnosticsInfo"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Info",
+        "tags": [
+          "diagnostics"
+        ]
+      }
+    },
+    "/api/diagnostics/log/open-folder": {
+      "post": {
+        "description": "Abre la carpeta de logs en el explorador del sistema.\n\nSolo tiene efecto en el host local — si el usuario abrio Orion via\nTailscale desde otra PC, esto correra en la maquina del servidor\n(donde uvicorn corre), no en la del cliente. Pero el 99% de los\nusuarios usan localhost, asi que el trade-off vale la pena.",
+        "operationId": "open_log_folder_api_diagnostics_log_open_folder_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Open Log Folder Api Diagnostics Log Open Folder Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Open Log Folder",
+        "tags": [
+          "diagnostics"
+        ]
+      }
+    },
+    "/api/diagnostics/log/tail": {
+      "get": {
+        "description": "Devuelve las ultimas ``lines`` lineas del log activo.\n\nCap a 5000 lineas para evitar abusos accidentales (un panel que se\nabre y cierra cada segundo no debe poder DoS-ar al backend leyendo\nmillones de bytes).",
+        "operationId": "log_tail_api_diagnostics_log_tail_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "lines",
+            "required": false,
+            "schema": {
+              "default": 200,
+              "title": "Lines",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LogTailResult"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Log Tail",
+        "tags": [
+          "diagnostics"
         ]
       }
     },
@@ -3588,6 +3868,68 @@
         "summary": "Poller Status",
         "tags": [
           "notifications"
+        ]
+      }
+    },
+    "/api/onboarding/save": {
+      "post": {
+        "operationId": "save_api_onboarding_save_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OnboardingSaveBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OnboardingSaveResult"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Save",
+        "tags": [
+          "onboarding"
+        ]
+      }
+    },
+    "/api/onboarding/status": {
+      "get": {
+        "operationId": "get_status_api_onboarding_status_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OnboardingStatus"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Status",
+        "tags": [
+          "onboarding"
         ]
       }
     },

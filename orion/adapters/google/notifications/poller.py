@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import threading
 import time
@@ -16,6 +17,69 @@ from .gmail import GmailAdapter
 from .store import get_store
 
 log = get_logger("notif_poller")
+
+
+# ── Clasificación de errores ────────────────────────────────────────────
+# Distinguimos:
+#   - "setup_required": el OAuth client está roto en GCP (deleted_client,
+#     invalid_client). El usuario debe rotar credenciales — ver
+#     docs/SETUP_GOOGLE_OAUTH.md. Mientras esto pase el poll va a fallar
+#     siempre con el mismo error, así que NO conviene loguearlo cada vez.
+#   - "auth_required": no hay token todavía o fue revocado. El usuario
+#     debe autorizar la cuenta desde el panel.
+#   - "transient": red, 5xx, timeout. Logueamos.
+
+_SETUP_REQUIRED_PATTERNS = (
+    "deleted_client",
+    "invalid_client",
+    "unauthorized_client",
+    "the oauth client was deleted",
+    "client was deleted",
+)
+_AUTH_REQUIRED_PATTERNS = (
+    "sin token",  # mensaje propio de ClassroomAdapter
+    "invalid_grant",
+    "token has been expired or revoked",
+    "consent_required",
+    "user_required",
+    "no autorizado",
+)
+
+# Throttle de re-logging del MISMO error. Si el error se repite, sólo
+# volvemos a loggear cada N segundos. Evita el spam de "deleted_client"
+# en cada poll (que es cada 60s por default).
+_RELOG_INTERVAL_S = 3600.0  # 1h
+
+
+def _classify_error(msg: str) -> dict:
+    """Clasifica un mensaje de error en {kind, user_message, doc}.
+
+    `kind` ∈ {"setup_required", "auth_required", "transient"}.
+    `user_message` es texto corto apto para mostrar al usuario.
+    `doc` es un slug opcional para que el frontend muestre un link.
+    """
+    low = (msg or "").lower()
+    if any(p in low for p in _SETUP_REQUIRED_PATTERNS):
+        return {
+            "kind": "setup_required",
+            "user_message": (
+                "Tu cliente OAuth de Google fue borrado o invalidado. "
+                "Tenés que crear uno nuevo en Google Cloud Console."
+            ),
+            "doc": "docs/SETUP_GOOGLE_OAUTH.md",
+        }
+    if any(p in low for p in _AUTH_REQUIRED_PATTERNS):
+        return {
+            "kind": "auth_required",
+            "user_message": "La cuenta necesita autorización. Abrí el panel de Notificaciones.",
+            "doc": None,
+        }
+    return {"kind": "transient", "user_message": msg[:200], "doc": None}
+
+
+def _hash_msg(msg: str) -> str:
+    return hashlib.sha1(msg.encode("utf-8", errors="replace")).hexdigest()[:12]
+
 
 _CONFIG_PATH = CONFIG_DIR / "notifications.json"
 _DEFAULT_CONFIG: dict = {
@@ -87,7 +151,10 @@ class NotificationPoller:
             "classroom": ClassroomAdapter(),
         }
         self._publish: Callable[[str, dict], None] | None = None
-        self._last_status: dict[str, dict] = {}  # source → {ok, ts, error?}
+        self._last_status: dict[str, dict] = {}  # source → {ok, ts, error?, error_kind?, ...}
+        # Dedup de logging por (source, hash de mensaje).
+        # {(src, hash): (first_ts, count, last_logged_ts)}
+        self._err_seen: dict[tuple[str, str], tuple[float, int, float]] = {}
 
     def set_publish(self, publish: Callable[[str, dict], None]) -> None:
         """``publish(event_type, payload)`` típicamente ``bus.publish``."""
@@ -151,14 +218,58 @@ class NotificationPoller:
                     )
             except Exception as e:
                 msg = str(e)
-                log.warning("%s falló: %s", src, msg)
-                results[src] = {"error": msg}
+                cls = _classify_error(msg)
+                self._log_error_throttled(src, msg, cls["kind"])
+                results[src] = {"error": msg, "error_kind": cls["kind"]}
+                prev_kind = self._last_status.get(src, {}).get("error_kind")
                 self._last_status[src] = {
                     "ok": False,
                     "ts": time.time(),
                     "error": msg,
+                    "error_kind": cls["kind"],
+                    "user_message": cls["user_message"],
+                    "doc": cls["doc"],
                 }
+                # Si transicionamos a setup_required (o cambia de source),
+                # avisamos por el bus para que la UI muestre el banner sin
+                # esperar a que el usuario abra el panel de status.
+                if cls["kind"] == "setup_required" and prev_kind != "setup_required":
+                    if self._publish:
+                        self._publish(
+                            "notification.setup_required",
+                            {
+                                "source": src,
+                                "user_message": cls["user_message"],
+                                "doc": cls["doc"],
+                            },
+                        )
         return results
+
+    def _log_error_throttled(self, src: str, msg: str, kind: str) -> None:
+        """Loguea el error la primera vez y después solo cada _RELOG_INTERVAL_S.
+
+        Para errores de setup_required en particular, el mensaje se repite
+        idéntico en cada poll — sin throttle se llena la consola.
+        """
+        h = _hash_msg(msg)
+        key = (src, h)
+        now = time.time()
+        first_ts, count, last_logged_ts = self._err_seen.get(key, (now, 0, 0.0))
+        count += 1
+        if count == 1 or (now - last_logged_ts) >= _RELOG_INTERVAL_S:
+            if count == 1:
+                log.warning("%s falló (%s): %s", src, kind, msg)
+            else:
+                log.warning(
+                    "%s sigue fallando (%s, %d veces desde %s): %s",
+                    src,
+                    kind,
+                    count,
+                    time.strftime("%H:%M:%S", time.localtime(first_ts)),
+                    msg,
+                )
+            last_logged_ts = now
+        self._err_seen[key] = (first_ts, count, last_logged_ts)
 
     def status(self) -> dict:
         # is_configured se calcula on-demand: inspecciona el filesystem para
@@ -172,10 +283,17 @@ class NotificationPoller:
             except Exception as e:
                 log.warning("is_configured(%s) falló: %s", src, e)
                 is_configured[src] = False
+        # Derivamos un summary `setup_required: {src: bool}` para que el
+        # frontend no tenga que parsear last_status[src].error_kind a mano.
+        setup_required: dict[str, bool] = {
+            src: bool(self._last_status.get(src, {}).get("error_kind") == "setup_required")
+            for src in self._adapters
+        }
         return {
             "running": bool(self._thread and self._thread.is_alive()),
             "last_status": self._last_status,
             "is_configured": is_configured,
+            "setup_required": setup_required,
             "config": _load_config(),
         }
 

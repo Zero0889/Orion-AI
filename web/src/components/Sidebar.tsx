@@ -52,6 +52,7 @@ const SECTIONS: Section[] = [
       { id: "mcp", label: "MCP", icon: "plug" },
       { id: "skills", label: "Skills", icon: "sparkles" },
       { id: "notifications", label: "Notificaciones", icon: "bell" },
+      { id: "diagnostics", label: "Diagnóstico", icon: "alert" },
       { id: "settings", label: "Ajustes", icon: "settings" },
     ],
   },
@@ -66,16 +67,23 @@ export function Sidebar({ collapsed = false }: Props) {
   const setView = useViewStore((s) => s.setView);
 
   return (
-    <nav className="flex flex-col gap-5 w-full">
-      {SECTIONS.map((sec) => (
+    <nav className="flex flex-col gap-4 w-full">
+      {SECTIONS.map((sec, idx) => (
         <div key={sec.label} className="flex flex-col gap-0.5">
+          {/* BRIEF G2 — separador de sección: solo tipografía + hairline
+              opcional encima (a partir de la 2.ª sección). Sin asteriscos
+              ni dots laterales: el label uppercase 9px con tracking amplio
+              ya comunica jerarquía. Cuando el rail está colapsado dejamos
+              solo el hairline para mantener la división espacial. */}
+          {idx > 0 && (
+            <div aria-hidden className="mx-3 mt-1 mb-1 h-px bg-white/[0.06] pointer-events-none" />
+          )}
           {!collapsed && (
-            <div className="px-3 mb-1.5 flex items-center gap-2">
-              <span className="h-1 w-1 rounded-full bg-pri/70 shadow-[0_0_4px_rgb(var(--orion-pri-glow))]" />
-              <div className="text-[9px] uppercase tracking-[0.28em] text-pri/85 font-semibold">
-                {sec.label}
-              </div>
-              <span className="h-1 w-1 rounded-full bg-pri/40" />
+            <div
+              className="px-3 mb-1 text-[9px] uppercase tracking-[0.22em]
+                         font-medium text-text-dim/35 select-none"
+            >
+              {sec.label}
             </div>
           )}
           {sec.items.map((it) => {
@@ -88,11 +96,11 @@ export function Sidebar({ collapsed = false }: Props) {
                 className={[
                   "group relative flex items-center rounded-md overflow-hidden",
                   collapsed ? "justify-center h-10 w-10 mx-auto" : "gap-3 px-3 h-9",
-                  "text-sm transition-all duration-150 ease-out-expo",
+                  "text-sm transition-all duration-200 ease-out-expo",
                   "border",
                   active
-                    ? "text-text border-pri/40"
-                    : "text-text-dim border-transparent hover:text-text hover:bg-pri/[0.035]",
+                    ? "text-text border-pri/45 shadow-[0_0_18px_-6px_rgb(var(--orion-pri-glow)/0.55)]"
+                    : "text-text-dim border-transparent hover:text-text hover:bg-pri/[0.05] hover:translate-x-0.5",
                 ].join(" ")}
               >
                 {/* Estado activo refinado:

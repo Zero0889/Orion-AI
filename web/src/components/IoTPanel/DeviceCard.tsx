@@ -66,12 +66,14 @@ export const DeviceCard = memo(function DeviceCard({ dev, config, onAct, onEdit,
     onAct(dev.id, { action: next ? "on" : "off" });
   }
 
+  // BRIEF G3 + G4: el chip del sensor es IDENTIFICACIÓN, no warning;
+  // usamos `info` (azul de marca) y traducimos el tipo a español.
   const chips = [
     caps.on_off && { tone: "info" as const, label: "on/off" },
     caps.dimmable && { tone: "accent" as const, label: "dim" },
     caps.rgb && { tone: "neutral" as const, label: "rgb" },
-    caps.sensor && { tone: "warn" as const, label: caps.sensor },
-  ].filter(Boolean) as { tone: "info" | "accent" | "neutral" | "warn"; label: string }[];
+    caps.sensor && { tone: "info" as const, label: translateSensorKind(caps.sensor) },
+  ].filter(Boolean) as { tone: "info" | "accent" | "neutral"; label: string }[];
 
   return (
     <Surface
@@ -120,7 +122,16 @@ export const DeviceCard = memo(function DeviceCard({ dev, config, onAct, onEdit,
                 </Badge>
               )}
             </div>
-            <code className="text-[10px] font-mono text-muted">{dev.transport}</code>
+            {/* BRIEF · IoT: el transport (mqtt/modbus/http) + topic largo
+                ocupa demasiado en una card. Mostramos solo el protocolo y
+                dejamos el resto en el tooltip; el panel de edición tiene
+                el detalle completo. */}
+            <code
+              className="text-[10px] font-mono text-muted truncate inline-block max-w-full"
+              title={dev.transport}
+            >
+              {shortTransport(dev.transport)}
+            </code>
           </div>
         </div>
 
@@ -353,4 +364,45 @@ function useStableId(): number {
   // since SVG <defs> ids only need to be unique on the page at a given moment.
   const [id] = useState(() => ++_sparkSeq);
   return id;
+}
+
+/* ── Traducción de tipo de sensor (BRIEF G4) ──────────────────────────
+   El backend manda kinds en inglés (`temperature`, `humidity`...). Acá
+   los pasamos a español para que el chip lea HUMEDAD, LUZ, etc. Tipos
+   desconocidos se preservan en su forma original (custom del usuario). */
+const SENSOR_LABEL_ES: Record<string, string> = {
+  temperature: "temperatura",
+  humidity: "humedad",
+  light: "luz",
+  motion: "movimiento",
+  presence: "presencia",
+  pressure: "presión",
+  proximity: "proximidad",
+  geo: "posición",
+  count: "cuenta",
+  contact: "contacto",
+  gas: "gas",
+  smoke: "humo",
+  sound: "sonido",
+};
+
+function translateSensorKind(kind: string): string {
+  const key = kind.toLowerCase().trim();
+  return SENSOR_LABEL_ES[key] ?? key;
+}
+
+/* ── Compactador del transport (BRIEF · IoT) ──────────────────────────
+   "mqtt://broker/sensor/abc#123/_topic" → "mqtt". El topic completo
+   queda en `title` (tooltip) y en el editor avanzado. La fila del
+   header no debe llevar identificadores técnicos largos. */
+function shortTransport(transport: string): string {
+  if (!transport) return "";
+  // Forma `protocolo://...` → solo el protocolo + "···"
+  const protoMatch = transport.match(/^([a-z]+):\/\//i);
+  if (protoMatch) {
+    return `${protoMatch[1]} ···`;
+  }
+  // Si ya es corto (un solo token), lo dejamos.
+  if (transport.length <= 24) return transport;
+  return `${transport.slice(0, 22)}…`;
 }

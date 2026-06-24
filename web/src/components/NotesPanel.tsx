@@ -16,6 +16,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { api, type NoteApi } from "@/api/rest";
+import { humanizeTime } from "@/lib/humanTime";
 import { QUERY_KEYS } from "@/query/keys";
 import { toast } from "@/stores/toast";
 import { Icon } from "@/ui/Icon";
@@ -210,8 +211,8 @@ export function NotesPanel() {
         {!loading && notes.length === 0 && (
           <Empty
             icon="notes"
-            title="Aún sin notas"
-            hint="Crea la primera arriba o pídele a Orion que la guarde por ti."
+            title="Aún no anoté nada por ti"
+            hint="Escribí la primera arriba, o pedímelo en voz alta y la capturo."
           />
         )}
         {!loading && notes.length > 0 && totalShown === 0 && (
@@ -371,23 +372,38 @@ function NoteCard({
   onRemove: () => void;
 }) {
   return (
+    // BRIEF · Notas:
+    //  · Quitamos el badge "NOTA" de cada card — redundante en una
+    //    sección llamada Notas. Solo mostramos "Anclada" cuando aplica.
+    //  · Texto de la nota a 15px para que sea legible sin esfuerzo.
+    //  · Hover: border-left de 2px del acento + lift sutil (-2px).
+    //  · Timestamp humanizado abajo a la derecha, sin prominencia.
     <Surface
       level={2}
       className={[
-        "group p-3.5 animate-fade-in-up transition-all duration-200",
-        note.pinned && "ring-1 ring-pri/30 bg-pri/[0.03]",
+        "group relative p-3.5 animate-fade-in-up transition-all duration-300 ease-spring",
+        "hover:-translate-y-0.5 hover:border-pri/25",
+        note.pinned ? "ring-1 ring-pri/30 bg-pri/[0.03]" : "",
       ]
         .filter(Boolean)
         .join(" ")}
       style={{ animationDelay: `${delay}ms` }}
     >
+      {/* barra accent que asoma al hover — sello visionOS */}
+      <span
+        aria-hidden
+        className="absolute left-0 top-3 bottom-3 w-[2px] rounded-r-full bg-pri/0
+                   group-hover:bg-pri/60 transition-colors duration-300
+                   shadow-[0_0_10px_rgb(var(--orion-pri-glow)/0.4)]"
+      />
+
       <header className="flex items-center justify-between gap-2 mb-2">
         {note.pinned ? (
           <Badge tone="info" dot>
             Anclada
           </Badge>
         ) : (
-          <span className="text-[10px] uppercase tracking-[0.18em] text-muted font-mono">Nota</span>
+          <span />
         )}
         <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
           <IconBtn
@@ -431,11 +447,11 @@ function NoteCard({
           </div>
         </div>
       ) : (
-        <p className="whitespace-pre-wrap text-sm leading-relaxed text-text">{note.text}</p>
+        <p className="whitespace-pre-wrap text-[15px] leading-relaxed text-text">{note.text}</p>
       )}
 
-      <footer className="mt-2 text-[10px] uppercase tracking-[0.18em] text-muted font-mono">
-        {note.updated}
+      <footer className="mt-2 flex justify-end text-[10px] text-muted/80 font-mono">
+        <span title={note.updated}>{humanizeTime(note.updated)}</span>
       </footer>
     </Surface>
   );

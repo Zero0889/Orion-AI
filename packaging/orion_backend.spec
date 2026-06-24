@@ -81,6 +81,32 @@ datas = [
     # Nota Fase 7: el asset github-logo.png se movió a web/public/ y va
     # dentro del bundle del frontend (web/dist/).
 ]
+
+# ── Tools auxiliares (binarios externos) ────────────────────────────────
+# Bundleamos `gog.exe` para que Gmail/Classroom/Drive/etc. funcionen out-
+# of-the-box en el .exe distribuido, sin pedirle al usuario que baje
+# binarios por separado. El runtime los busca en este orden:
+#   1. BASE_DIR/tools/<name>/<bin>      (user-writable; upgrades manuales)
+#   2. RESOURCES_DIR/tools/<name>/<bin> (esto — bundled, read-only)
+#   3. PATH del sistema
+#
+# Excluidos a propósito:
+#   - tools/gog/client_secret.json  (secreto OAuth del dev — el usuario
+#                                    crea el suyo en GCP, ver docs/SETUP_GOOGLE_OAUTH.md)
+#   - tools/classroom/token.json    (token del usuario)
+#   - tools/__pycache__             (caché de Python)
+#   - tools/*.py                    (scripts de testing del dev, no
+#                                    necesarios en runtime)
+_gog = ROOT / "tools" / "gog"
+if (_gog / "gog.exe").exists():
+    datas += [
+        (str(_gog / "gog.exe"),      "tools/gog"),
+    ]
+    # LICENSE/README/CHANGELOG van para compliance + transparencia con
+    # los usuarios. Tamaño insignificante.
+    for _aux in ("LICENSE", "README.md", "CHANGELOG.md"):
+        if (_gog / _aux).exists():
+            datas.append((str(_gog / _aux), "tools/gog"))
 # Algunos paquetes (google-genai, opencv, etc.) traen sus propios data.
 for pkg in ("google.genai", "google.api_core"):
     datas += collect_data_files(pkg)

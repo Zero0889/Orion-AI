@@ -86,7 +86,7 @@ describe("NotesPanel (TanStack Query POC)", () => {
     renderWithQuery(<NotesPanel />);
 
     await waitFor(() => {
-      expect(screen.getByText(/aún sin notas/i)).toBeInTheDocument();
+      expect(screen.getByText(/aún no anoté nada/i)).toBeInTheDocument();
     });
   });
 

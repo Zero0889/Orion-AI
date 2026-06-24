@@ -241,6 +241,72 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/diagnostics/info": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get Info */
+    get: operations["get_info_api_diagnostics_info_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/diagnostics/log/open-folder": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Open Log Folder
+     * @description Abre la carpeta de logs en el explorador del sistema.
+     *
+     *     Solo tiene efecto en el host local — si el usuario abrio Orion via
+     *     Tailscale desde otra PC, esto correra en la maquina del servidor
+     *     (donde uvicorn corre), no en la del cliente. Pero el 99% de los
+     *     usuarios usan localhost, asi que el trade-off vale la pena.
+     */
+    post: operations["open_log_folder_api_diagnostics_log_open_folder_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/diagnostics/log/tail": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Log Tail
+     * @description Devuelve las ultimas ``lines`` lineas del log activo.
+     *
+     *     Cap a 5000 lineas para evitar abusos accidentales (un panel que se
+     *     abre y cierra cada segundo no debe poder DoS-ar al backend leyendo
+     *     millones de bytes).
+     */
+    get: operations["log_tail_api_diagnostics_log_tail_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/files/current": {
     parameters: {
       query?: never;
@@ -1299,6 +1365,40 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/onboarding/save": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Save */
+    post: operations["save_api_onboarding_save_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/onboarding/status": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get Status */
+    get: operations["get_status_api_onboarding_status_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/settings/api_key": {
     parameters: {
       query?: never;
@@ -1677,6 +1777,37 @@ export interface components {
       /** Transport */
       transport: string;
     };
+    /** DiagnosticsInfo */
+    DiagnosticsInfo: {
+      /** Api Keys Path */
+      api_keys_path: string;
+      /**
+       * Base Dir
+       * @description Raiz user-writable (APPDATA en prod).
+       */
+      base_dir: string;
+      /** Config Dir */
+      config_dir: string;
+      /** Data Dir */
+      data_dir: string;
+      /** Frozen */
+      frozen: boolean;
+      /** Log Dir */
+      log_dir: string;
+      /** Log Path */
+      log_path: string;
+      /** Platform */
+      platform: string;
+      /** Python Version */
+      python_version: string;
+      /**
+       * Resources Dir
+       * @description Raiz read-only (assets bundled en prod).
+       */
+      resources_dir: string;
+      /** Sys Executable */
+      sys_executable: string;
+    };
     /** FromImageRequest */
     FromImageRequest: {
       /**
@@ -1711,6 +1842,22 @@ export interface components {
        */
       source: string;
     };
+    /** LogTailResult */
+    LogTailResult: {
+      /** Exists */
+      exists: boolean;
+      /** Lines */
+      lines: string[];
+      /** Path */
+      path: string;
+      /** Size Bytes */
+      size_bytes: number;
+      /**
+       * Truncated
+       * @description True si pedimos mas lineas de las que el archivo tiene.
+       */
+      truncated: boolean;
+    };
     /** MarkReadBody */
     MarkReadBody: {
       /** Uids */
@@ -1741,6 +1888,47 @@ export interface components {
       pinned?: boolean | null;
       /** Text */
       text?: string | null;
+    };
+    /** OnboardingSaveBody */
+    OnboardingSaveBody: {
+      /**
+       * Gemini Api Key
+       * @description API key de Google AI Studio. Formato típico: 'AIza…'.
+       */
+      gemini_api_key: string;
+      /**
+       * Validate Remote
+       * @description Hace un round-trip a Gemini para validar la key antes de persistir. Si está en False solo se chequea formato.
+       * @default true
+       */
+      validate_remote: boolean;
+    };
+    /** OnboardingSaveResult */
+    OnboardingSaveResult: {
+      /** Api Keys Path */
+      api_keys_path?: string | null;
+      /** Message */
+      message: string;
+      /** Ok */
+      ok: boolean;
+    };
+    /** OnboardingStatus */
+    OnboardingStatus: {
+      /** Api Keys Path */
+      api_keys_path: string;
+      /** Base Dir */
+      base_dir: string;
+      /** Config Dir */
+      config_dir: string;
+      /** Data Dir */
+      data_dir: string;
+      /** Has Api Key */
+      has_api_key: boolean;
+      /**
+       * Ready
+       * @description True si la app puede arrancar sin pasar por el wizard (API key presente).
+       */
+      ready: boolean;
     };
     /** ProteusAutodrawRequest */
     ProteusAutodrawRequest: {
@@ -2300,6 +2488,79 @@ export interface operations {
           [name: string]: unknown;
         };
         content?: never;
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  get_info_api_diagnostics_info_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["DiagnosticsInfo"];
+        };
+      };
+    };
+  };
+  open_log_folder_api_diagnostics_log_open_folder_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            [key: string]: unknown;
+          };
+        };
+      };
+    };
+  };
+  log_tail_api_diagnostics_log_tail_get: {
+    parameters: {
+      query?: {
+        lines?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["LogTailResult"];
+        };
       };
       /** @description Validation Error */
       422: {
@@ -4033,6 +4294,59 @@ export interface operations {
           "application/json": {
             [key: string]: unknown;
           };
+        };
+      };
+    };
+  };
+  save_api_onboarding_save_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["OnboardingSaveBody"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OnboardingSaveResult"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  get_status_api_onboarding_status_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OnboardingStatus"];
         };
       };
     };

@@ -7,22 +7,17 @@
  */
 
 import { useQuery } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { api, type NotebookLMStatus, type SharingState, type ThemeInfo } from "@/api/rest";
 import { GogAccountsCard } from "@/components/GogAccountsCard";
+import { deriveAccent, extractDominantColor } from "@/lib/imageColor";
 import { QUERY_KEYS } from "@/query/keys";
+import { usePersonalization } from "@/stores/personalization";
 import { toast } from "@/stores/toast";
 import { Icon, type IconName } from "@/ui/Icon";
 import { Badge, Button, Empty, SectionHeader, Surface, Switch } from "@/ui/primitives";
-import { toggleLightDark, isLightTheme } from "@/App";
-
-interface Palette {
-  PRI?: string;
-  PANEL?: string;
-  BG?: string;
-  ACC?: string;
-}
+import { resolveTheme, toggleLightDark, isLightTheme } from "@/App";
 
 type Tab = "appearance" | "network" | "integrations" | "voice" | "data" | "about";
 const TABS: { id: Tab; label: string; icon: IconName }[] = [
@@ -44,15 +39,6 @@ export function SettingsPanel() {
     queryFn: () => api.getTheme(),
   });
 
-  // Cache local de paletas — acumula `{ themeName → palette }` a medida
-  // que el usuario va probando temas, para no refetchear cuando vuelve.
-  // No es server-state: lo va llenando `pick()` con la respuesta de
-  // setTheme. La query del tema activo se sincroniza acá via useEffect.
-  const [palettes, setPalettes] = useState<Record<string, Palette>>({});
-  useEffect(() => {
-    if (info) setPalettes((p) => ({ ...p, [info.name]: info.theme as Palette }));
-  }, [info]);
-
   // Errores: la query expone su propio error; pick() puede fallar aparte.
   // Unificamos en un único string mostrado en la UI.
   const [pickError, setPickError] = useState<string | null>(null);
@@ -61,8 +47,7 @@ export function SettingsPanel() {
   async function pick(name: string) {
     if (!info || info.name === name) return;
     try {
-      const r = await api.setTheme(name);
-      setPalettes((p) => ({ ...p, [name]: r.theme as Palette }));
+      await api.setTheme(name);
       setPickError(null);
     } catch (e) {
       setPickError(String(e));
@@ -121,7 +106,7 @@ export function SettingsPanel() {
             </div>
           )}
 
-          {tab === "appearance" && <Appearance info={info} palettes={palettes} onPick={pick} />}
+          {tab === "appearance" && <Appearance info={info} onPick={pick} />}
 
           {tab === "network" && <Network onError={setPickError} />}
 
@@ -185,15 +170,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   );
 }
 
-function Appearance({
-  info,
-  palettes,
-  onPick,
-}: {
-  info: ThemeInfo | null;
-  palettes: Record<string, Palette>;
-  onPick: (name: string) => void;
-}) {
+function Appearance({ info, onPick }: { info: ThemeInfo | null; onPick: (name: string) => void }) {
   const [light, setLight] = useState(() => isLightTheme());
 
   function handleLightDarkToggle() {
@@ -241,58 +218,465 @@ function Appearance({
         </Surface>
       </Section>
 
-      {/* Color palette picker */}
+      {/* Color del Ojo — sobrescribe --orion-pri / --orion-acc en vivo */}
+      <EyeColorPicker />
+
+      {/* Color palette picker con mini-previews + agrupado por familia
+          (BRIEF · Ajustes). Cada paleta se ubica en uno de tres grupos
+          según la slug resuelta — fallback: Especiales si el backend
+          devuelve algo que no caemos en otro. */}
       <Section title="Paleta de color">
         <p className="text-xs text-text-dim/80 mb-4 leading-relaxed">
-          Cambia la paleta global. El frontend reacciona al evento{" "}
-          <code className="text-acc font-mono text-[11px]">settings.theme</code> y aplica el nuevo
-          tema en caliente.
+          Cada miniatura es una versión micro de la interfaz con esa paleta aplicada en tiempo real.
         </p>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
-          {info.available.map((t, i) => {
-            const active = t.id === info.name;
-            const palette = palettes[t.id];
-            return (
-              <button
-                key={t.id}
-                onClick={() => onPick(t.id)}
-                style={{ animationDelay: `${i * 40}ms` }}
-                className={[
-                  "group relative rounded-xl border px-4 py-3.5 text-left animate-fade-in-up",
-                  "transition-all duration-200 ease-out-expo",
-                  active
-                    ? "bg-pri/8 border-pri/40 shadow-glow-soft"
-                    : "bg-elevated/40 border-white/[0.06] hover:border-white/[0.14] hover:bg-elevated/70",
-                ].join(" ")}
-              >
-                <div className="flex items-center gap-3">
-                  <div className="flex gap-0.5">
-                    <Swatch color={palette?.BG ?? "#0A0B0F"} />
-                    <Swatch color={palette?.PANEL ?? "#11131A"} />
-                    <Swatch color={palette?.PRI ?? "#6D7CFF"} />
-                    <Swatch color={palette?.ACC ?? "#7EE7FF"} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-sm font-medium text-text truncate">{t.name}</div>
-                    <code className="text-[10px] font-mono text-muted">{t.id}</code>
-                  </div>
-                  {active && <Icon name="check" size={16} className="text-pri shrink-0" />}
-                </div>
-              </button>
-            );
-          })}
-        </div>
+        <ThemeGroupedGrid available={info.available} activeId={info.name} onPick={onPick} />
       </Section>
+
+      {/* Fondo personalizado del usuario (subir wallpaper) */}
+      <WallpaperSection />
     </>
   );
 }
 
-function Swatch({ color }: { color: string }) {
+/* ── Agrupador de paletas (BRIEF · Ajustes) ──────────────────────────
+   Separa la lista del backend en tres familias:
+     · Oscuros    — los temas base / sobrios (night, light)
+     · Neón       — alto contraste y saturación (cyan, green, red)
+     · Especiales — desviaciones temáticas (violet, emerald, amber, purple)
+   El mapping es por slug resuelto, así sobrevive a cambios de nombre
+   en el backend. Cualquier slug nuevo cae en "Especiales" por defecto. */
+type ThemeGroup = "oscuros" | "neon" | "especiales";
+
+function themeGroup(slug: string): ThemeGroup {
+  if (slug === "orion-night" || slug === "orion-light") return "oscuros";
+  if (slug === "orion-cyan" || slug === "orion-green" || slug === "orion-red") return "neon";
+  return "especiales";
+}
+
+const GROUP_ORDER: ThemeGroup[] = ["oscuros", "neon", "especiales"];
+const GROUP_LABELS: Record<ThemeGroup, string> = {
+  oscuros: "Oscuros",
+  neon: "Neón",
+  especiales: "Especiales",
+};
+
+function ThemeGroupedGrid({
+  available,
+  activeId,
+  onPick,
+}: {
+  available: ThemeInfo["available"];
+  activeId: string;
+  onPick: (id: string) => void;
+}) {
+  // Particiono por grupo manteniendo el orden interno del backend
+  // (preserva la lista canónica si el backend ya viene priorizada).
+  const buckets: Record<ThemeGroup, typeof available> = {
+    oscuros: [],
+    neon: [],
+    especiales: [],
+  };
+  for (const t of available) {
+    buckets[themeGroup(resolveTheme(t.id))].push(t);
+  }
+
   return (
-    <span
-      className="block w-4 h-8 rounded border border-white/[0.08]"
-      style={{ background: color }}
-    />
+    <div className="flex flex-col gap-5">
+      {GROUP_ORDER.map((group) => {
+        const items = buckets[group];
+        if (items.length === 0) return null;
+        return (
+          <div key={group}>
+            <div className="orion-label text-text-dim/55 mb-2">{GROUP_LABELS[group]}</div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+              {items.map((t, i) => {
+                const active = t.id === activeId;
+                const slug = resolveTheme(t.id);
+                return (
+                  <button
+                    key={t.id}
+                    onClick={() => onPick(t.id)}
+                    style={{ animationDelay: `${i * 40}ms` }}
+                    className={[
+                      "group relative rounded-xl border p-2 text-left animate-fade-in-up",
+                      "transition-all duration-200 ease-out-expo",
+                      active
+                        ? "bg-pri/8 border-pri/40 shadow-glow-soft"
+                        : "bg-elevated/40 border-white/[0.06] hover:border-white/[0.14] hover:bg-elevated/70",
+                    ].join(" ")}
+                  >
+                    <ThemeMini slug={slug} />
+                    <div className="flex items-center gap-2 px-1.5 pt-2 pb-0.5">
+                      <div className="flex-1 min-w-0">
+                        <div className="text-[12px] font-medium text-text truncate">{t.name}</div>
+                        <code className="text-[9px] font-mono text-muted">{t.id}</code>
+                      </div>
+                      {active && <Icon name="check" size={14} className="text-pri shrink-0" />}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+/* ── ThemeMini — micro-preview real de la UI con esa paleta aplicada ──
+   Usa `data-theme={slug}` para que el CSS resuelva los tokens del tema
+   correcto sin tener que fetchear paleta del backend. Muestra un
+   sidebar diminuto + glow radial + un "ojo" como bullet central. */
+function ThemeMini({ slug }: { slug: string }) {
+  return (
+    <div
+      data-theme={slug}
+      style={{
+        position: "relative",
+        height: 64,
+        borderRadius: 8,
+        overflow: "hidden",
+        background: "rgb(var(--orion-bg))",
+        border: "1px solid rgb(var(--orion-border) / 0.1)",
+        display: "flex",
+      }}
+    >
+      <div
+        style={{
+          width: 22,
+          height: "100%",
+          background: "rgb(var(--orion-surface))",
+          borderRight: "1px solid rgb(var(--orion-pri) / 0.2)",
+          display: "flex",
+          flexDirection: "column",
+          gap: 3,
+          padding: 5,
+          boxSizing: "border-box",
+        }}
+      >
+        <span style={{ height: 3, borderRadius: 2, background: "rgb(var(--orion-pri))" }} />
+        <span
+          style={{ height: 3, borderRadius: 2, background: "rgb(var(--orion-border) / 0.2)" }}
+        />
+        <span
+          style={{ height: 3, borderRadius: 2, background: "rgb(var(--orion-border) / 0.2)" }}
+        />
+      </div>
+      <div
+        style={{
+          flex: 1,
+          display: "grid",
+          placeItems: "center",
+          background:
+            "radial-gradient(circle at 50% 45%, rgb(var(--orion-pri-glow) / 0.18), transparent 70%)",
+        }}
+      >
+        <span
+          style={{
+            width: 22,
+            height: 22,
+            borderRadius: 999,
+            background:
+              "radial-gradient(circle, #fff 0%, rgb(var(--orion-pri)) 55%, rgb(var(--orion-acc)) 100%)",
+            boxShadow: "0 0 12px rgb(var(--orion-pri-glow))",
+          }}
+        />
+      </div>
+    </div>
+  );
+}
+
+/* ── EyeColorPicker — 6 swatches que sobrescriben --orion-pri/acc ─────
+   Persiste el override en localStorage via usePersonalization. Pulsar el
+   swatch activo lo apaga (vuelve a los colores del tema). */
+const EYE_COLORS: { name: string; pri: string; acc: string }[] = [
+  { name: "Azur", pri: "96 99 236", acc: "99 102 241" },
+  { name: "Cian", pri: "42 255 214", acc: "26 184 255" },
+  { name: "Esmeralda", pri: "52 211 153", acc: "110 231 183" },
+  { name: "Violeta", pri: "167 139 250", acc: "232 121 249" },
+  { name: "Ámbar", pri: "251 191 36", acc: "252 211 77" },
+  { name: "Carmín", pri: "255 42 77", acc: "255 107 26" },
+];
+
+function EyeColorPicker() {
+  const eyeColorPri = usePersonalization((s) => s.eyeColorPri);
+  const setEyeColor = usePersonalization((s) => s.setEyeColor);
+  const clearEyeColor = usePersonalization((s) => s.clearEyeColor);
+
+  return (
+    <Section title="Color del Ojo">
+      <p className="text-xs text-text-dim/80 mb-4 leading-relaxed">
+        Sobrescribe el acento del tema activo. Afecta al Ojo, al chrome y a cualquier elemento que
+        use el color primario. Persiste solo en este navegador.
+      </p>
+      <Surface level={2} className="p-4 flex flex-wrap items-center gap-2">
+        {EYE_COLORS.map((c) => {
+          const active = eyeColorPri === c.pri;
+          return (
+            <button
+              key={c.name}
+              onClick={() => (active ? clearEyeColor() : setEyeColor(c.pri, c.acc))}
+              title={c.name}
+              className={[
+                "flex items-center gap-2 pl-1.5 pr-3 py-1.5 rounded-full border",
+                "bg-elevated transition-all duration-200 ease-out-expo",
+                active ? "" : "border-white/[0.08] hover:border-white/[0.18]",
+              ].join(" ")}
+              style={
+                active
+                  ? {
+                      borderColor: `rgb(${c.pri})`,
+                      boxShadow: `0 0 12px -2px rgb(${c.pri} / 0.6)`,
+                    }
+                  : undefined
+              }
+            >
+              <span
+                className="h-5 w-5 rounded-full shrink-0"
+                style={{
+                  background: `radial-gradient(circle, rgb(${c.pri}), rgb(${c.acc}))`,
+                  boxShadow: `0 0 8px rgb(${c.pri} / 0.7)`,
+                }}
+              />
+              <span className="text-[12px] font-medium text-text">{c.name}</span>
+            </button>
+          );
+        })}
+        {eyeColorPri && (
+          <button
+            onClick={clearEyeColor}
+            className="ml-auto text-[11px] text-text-dim hover:text-text underline-offset-2 hover:underline"
+          >
+            Restaurar tema
+          </button>
+        )}
+      </Surface>
+    </Section>
+  );
+}
+
+/* ── WallpaperSection — fondo personalizado del usuario ──────────────
+   Carga la imagen como dataURL via FileReader, persiste en localStorage
+   (puede fallar por quota si la imagen pesa varios MB → toast de error).
+   Dos sliders sobre el wallpaper: blur (legibilidad del contenido) y
+   overlay (oscurecido). Preview en vivo dentro del card. */
+function WallpaperSection() {
+  const wallpaper = usePersonalization((s) => s.wallpaper);
+  const blur = usePersonalization((s) => s.wallpaperBlur);
+  const overlay = usePersonalization((s) => s.wallpaperOverlay);
+  const autoColor = usePersonalization((s) => s.autoColorFromWallpaper);
+  const setWallpaper = usePersonalization((s) => s.setWallpaper);
+  const setBlur = usePersonalization((s) => s.setWallpaperBlur);
+  const setOverlay = usePersonalization((s) => s.setWallpaperOverlay);
+  const setAutoColor = usePersonalization((s) => s.setAutoColorFromWallpaper);
+  const setEyeColor = usePersonalization((s) => s.setEyeColor);
+  const clearWallpaper = usePersonalization((s) => s.clearWallpaper);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // Extrae el color dominante de un dataURL y lo aplica como override
+  // del Ojo (pri + acc derivado). Reusable: lo llamamos automáticamente
+  // al subir un wallpaper si autoColor está activo, y manualmente desde
+  // el botón "Adoptar color del fondo".
+  async function applyAutoColorFromDataUrl(dataUrl: string, silent = false) {
+    try {
+      const dominant = await extractDominantColor(dataUrl);
+      const accent = deriveAccent(dominant);
+      setEyeColor(dominant.triplet, accent.triplet);
+      if (!silent) {
+        toast.success(
+          "Ojo sincronizado al fondo",
+          "Detecté el color dominante de tu imagen y lo apliqué al Ojo.",
+        );
+      }
+    } catch (e) {
+      if (!silent) {
+        toast.warn("No pude analizar la imagen", String(e));
+      }
+    }
+  }
+
+  function handleFile(file: File) {
+    if (!file.type.startsWith("image/")) {
+      toast.error("Tipo de archivo no soportado", "Subí una imagen (PNG, JPG, WebP).");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = String(reader.result);
+      try {
+        setWallpaper(dataUrl);
+        toast.success("Fondo aplicado", "El wallpaper ya está activo en toda la interfaz.");
+        // Si el usuario quiere que el Ojo se adapte al wallpaper,
+        // extraemos el color dominante en background y lo aplicamos.
+        // Es async pero no necesitamos bloquear la UI por esto.
+        if (autoColor) {
+          void applyAutoColorFromDataUrl(dataUrl, true);
+        }
+      } catch {
+        toast.error(
+          "La imagen es demasiado grande",
+          "El almacenamiento local no alcanza. Probá con una versión más liviana (<3 MB).",
+        );
+      }
+    };
+    reader.onerror = () => toast.error("No pude leer la imagen", String(reader.error));
+    reader.readAsDataURL(file);
+  }
+
+  return (
+    <Section title="Fondo personalizado">
+      <p className="text-xs text-text-dim/80 mb-4 leading-relaxed">
+        Subí una imagen tuya y la uso como fondo de la interfaz. Si no hay imagen, sigue
+        renderizándose el NeuralBackground por defecto.
+      </p>
+      <Surface level={2} className="p-4">
+        {/* Preview en vivo */}
+        <div
+          className="relative h-32 rounded-lg overflow-hidden border border-white/[0.06] mb-4"
+          style={{ background: "rgb(var(--orion-sunken))" }}
+        >
+          {wallpaper ? (
+            <>
+              <div
+                className="absolute inset-0"
+                style={{
+                  backgroundImage: `url(${wallpaper})`,
+                  backgroundSize: "cover",
+                  backgroundPosition: "center",
+                  filter: `blur(${Math.min(blur, 24)}px)`,
+                  transform: `scale(${1 + blur / 200})`,
+                }}
+              />
+              <div
+                className="absolute inset-0"
+                style={{ background: `rgb(var(--orion-bg) / ${overlay / 100})` }}
+              />
+              <div className="absolute inset-0 grid place-items-center">
+                <span className="text-[10px] uppercase tracking-[0.22em] text-text-dim/70 font-mono">
+                  vista previa
+                </span>
+              </div>
+            </>
+          ) : (
+            <div className="absolute inset-0 grid place-items-center text-[11px] text-muted">
+              Sin fondo · usando NeuralBackground
+            </div>
+          )}
+        </div>
+
+        {/* Acciones */}
+        <div className="flex flex-wrap items-center gap-2 mb-4">
+          <input
+            ref={inputRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) handleFile(f);
+              e.target.value = "";
+            }}
+          />
+          <Button
+            variant="primary"
+            size="sm"
+            icon="upload"
+            onClick={() => inputRef.current?.click()}
+          >
+            {wallpaper ? "Cambiar imagen" : "Subir imagen"}
+          </Button>
+          {wallpaper && (
+            <>
+              <Button
+                variant="ghost"
+                size="sm"
+                icon="sparkles"
+                onClick={() => void applyAutoColorFromDataUrl(wallpaper)}
+                title="Re-extraer el color dominante del wallpaper y aplicarlo al Ojo"
+              >
+                Adoptar color del fondo
+              </Button>
+              <Button variant="ghost" size="sm" icon="close" onClick={clearWallpaper}>
+                Quitar fondo
+              </Button>
+            </>
+          )}
+        </div>
+
+        {/* Toggle: que el Ojo se adapte automáticamente al subir
+            wallpapers nuevos. Independiente del Eye color picker —
+            el usuario puede mantener autoColor on Y picar manualmente
+            uno de los swatches después; el último gana. */}
+        <div className="flex items-center justify-between gap-3 py-3 border-t border-white/[0.05]">
+          <div className="min-w-0">
+            <div className="text-sm font-medium text-text">Adaptar color del Ojo al fondo</div>
+            <div className="text-[11px] text-text-dim leading-snug mt-0.5">
+              Cuando subas una imagen detecto su color dominante y lo aplico al Ojo automáticamente.
+            </div>
+          </div>
+          <Switch on={autoColor} onClick={() => setAutoColor(!autoColor)} />
+        </div>
+
+        {/* Sliders blur + overlay (solo si hay wallpaper) */}
+        {wallpaper && (
+          <div className="space-y-3 pt-3 border-t border-white/[0.05]">
+            <SliderRow
+              label="Desenfoque"
+              value={blur}
+              min={0}
+              max={40}
+              unit="px"
+              onChange={setBlur}
+            />
+            <SliderRow
+              label="Oscurecido"
+              value={overlay}
+              min={0}
+              max={90}
+              unit="%"
+              onChange={setOverlay}
+            />
+          </div>
+        )}
+      </Surface>
+    </Section>
+  );
+}
+
+function SliderRow({
+  label,
+  value,
+  min,
+  max,
+  unit,
+  onChange,
+}: {
+  label: string;
+  value: number;
+  min: number;
+  max: number;
+  unit: string;
+  onChange: (n: number) => void;
+}) {
+  return (
+    <div className="flex items-center gap-3">
+      <span className="text-[11px] uppercase tracking-[0.18em] text-text-dim w-24 shrink-0">
+        {label}
+      </span>
+      <input
+        type="range"
+        min={min}
+        max={max}
+        value={value}
+        onChange={(e) => onChange(Number(e.target.value))}
+        className="flex-1 accent-pri"
+      />
+      <span className="text-xs font-mono tabular-nums w-12 text-right text-text-dim">
+        {value}
+        {unit}
+      </span>
+    </div>
   );
 }
 
@@ -586,7 +970,9 @@ function NotebookLMCard() {
             <h4 className="text-sm font-semibold text-text">NotebookLM</h4>
             <SessionBadge tone={sessionTone} label={sessionLabel} pulse={inProgress} />
             {!status.installed && (
-              <Badge tone="danger" dot>
+              // BRIEF G3: falta de CLI es atención pendiente, no error
+              // runtime. Ámbar — el usuario sabe qué hacer (instalar).
+              <Badge tone="warn" dot>
                 Sin CLI
               </Badge>
             )}

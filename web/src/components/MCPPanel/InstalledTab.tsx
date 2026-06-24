@@ -80,11 +80,41 @@ export function InstalledTab({
       </section>
 
       {servers.length > 0 && (
-        <div className="px-6 pb-6 text-[11px] text-text-dim">
-          {enabledCount} habilitados · {runningCount} corriendo · {toolsCount} tools registradas
+        // BRIEF · MCP: stats al pie como stat-chips compactos
+        // (en lugar de un párrafo plano "0 habilitados · 0 corriendo…").
+        // Cada chip lleva ícono propio + número monoespaciado.
+        <div className="px-6 pb-6 flex flex-wrap items-center gap-2">
+          <StatChip icon="bolt" label="activos" value={enabledCount} />
+          <StatChip icon="play" label="corriendo" value={runningCount} />
+          <StatChip icon="plug" label="tools registradas" value={toolsCount} />
         </div>
       )}
     </>
+  );
+}
+
+/* ── Stat chip al pie de la lista ──────────────────────────────────── */
+
+function StatChip({
+  icon,
+  label,
+  value,
+}: {
+  icon: React.ComponentProps<typeof Icon>["name"];
+  label: string;
+  value: number;
+}) {
+  return (
+    <span
+      className="inline-flex items-center gap-1.5 pl-1.5 pr-2.5 py-1 rounded-full
+                 bg-elevated/60 border border-white/[0.06] text-[11px]"
+    >
+      <span className="grid place-items-center h-5 w-5 rounded-full bg-pri/15 text-pri">
+        <Icon name={icon} size={11} />
+      </span>
+      <span className="font-mono tabular-nums text-text font-medium">{value}</span>
+      <span className="text-text-dim uppercase tracking-[0.16em] text-[10px]">{label}</span>
+    </span>
   );
 }
 
@@ -107,15 +137,19 @@ function ServerCard({
   onDelete: () => void;
   onRestart: () => void;
 }) {
+  // BRIEF · MCP: "deshabilitado" en rojo es alarmista para el estado
+  // normal de un server apagado. Lo bajamos a "inactivo" gris-azulado
+  // (sem-inactive). Solo `server.error` (failure real del subprocess)
+  // se queda en danger.
   const statusTone = !server.enabled
-    ? "muted"
+    ? "inactive"
     : server.error
       ? "danger"
       : server.running
         ? "ok"
         : "warn";
   const statusLabel = !server.enabled
-    ? "deshabilitado"
+    ? "inactivo"
     : server.error
       ? "error"
       : server.running
@@ -139,9 +173,16 @@ function ServerCard({
             <StatusPill tone={statusTone} label={statusLabel} />
             {server.tool_count > 0 && <Badge tone="info">{server.tool_count} tools</Badge>}
           </div>
-          <div className="text-[11px] text-text-dim truncate font-mono">
-            {server.command}
-            {server.args.length > 0 && <span className="text-muted"> {server.args.join(" ")}</span>}
+          {/* BRIEF · MCP: el comando npm completo
+              (`npx -y @modelcontextprotocol/server-foo`) llena la
+              fila sin aportar. Mostramos solo el package name (o el
+              último arg legible) y dejamos el comando completo en el
+              tooltip + en la sección expandida. */}
+          <div
+            className="text-[11px] text-text-dim truncate font-mono"
+            title={`${server.command} ${server.args.join(" ")}`.trim()}
+          >
+            {shortenCommand(server.command, server.args)}
           </div>
           {server.error && (
             <div className="text-[11px] text-danger mt-1 truncate">{server.error}</div>
@@ -177,27 +218,46 @@ function ServerCard({
         </div>
       </div>
 
-      {/* expanded: tools list */}
+      {/* expanded: comando completo + tools list */}
       {expanded && (
-        <div className="border-t border-white/[0.05] bg-sunken/30 px-4 py-3 animate-fade-in">
-          {server.tools.length === 0 ? (
-            <div className="text-xs text-text-dim">
-              {server.running
-                ? "El server no expuso ninguna tool."
-                : "Iniciá el server para ver las tools."}
+        <div className="border-t border-white/[0.05] bg-sunken/30 px-4 py-3 animate-fade-in space-y-3">
+          <div>
+            <div className="text-[9px] uppercase tracking-[0.22em] text-text-dim mb-1.5">
+              Comando completo
             </div>
-          ) : (
-            <ul className="flex flex-col gap-1.5">
-              {server.tools.map((t) => (
-                <li key={t.name} className="text-xs">
-                  <span className="font-mono text-text">
-                    {server.id}__{t.name}
-                  </span>
-                  {t.description && <span className="text-text-dim"> · {t.description}</span>}
-                </li>
-              ))}
-            </ul>
-          )}
+            <code className="block text-[11px] font-mono text-text/85 break-all leading-relaxed">
+              {server.command}
+              {server.args.length > 0 && (
+                <span className="text-text-dim"> {server.args.join(" ")}</span>
+              )}
+            </code>
+          </div>
+          <div>
+            <div className="text-[9px] uppercase tracking-[0.22em] text-text-dim mb-1.5">
+              Tools registradas{" "}
+              {server.tools.length > 0 && (
+                <span className="text-text/60 font-mono">({server.tools.length})</span>
+              )}
+            </div>
+            {server.tools.length === 0 ? (
+              <div className="text-xs text-text-dim">
+                {server.running
+                  ? "El server no expuso ninguna tool."
+                  : "Iniciá el server para ver las tools."}
+              </div>
+            ) : (
+              <ul className="flex flex-col gap-1.5">
+                {server.tools.map((t) => (
+                  <li key={t.name} className="text-xs">
+                    <span className="font-mono text-text">
+                      {server.id}__{t.name}
+                    </span>
+                    {t.description && <span className="text-text-dim"> · {t.description}</span>}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
         </div>
       )}
     </Surface>
@@ -206,15 +266,43 @@ function ServerCard({
 
 /* ── Pill de estado ───────────────────────────────────────────────── */
 
+/* ── Compactador del comando del server (BRIEF · MCP) ─────────────────
+   Toma `npx -y @modelcontextprotocol/server-foo` y devuelve solo el
+   package name (`@modelcontextprotocol/server-foo`). Si no encuentra un
+   "spec" obvio (uvx, pip, etc), cae al binario + último arg.
+
+   Casos cubiertos:
+     npx -y @x/y       → @x/y
+     uvx mcp-server-x  → mcp-server-x
+     node script.js    → node script.js
+     python -m foo     → python -m foo
+*/
+function shortenCommand(cmd: string, args: string[]): string {
+  // npm/npx: ignoramos flags y nos quedamos con el primer non-flag arg
+  // que suele ser el package name.
+  if (/^(npx|npm|pnpm|yarn|bunx|uvx)$/i.test(cmd)) {
+    const pkg = args.find((a) => !a.startsWith("-"));
+    if (pkg) return pkg;
+  }
+  // Fallback: comando + un solo arg para no llenar la fila.
+  if (args.length === 0) return cmd;
+  if (args.length === 1) return `${cmd} ${args[0]}`;
+  return `${cmd} ${args[0]} …`;
+}
+
 function StatusPill({ tone, label }: { tone: string; label: string }) {
+  // BRIEF G3 — el dot codifica el estado; la cápsula queda siempre
+  // gris/translúcida (no rojo de fondo) salvo error real.
   const dotColor =
     tone === "ok"
-      ? "bg-ok shadow-[0_0_8px_rgb(var(--orion-ok))]"
+      ? "bg-sem-success shadow-[0_0_8px_rgb(var(--sem-success))]"
       : tone === "danger"
-        ? "bg-danger"
+        ? "bg-sem-error"
         : tone === "warn"
-          ? "bg-warn"
-          : "bg-muted";
+          ? "bg-sem-warning"
+          : tone === "inactive"
+            ? "bg-sem-inactive"
+            : "bg-muted";
   return (
     <span
       className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full

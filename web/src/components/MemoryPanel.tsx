@@ -299,8 +299,8 @@ export function MemoryPanel() {
           <div className="flex flex-col gap-4">
             <Empty
               icon={active.icon}
-              title="Sin entradas en esta categoría"
-              hint="Pulsa una sugerencia abajo o pídeselo a Orion durante la charla."
+              title="Aún no sé quién eres"
+              hint="Preséntate durante nuestra próxima charla, o pulsá una sugerencia para empezar."
             />
             {unusedSuggestions.length > 0 && (
               <SuggestionChips items={unusedSuggestions} onPick={fillFromSuggestion} />

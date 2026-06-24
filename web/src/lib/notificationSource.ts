@@ -77,14 +77,8 @@ export function stripLeadingEmoji(s: string): string {
   return s.replace(/^[\p{Extended_Pictographic}️‍\s]+/u, "");
 }
 
-/** "hace 5 min" / "hace 2 h" / "ayer" / fecha corta. */
-export function formatRelative(ts: number): string {
-  const now = Date.now() / 1000;
-  const diff = Math.max(0, now - ts);
-  if (diff < 60) return "ahora";
-  if (diff < 3600) return `hace ${Math.floor(diff / 60)} min`;
-  if (diff < 86400) return `hace ${Math.floor(diff / 3600)} h`;
-  if (diff < 86400 * 2) return "ayer";
-  if (diff < 86400 * 7) return `hace ${Math.floor(diff / 86400)} d`;
-  return new Date(ts * 1000).toLocaleDateString();
-}
+/** "hace 5 min" / "hace 2 h" / "ayer 22:14" / "mié 18 jun" / etc.
+ *  Wrapper de `humanizeUnix` para no romper consumidores que importan
+ *  `formatRelative` desde acá. La implementación canónica vive en
+ *  `lib/humanTime.ts` (BRIEF G6 — un único helper para toda la UI). */
+export { humanizeUnix as formatRelative } from "@/lib/humanTime";

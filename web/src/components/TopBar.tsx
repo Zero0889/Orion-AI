@@ -29,6 +29,7 @@ const VIEW_TITLE: Record<View, { eyebrow: string; title: string }> = {
   skills: { eyebrow: "Sistema", title: "Skills" },
   notifications: { eyebrow: "Sistema", title: "Notificaciones" },
   circuit: { eyebrow: "Herramientas", title: "Circuitos" },
+  diagnostics: { eyebrow: "Sistema", title: "Diagnóstico" },
   settings: { eyebrow: "Sistema", title: "Ajustes" },
 };
 

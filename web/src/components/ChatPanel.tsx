@@ -33,15 +33,39 @@ import { prettyToolName } from "@/lib/toolLabels";
 import { useInteractionStore } from "@/stores/interaction";
 import { useOrionStore } from "@/stores/orion";
 import type { ChatMessage, LogRole } from "@/types";
-import { Icon } from "@/ui/Icon";
+import { Icon, type IconName } from "@/ui/Icon";
 import { Button, Kbd } from "@/ui/primitives";
 import { useEyeState } from "@/widgets/eye";
 
-const SUGGESTIONS: { eyebrow: string; prompt: string }[] = [
-  { eyebrow: "Sistema", prompt: "¿Cómo está el sistema ahora mismo?" },
-  { eyebrow: "Memoria", prompt: "Recuérdame mis proyectos activos." },
-  { eyebrow: "Hogar", prompt: "Pon una escena tranquila en el salón." },
-  { eyebrow: "Agentes", prompt: "Lanza una tarea para resumir mis notas." },
+// BRIEF · Conversación: cada categoría con un acento de color propio
+// (Sistema=azul de marca, Memoria=violeta, Hogar=verde, Agentes=ámbar).
+// El token CSS lo resuelve el render (var() inline) para que respete
+// el override del tema activo del usuario.
+const SUGGESTIONS: { eyebrow: string; prompt: string; identity: string; icon: IconName }[] = [
+  {
+    eyebrow: "Sistema",
+    prompt: "¿Cómo está el sistema ahora mismo?",
+    identity: "--orion-pri",
+    icon: "telemetry",
+  },
+  {
+    eyebrow: "Memoria",
+    prompt: "Recuérdame mis proyectos activos.",
+    identity: "--agent-analyst",
+    icon: "memory",
+  },
+  {
+    eyebrow: "Hogar",
+    prompt: "Pon una escena tranquila en el salón.",
+    identity: "--sem-success",
+    icon: "iot",
+  },
+  {
+    eyebrow: "Agentes",
+    prompt: "Lanza una tarea para resumir mis notas.",
+    identity: "--agent-writer",
+    icon: "agents",
+  },
 ];
 
 interface Props {
@@ -145,6 +169,9 @@ export function ChatPanel({ send }: Props) {
    el primer turno. Vista estable: no se cierra sola con mensajes de
    sistema, no parpadea. */
 function Hero({ onPick }: { onPick: (p: string) => void }) {
+  const eyeState = useEyeState();
+  const listening = eyeState === "listening";
+  const responding = eyeState === "speaking";
   // El Hero ya vive dentro de un scroll container del ChatPanel. NO
   // anidamos otro scroll acá: usábamos `h-full overflow-y-auto` +
   // `min-h-full + justify-center` y cuando la suma de eye + greeting +
@@ -154,7 +181,8 @@ function Hero({ onPick }: { onPick: (p: string) => void }) {
   // scroll y nos posicionamos top-aligned con padding razonable.
   return (
     <div className="min-h-full flex flex-col items-center px-6 pt-12 pb-6 animate-fade-in">
-      {/* OJO centerpiece. Halo radial detrás. */}
+      {/* OJO centerpiece. Halo radial detrás + onda de audio reactiva
+          debajo cuando ORION está escuchando o respondiendo (brief). */}
       <div className="relative flex flex-col items-center">
         <div
           className="absolute top-0 left-1/2 -translate-x-1/2 h-56 w-56 rounded-full
@@ -162,6 +190,10 @@ function Hero({ onPick }: { onPick: (p: string) => void }) {
                         blur-3xl pointer-events-none animate-halo"
         />
         <OrbHUD />
+        <AudioWave
+          active={listening || responding}
+          variant={responding ? "speaking" : "listening"}
+        />
       </div>
 
       <h1 className="mt-6 text-3xl md:text-[34px] font-semibold tracking-tight text-text text-center max-w-2xl leading-[1.15] animate-fade-in-up">
@@ -175,30 +207,114 @@ function Hero({ onPick }: { onPick: (p: string) => void }) {
       </p>
 
       <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-2.5 w-full max-w-2xl">
-        {SUGGESTIONS.map((s, i) => (
-          <button
-            key={s.prompt}
-            onClick={() => onPick(s.prompt)}
-            style={{ animationDelay: `${160 + 80 * i}ms` }}
-            className="group relative text-left rounded-lg surface-1 px-4 py-3
-                       hover:border-white/[0.12] hover:bg-elevated/70
-                       transition-all duration-200 ease-out-expo
-                       animate-fade-in-up"
-          >
-            <div className="text-[10px] uppercase tracking-[0.22em] text-pri/80 font-mono">
-              {s.eyebrow}
-            </div>
-            <div className="mt-1 text-sm text-text leading-snug pr-6">{s.prompt}</div>
-            <Icon
-              name="chevron-right"
-              size={14}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted
-                         opacity-0 group-hover:opacity-100 group-hover:translate-x-0.5
-                         transition-all duration-200"
-            />
-          </button>
-        ))}
+        {SUGGESTIONS.map((s, i) => {
+          // BRIEF · Conversación: la card lleva su categoría como
+          // identidad visual — eyebrow + icon + halo de hover en el
+          // color asignado. El border-left fino comunica jerarquía sin
+          // gritar (translation Y + ring de color al hover).
+          const rgb = `rgb(var(${s.identity}))`;
+          const rgbAlpha = (a: number) => `rgb(var(${s.identity}) / ${a})`;
+          return (
+            <button
+              key={s.prompt}
+              onClick={() => onPick(s.prompt)}
+              style={{
+                animationDelay: `${160 + 80 * i}ms`,
+                borderLeft: `2px solid ${rgbAlpha(0.55)}`,
+              }}
+              className="group relative text-left rounded-lg surface-1 px-4 py-3
+                         hover:border-white/[0.12] hover:bg-elevated/70
+                         hover:-translate-y-0.5
+                         transition-all duration-200 ease-out-expo
+                         animate-fade-in-up"
+            >
+              <div className="flex items-center gap-2">
+                <span
+                  className="grid place-items-center h-5 w-5 rounded-md transition-colors"
+                  style={{
+                    background: rgbAlpha(0.13),
+                    color: rgb,
+                    border: `1px solid ${rgbAlpha(0.3)}`,
+                  }}
+                >
+                  <Icon name={s.icon} size={11} />
+                </span>
+                <div
+                  className="text-[10px] uppercase tracking-[0.22em] font-mono"
+                  style={{ color: rgbAlpha(0.85) }}
+                >
+                  {s.eyebrow}
+                </div>
+              </div>
+              <div className="mt-1.5 text-sm text-text leading-snug pr-6">{s.prompt}</div>
+              <Icon
+                name="chevron-right"
+                size={14}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted
+                           opacity-0 group-hover:opacity-100 group-hover:translate-x-0.5
+                           transition-all duration-200"
+              />
+              {/* halo del hover en el color de identidad */}
+              <span
+                aria-hidden
+                className="absolute inset-0 rounded-lg opacity-0 group-hover:opacity-100
+                           transition-opacity duration-300 pointer-events-none"
+                style={{ boxShadow: `0 8px 24px -12px ${rgbAlpha(0.55)}` }}
+              />
+            </button>
+          );
+        })}
       </div>
+    </div>
+  );
+}
+
+/* ─── AUDIO WAVE ─────────────────────────────────────────────────────
+   Onda de barras CSS-animated. Reacciona al estado del Ojo:
+     · listening → barras corren más rápido y vivas (cyan claro)
+     · speaking  → barras más amplias y verdosas (sem-live)
+     · inactivo  → render NULL (no ocupa espacio)
+   No usa Web Audio API porque el volumen del mic real lo maneja el
+   backend (Gemini Live). Es una visualización indicativa, no una
+   medición. Cada barra tiene su propio delay y duración para que el
+   patrón no se vea sincronizado/mecánico. */
+const WAVE_BARS = [
+  { d: 1100, delay: 0 },
+  { d: 950, delay: 120 },
+  { d: 1300, delay: 80 },
+  { d: 850, delay: 200 },
+  { d: 1180, delay: 40 },
+  { d: 1000, delay: 260 },
+  { d: 920, delay: 160 },
+  { d: 1240, delay: 100 },
+  { d: 880, delay: 300 },
+  { d: 1080, delay: 60 },
+  { d: 1160, delay: 220 },
+  { d: 990, delay: 140 },
+];
+
+function AudioWave({ active, variant }: { active: boolean; variant: "listening" | "speaking" }) {
+  if (!active) return null;
+  // BRIEF · Conversación: la onda usa el color del tema (listening) o
+  // sem-live (speaking). Antes el listening estaba hardcoded a cian
+  // — al picar un tema distinto, el Ojo cambiaba pero la onda no.
+  const color = variant === "speaking" ? "rgb(var(--sem-live))" : "rgb(var(--orion-pri))";
+  const glow =
+    variant === "speaking" ? "rgb(var(--sem-live) / 0.5)" : "rgb(var(--orion-pri) / 0.5)";
+  return (
+    <div className="mt-4 flex items-end justify-center gap-1 h-10 animate-fade-in-up" aria-hidden>
+      {WAVE_BARS.map((b, i) => (
+        <span
+          key={i}
+          className="w-1 rounded-full origin-bottom"
+          style={{
+            height: "100%",
+            background: color,
+            boxShadow: `0 0 8px ${glow}`,
+            animation: `wave ${b.d}ms ease-in-out ${b.delay}ms infinite`,
+          }}
+        />
+      ))}
     </div>
   );
 }

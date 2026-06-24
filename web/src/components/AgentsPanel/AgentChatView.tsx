@@ -15,6 +15,7 @@
 import { useEffect, useRef, useState } from "react";
 
 import { api, type OrchestraAgent } from "@/api/rest";
+import { humanizeTime } from "@/lib/humanTime";
 import { Markdown } from "@/lib/markdown";
 import { Icon, type IconName } from "@/ui/Icon";
 import { Button } from "@/ui/primitives";
@@ -121,7 +122,7 @@ export function AgentChatView({
               >
                 <div className="text-[11px] text-text truncate leading-tight">{s.title}</div>
                 <div className="text-[9px] text-muted mt-0.5">
-                  {s.messages.length} msgs · {new Date(s.createdAt).toLocaleDateString()}
+                  {s.messages.length} msgs · {humanizeTime(s.createdAt)}
                 </div>
               </button>
               {sessions.length > 1 && (

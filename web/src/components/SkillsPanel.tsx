@@ -102,8 +102,8 @@ export function SkillsPanel() {
         {!loading && skills.length === 0 && (
           <Empty
             icon="sparkles"
-            title="Aún no hay skills cargadas"
-            hint="Creá una carpeta en `skills/<nombre>/` con un archivo SKILL.md (frontmatter YAML + markdown) y dale a Recargar."
+            title="Sin skills cargadas"
+            hint="Las skills expanden mis capacidades como contexto adicional. Dejá una carpeta en `skills/<nombre>/` con un archivo SKILL.md y dale a Recargar."
           />
         )}
 

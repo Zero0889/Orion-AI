@@ -54,6 +54,88 @@
   --orion-shadow-2: 0 4px 12px rgb(0 0 0 / 0.3), 0 1px 2px rgb(0 0 0 / 0.2);
   --orion-shadow-3: 0 12px 32px rgb(0 0 0 / 0.4), 0 2px 6px rgb(0 0 0 / 0.25);
   --orion-shadow-pri: 0 0 24px -4px rgb(var(--orion-pri-glow) / 0.45);
+  /* lift sombra + borde hairline; glow tinta marca (focus / hero); soft = halo sólo */
+  --orion-shadow-lift: 0 20px 60px -20px rgb(0 0 0 / 0.7), 0 0 0 1px rgb(255 255 255 / 0.04);
+  --orion-shadow-glow:
+    0 0 0 1px rgb(var(--orion-pri) / 0.3), 0 8px 28px -8px rgb(var(--orion-pri) / 0.35);
+  --orion-shadow-glow-soft: 0 0 24px -4px rgb(var(--orion-pri) / 0.35);
+
+  /* duraciones canónicas — toda transición se ata a una de las tres. */
+  --orion-dur-fast: 120ms;
+  --orion-dur-base: 200ms;
+  --orion-dur-slow: 280ms;
+
+  /* ── Sistema semántico (BRIEF G3) ────────────────────────────────────
+     Colores dirigidos por LÓGICA, no por estética. Nunca reusar danger
+     como "inactivo": un estado deshabilitado JAMÁS es rojo. */
+  --sem-error: var(--orion-danger); /* rojo — errores REALES */
+  --sem-warning: var(--orion-warn); /* ámbar — advertencias */
+  --sem-success: var(--orion-ok); /* verde — activo / positivo */
+  --sem-inactive: 100 116 139; /* #64748B — gris azulado, deshabilitado */
+  --sem-live: 34 197 94; /* verde — LIVE / conectado (pulsa) */
+  /* data-viz: un solo acento en tres luminosidades (dials de cabina). */
+  --sem-data-a: var(--orion-pri); /* métrica primaria — 100% */
+  --sem-data-b: var(--orion-acc); /* métrica secundaria — ~70% */
+  --sem-data-c: var(--orion-pri-dim); /* métrica terciaria — ~40% */
+
+  /* ── Paleta de identidad por agente (BRIEF · Agentes) ───────────────
+     Cada rol autónomo conserva su hue para leerse de un vistazo. */
+  --agent-researcher: 109 124 255; /* azul   */
+  --agent-coder: 52 211 153; /* verde  */
+  --agent-writer: 251 191 36; /* ámbar  */
+  --agent-analyst: 167 139 250; /* violeta*/
+  --agent-default: var(--orion-pri);
+
+  /* ── Paleta por tipo de sensor IoT (BRIEF · IoT) ───────────────────*/
+  --iot-temp: 251 146 60; /* naranja — temperatura */
+  --iot-humidity: 56 189 248; /* azul    — humedad */
+  --iot-light: 250 204 21; /* amarillo — luz */
+  --iot-actuator: 52 211 153; /* verde   — actuadores */
+
+  /* ── Roles tipográficos (BRIEF G5) ─────────────────────────────────
+     Seis roles deliberados. Display es drama solo para Inicio; el resto
+     se mantiene denso y preciso como una consola de control. */
+  --orion-display-size: 38px;
+  --orion-display-weight: 300;
+  --orion-display-tracking: -0.02em;
+  --orion-h1-size: 24px;
+  --orion-h1-weight: 600;
+  --orion-h1-tracking: -0.01em;
+  --orion-h2-size: 13px;
+  --orion-h2-weight: 600;
+  --orion-h2-tracking: 0.08em;
+  --orion-body-size: 14px;
+  --orion-body-weight: 400;
+  --orion-body-line: 1.6;
+  --orion-label-size: 10px;
+  --orion-label-weight: 500;
+  --orion-label-tracking: 0.12em;
+  --orion-meta-size: 12px;
+  --orion-meta-weight: 400;
+  --orion-font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --orion-font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, "Fira Code", monospace;
+
+  /* ── Escala de spacing (base 4px) + radii + constantes de shell ────*/
+  --orion-space-1: 4px;
+  --orion-space-2: 8px;
+  --orion-space-3: 12px;
+  --orion-space-4: 16px;
+  --orion-space-5: 20px;
+  --orion-space-6: 24px;
+  --orion-space-8: 32px;
+  --orion-space-10: 40px;
+  --orion-space-12: 48px;
+  --orion-radius-xs: 6px;
+  --orion-radius-sm: 8px;
+  --orion-radius-md: 10px;
+  --orion-radius-lg: 14px;
+  --orion-radius-xl: 18px;
+  --orion-radius-2xl: 22px;
+  --orion-radius-3xl: 28px;
+  --orion-radius-full: 999px;
+  --orion-rail-width: 264px;
+  --orion-rail-collapsed: 72px;
+  --orion-topbar-height: 56px;
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
@@ -81,6 +163,9 @@
   --orion-text: 24 27 34; /* #181B22 */
   --orion-text-dim: 100 110 135; /* #646E87 */
   --orion-muted: 148 155 172; /* #949BAC */
+
+  /* G3: deshabilitado debe leerse como neutro, no como error. */
+  --sem-inactive: 148 163 184; /* slate-400 */
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
@@ -479,23 +564,49 @@
     }
   }
 
-  /* scrollbars */
+  /* ── Scrollbars (BRIEF §4) ──────────────────────────────────────────
+     · `.scrollbar-thin` — 4px, color acento al 30 % en reposo, 60 % al
+       hover del CONTENEDOR (no del thumb). Pista transparente.
+     · `.scrollbar-accent` — variante opt-in con un poco más de presencia
+       (acento al 45 %), pensada para listas largas donde el scroll es
+       parte de la composición.
+     Firefox los respeta vía `scrollbar-width: thin; scrollbar-color`. */
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: rgb(var(--orion-pri) / 0.3) transparent;
+  }
   .scrollbar-thin::-webkit-scrollbar {
-    width: 8px;
-    height: 8px;
+    width: 4px;
+    height: 4px;
   }
   .scrollbar-thin::-webkit-scrollbar-thumb {
-    background: rgb(var(--orion-border) / 0.12);
-    border-radius: 8px;
-    border: 2px solid transparent;
-    background-clip: padding-box;
+    background: rgb(var(--orion-pri) / 0.3);
+    border-radius: 999px;
+    transition: background 200ms var(--orion-ease-soft);
   }
   .scrollbar-thin:hover::-webkit-scrollbar-thumb {
-    background: rgb(var(--orion-border) / 0.22);
-    background-clip: padding-box;
+    background: rgb(var(--orion-pri) / 0.6);
   }
   .scrollbar-thin::-webkit-scrollbar-track {
     background: transparent;
+  }
+  .scrollbar-thin::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+  .scrollbar-accent {
+    scrollbar-width: thin;
+    scrollbar-color: rgb(var(--orion-pri) / 0.45) transparent;
+  }
+  .scrollbar-accent::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  .scrollbar-accent::-webkit-scrollbar-thumb {
+    background: rgb(var(--orion-pri) / 0.45);
+    border-radius: 999px;
+  }
+  .scrollbar-accent:hover::-webkit-scrollbar-thumb {
+    background: rgb(var(--orion-pri) / 0.7);
   }
 
   /* ── Tabular numerals ─────────────────────────────────────────────
@@ -513,6 +624,65 @@
   .numeric {
     font-variant-numeric: tabular-nums;
     font-feature-settings: "tnum";
+  }
+
+  /* ── Drop zone con borde "scan" animado (BRIEF · Circuitos) ──────────
+     El truco: dibujamos un conic-gradient sobre TODO el rectángulo y lo
+     recortamos con `mask` para que solo se vea el "padding" (1.5px). El
+     conic rota a 6s, así una línea de luz acento recorre el perímetro
+     en loop continuo. En drag-over la rotación se acelera. */
+  .circuit-dropzone {
+    --dz-accent: rgb(var(--orion-pri));
+    --dz-thickness: 1.5px;
+  }
+  .circuit-dropzone[data-dragging="true"] {
+    --dz-accent: rgb(var(--sem-success));
+  }
+  .circuit-dropzone::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    padding: var(--dz-thickness);
+    background: conic-gradient(
+      from var(--dz-angle, 0deg),
+      transparent 0%,
+      transparent 60%,
+      var(--dz-accent) 80%,
+      transparent 100%
+    );
+    -webkit-mask:
+      linear-gradient(#fff 0 0) content-box,
+      linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    pointer-events: none;
+    animation: dz-scan 6s linear infinite;
+    opacity: 0.85;
+  }
+  .circuit-dropzone:hover::before {
+    opacity: 1;
+  }
+  .circuit-dropzone[data-dragging="true"]::before {
+    animation-duration: 2s;
+    opacity: 1;
+  }
+  /* Fallback estático para Firefox/Safari sin @property — el conic
+     queda quieto pero con un arco de luz visible, no se "rompe". */
+  @property --dz-angle {
+    syntax: "<angle>";
+    inherits: false;
+    initial-value: 0deg;
+  }
+  @keyframes dz-scan {
+    to {
+      --dz-angle: 360deg;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .circuit-dropzone::before {
+      animation: none;
+    }
   }
 
   /* shimmer skeleton */
@@ -656,6 +826,70 @@
     flex: 1;
     height: 1px;
     background: rgb(var(--orion-border) / 0.08);
+  }
+
+  /* ── Roles tipográficos (BRIEF G5) ─────────────────────────────────
+     Utility classes con prefijo `orion-` para no colisionar con Tailwind.
+     Usar en lugar de tamaños/pesos ad-hoc cuando un nodo represente uno
+     de los seis roles canónicos. */
+  .orion-display {
+    font-family: var(--orion-font-sans);
+    font-size: var(--orion-display-size);
+    font-weight: var(--orion-display-weight);
+    letter-spacing: var(--orion-display-tracking);
+    line-height: 1.1;
+    color: rgb(var(--orion-text));
+  }
+  .orion-h1 {
+    font-family: var(--orion-font-sans);
+    font-size: var(--orion-h1-size);
+    font-weight: var(--orion-h1-weight);
+    letter-spacing: var(--orion-h1-tracking);
+    line-height: 1.25;
+    color: rgb(var(--orion-text));
+  }
+  .orion-h2 {
+    font-family: var(--orion-font-sans);
+    font-size: var(--orion-h2-size);
+    font-weight: var(--orion-h2-weight);
+    letter-spacing: var(--orion-h2-tracking);
+    text-transform: uppercase;
+    color: rgb(var(--orion-text));
+  }
+  .orion-body {
+    font-family: var(--orion-font-sans);
+    font-size: var(--orion-body-size);
+    font-weight: var(--orion-body-weight);
+    line-height: var(--orion-body-line);
+    color: rgb(var(--orion-text));
+  }
+  .orion-label {
+    font-family: var(--orion-font-sans);
+    font-size: var(--orion-label-size);
+    font-weight: var(--orion-label-weight);
+    letter-spacing: var(--orion-label-tracking);
+    text-transform: uppercase;
+    color: rgb(var(--orion-text-dim));
+  }
+  .orion-meta {
+    font-family: var(--orion-font-sans);
+    font-size: var(--orion-meta-size);
+    font-weight: var(--orion-meta-weight);
+    color: rgb(var(--orion-text-dim));
+    opacity: 0.7;
+  }
+  /* Mono explícito con tabular + stylistic-sets activados. Usar en
+     telemetría, timestamps, IDs y readouts de cabina. */
+  .orion-mono {
+    font-family: var(--orion-font-mono);
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum", "ss01", "cv11";
+  }
+  /* Numerales tabulares sobre texto NO mono que igual necesita columnas
+     alineadas (chips con contadores, badges con números). */
+  .orion-numeric {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum";
   }
 }
 
@@ -946,9 +1180,17 @@ input[type="number"] {
    los tokens globales de Orion.
    ══════════════════════════════════════════════════════════════════════ */
 .ec-canvas {
-  --ec-neon-main: #00f0ff;
-  --ec-neon-second: #0055ff;
-  --ec-neon-glow: rgba(0, 240, 255, 0.6);
+  /* Paleta del Ojo — indirección.
+     Los `--ec-base-*` viven en :root y los puede setear el Eye color
+     picker (Ajustes → Color del Ojo) o el autoextractor del wallpaper.
+     Si no hay override, caemos al cian neón clásico.
+     Los state-classes (.ec-state-*) redeclaran --ec-neon-main directo,
+     así el listening/thinking/speaking/error mantienen su DNA de marca
+     pase lo que pase con la elección del usuario — el override solo
+     gobierna el estado IDLE (que es donde Orion pasa el 80% del tiempo). */
+  --ec-neon-main: var(--ec-base-main, #00f0ff);
+  --ec-neon-second: var(--ec-base-second, #0055ff);
+  --ec-neon-glow: var(--ec-base-glow, rgba(0, 240, 255, 0.6));
   --ec-spin-outer: 30s;
   --ec-spin-mid: 15s;
   --ec-spin-inner: 8s;
@@ -960,10 +1202,14 @@ input[type="number"] {
 
   position: relative;
   display: block;
-  /* Glow estratificado: halo cercano + halo medio + halo ambiental.
-     Da profundidad cromática sin caer en el cliché "neón plano". */
-  filter: drop-shadow(0 0 14px rgba(0, 240, 255, 0.18))
-    drop-shadow(0 0 36px rgba(0, 102, 255, 0.14)) drop-shadow(0 0 72px rgba(0, 102, 255, 0.06));
+  /* Glow estratificado: halo cercano (más opaco) + halo medio + halo
+     ambiental (apenas perceptible). `color-mix` mezcla cada capa con
+     `transparent` para conseguir la opacidad target sin hardcodear hex
+     rgba — así el override del usuario tinta TODO el glow del ojo, no
+     solo los stroke-fills del SVG. */
+  filter: drop-shadow(0 0 14px color-mix(in srgb, var(--ec-neon-main) 30%, transparent))
+    drop-shadow(0 0 36px color-mix(in srgb, var(--ec-neon-second) 22%, transparent))
+    drop-shadow(0 0 72px color-mix(in srgb, var(--ec-neon-second) 10%, transparent));
   transition: filter 0.5s cubic-bezier(0.4, 0, 0.2, 1);
   /* Respiración sutil: 1.5% de escala con ease "spring" tipo visionOS. */
   animation: ec-breath var(--ec-breath) cubic-bezier(0.32, 0.72, 0, 1) infinite;
@@ -999,29 +1245,33 @@ input[type="number"] {
   opacity: 0.32;
 }
 
-/* ── ESTADOS ───────────────────────────────────────────────────────── */
+/* ── ESTADOS ───────────────────────────────────────────────────────────
+   Los estados ahora modulan SOLO la animación (spin, pulso, dilatación,
+   filter blur). El color lo manda --ec-neon-main (= --ec-base-main → tu
+   tema / picker / auto-color del wallpaper). La distinción entre estados
+   se lee por velocidad y tamaño, no por hue arbitrario.
 
-/* Escuchando — cian más vivo, pulso de iris un poco más rápido. */
+   ÚNICA excepción: `ec-state-error` mantiene rojo hardcoded. Si tapamos
+   ese rojo con el tema del usuario, un error crítico podría pasar
+   desapercibido — el rojo del Ojo en error es señalización de seguridad,
+   no decoración.
+   ───────────────────────────────────────────────────────────────────── */
+
+/* Escuchando — pulso de iris más rápido + iris dilatado. Color del tema. */
 .ec-canvas.ec-state-listening {
-  --ec-neon-main: #7ee7ff;
-  --ec-neon-second: #00f0ff;
-  --ec-neon-glow: rgba(126, 231, 255, 0.7);
   --ec-core-pulse: 1.8s;
   --ec-dilation: 1.1;
-  filter: drop-shadow(0 0 36px rgba(126, 231, 255, 0.35));
+  filter: drop-shadow(0 0 36px color-mix(in srgb, var(--ec-neon-main) 45%, transparent));
 }
 
-/* Pensando — magenta intenso, giro vertiginoso, iris contraído. */
+/* Pensando — giro vertiginoso + iris contraído. Color del tema. */
 .ec-canvas.ec-state-thinking {
-  --ec-neon-main: #ff0055;
-  --ec-neon-second: #7700ff;
-  --ec-neon-glow: rgba(255, 0, 85, 0.6);
   --ec-spin-outer: 0.8s;
   --ec-spin-mid: 0.5s;
   --ec-spin-inner: 0.3s;
   --ec-core-pulse: 1.2s;
   --ec-dilation: 0.6;
-  filter: drop-shadow(0 0 50px rgba(255, 0, 85, 0.4));
+  filter: drop-shadow(0 0 50px color-mix(in srgb, var(--ec-neon-main) 50%, transparent));
 }
 /* bloqueo central — el ojo no se mueve mientras piensa */
 .ec-canvas.ec-state-thinking .ec-tracking-group {
@@ -1029,23 +1279,22 @@ input[type="number"] {
   transform: translate(0, 0) !important;
 }
 
-/* Hablando — verde-cian, dilatado, destellos blancos de voz. */
+/* Hablando — iris más dilatado, anillos más amplios, destellos de voz. */
 .ec-canvas.ec-state-responding {
-  --ec-neon-main: #00ffaa;
-  --ec-neon-second: #0088ff;
-  --ec-neon-glow: rgba(0, 255, 170, 0.6);
   --ec-spin-outer: 20s;
   --ec-spin-mid: 10s;
   --ec-spin-inner: 5s;
   --ec-core-pulse: 1.5s;
   --ec-dilation: 1.3;
-  filter: drop-shadow(0 0 40px rgba(0, 255, 170, 0.3));
+  filter: drop-shadow(0 0 40px color-mix(in srgb, var(--ec-neon-main) 45%, transparent));
 }
 .ec-canvas.ec-state-responding .ec-voice-target {
   animation: ec-voice-flashes 1s infinite alternate cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-/* Error — rojo crítico, símbolo de alerta gigante. */
+/* Error — rojo crítico, símbolo de alerta gigante.
+   DELIBERADAMENTE hardcoded — no debe ser sobrescribible por temas
+   del usuario para que el color rojo siga señalizando peligro real. */
 .ec-canvas.ec-state-error {
   --ec-neon-main: #ff0011;
   --ec-neon-second: #ff5500;

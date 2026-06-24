@@ -38,7 +38,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from orion.config import BASE_DIR
+from orion.config import BASE_DIR, RESOURCES_DIR
 import contextlib
 
 
@@ -146,9 +146,36 @@ def _asset_for(spec: CliSpec) -> tuple[str, str]:
 
 
 def tools_dir() -> Path:
+    """Carpeta user-writable para binarios CLI (user upgrades, descargas).
+
+    En frozen mode = ``%APPDATA%\\Orion\\tools\\``.
+    En dev = ``<repo>/tools/``.
+    """
     p = BASE_DIR / "tools"
     p.mkdir(exist_ok=True)
     return p
+
+
+def bundled_tools_dir() -> Path | None:
+    """Carpeta read-only con los binarios empaquetados en el .exe.
+
+    En frozen mode = ``<_MEIPASS>/tools/`` (PyInstaller).
+    En dev = el mismo ``<repo>/tools/`` (no hay bundle separado).
+    Devuelve None si no existe.
+    """
+    p = RESOURCES_DIR / "tools"
+    return p if p.is_dir() else None
+
+
+def _candidate_tool_roots() -> list[Path]:
+    """Roots a inspeccionar en orden de prioridad. ``tools_dir`` primero
+    para permitir que un usuario power sustituya un binario bundled por
+    una versión más nueva sin recompilar el .exe."""
+    roots = [tools_dir()]
+    bundled = bundled_tools_dir()
+    if bundled is not None and bundled.resolve() != tools_dir().resolve():
+        roots.append(bundled)
+    return roots
 
 
 def extra_path_dirs() -> list[str]:
@@ -156,28 +183,40 @@ def extra_path_dirs() -> list[str]:
     cuando lanzamos subprocesses (ver agent/executor.py).
     Filtra metadirectorios para no contaminar el PATH.
     """
-    root = tools_dir()
-    if not root.exists():
-        return []
+    seen: set[str] = set()
     out: list[str] = []
-    for sub in root.iterdir():
-        if not sub.is_dir():
+    for root in _candidate_tool_roots():
+        if not root.exists():
             continue
-        if sub.name.startswith(".") or sub.name == "__pycache__":
-            continue
-        out.append(str(sub))
+        for sub in root.iterdir():
+            if not sub.is_dir():
+                continue
+            if sub.name.startswith(".") or sub.name == "__pycache__":
+                continue
+            s = str(sub)
+            if s in seen:
+                continue
+            seen.add(s)
+            out.append(s)
     return out
 
 
 def cli_path(name: str) -> str | None:
-    """Ruta absoluta al binario si está disponible (tools/ o PATH del sistema)."""
+    """Ruta absoluta al binario si está disponible.
+
+    Orden de búsqueda:
+      1. ``BASE_DIR/tools/<name>/<bin>`` — user-writable (upgrades manuales).
+      2. ``RESOURCES_DIR/tools/<name>/<bin>`` — bundled en el .exe (frozen).
+      3. ``shutil.which(bin)`` — PATH del sistema.
+    """
     spec = REGISTRY.get(name)
     bin_name = spec.bin_name if spec else name
     exe = f"{bin_name}.exe" if os.name == "nt" else bin_name
 
-    managed = tools_dir() / name / exe
-    if managed.exists():
-        return str(managed)
+    for root in _candidate_tool_roots():
+        candidate = root / name / exe
+        if candidate.exists():
+            return str(candidate)
     return shutil.which(bin_name)
 
 

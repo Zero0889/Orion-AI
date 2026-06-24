@@ -236,7 +236,7 @@ export function HistoryPanel() {
             <Empty
               icon="history"
               title="Sin conversaciones"
-              hint="Cuando tengas tu primera charla con Orion aparecerá aquí."
+              hint="Cuando hablemos por primera vez, lo recordaré aquí."
             />
           )}
           <div className="flex flex-col gap-1.5">
@@ -265,8 +265,8 @@ export function HistoryPanel() {
             <div className="h-full grid place-items-center">
               <Empty
                 icon="chat"
-                title="Selecciona una conversación"
-                hint="Haz clic en cualquier elemento de la lista para abrirla."
+                title="Elegí una conversación"
+                hint="Tocá cualquier elemento de la lista para abrirla."
               />
             </div>
           ) : (

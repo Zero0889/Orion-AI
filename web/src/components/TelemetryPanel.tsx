@@ -36,8 +36,8 @@ export function TelemetryPanel() {
         {empty ? (
           <Empty
             icon="telemetry"
-            title="Esperando datos"
-            hint="Cuando el backend empiece a emitir eventos `telemetry` los verás dibujados aquí."
+            title="A la espera de la primera lectura"
+            hint="En cuanto reciba un evento `telemetry` del backend, lo dibujo acá en tiempo real."
           />
         ) : (
           <section className="p-6 grid grid-cols-1 lg:grid-cols-3 gap-3">

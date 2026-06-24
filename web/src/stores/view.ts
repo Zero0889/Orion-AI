@@ -20,6 +20,7 @@ export type View =
   | "skills"
   | "notifications"
   | "circuit"
+  | "diagnostics"
   | "settings";
 
 interface ViewState {

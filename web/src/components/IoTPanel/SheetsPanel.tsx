@@ -14,6 +14,7 @@
 import { useEffect, useState } from "react";
 
 import { api } from "@/api/rest";
+import { humanizeAge } from "@/lib/humanTime";
 import { Icon } from "@/ui/Icon";
 import { Badge, Button, Surface } from "@/ui/primitives";
 
@@ -186,7 +187,7 @@ export function SheetsPanel() {
   }
 
   // ── Connected: dashboard ────────────────────────────────────────
-  const ageStr = state.last_sync_at ? formatAge(state.last_sync_at) : "nunca";
+  const ageStr = state.last_sync_at ? humanizeAge(state.last_sync_at) : "nunca";
 
   return (
     <Surface level={2} className="p-4">
@@ -230,17 +231,27 @@ export function SheetsPanel() {
       </div>
 
       {state.spreadsheet_url && (
+        // BRIEF · IoT: NUNCA mostrar URLs completas en la UI. Mostramos
+        // un chip con el ícono de Sheets + el nombre legible (o sheet_id
+        // truncado como fallback) + un ícono "abrir externo". La URL
+        // completa queda en `title` para inspección rápida.
         <a
           href={state.spreadsheet_url}
           target="_blank"
           rel="noopener noreferrer"
-          className="mt-3 flex items-center gap-2 px-3 py-2 rounded-md
+          title={state.spreadsheet_url}
+          className="mt-3 flex items-center gap-2.5 px-3 py-2 rounded-md
                      border border-acc/30 bg-acc/10 text-sm text-acc
                      hover:bg-acc/15 transition-colors"
         >
-          <Icon name="chart" size={14} />
-          <span className="flex-1 truncate font-mono">{state.spreadsheet_url}</span>
-          <Icon name="arrow-right" size={13} />
+          <Icon name="chart" size={14} className="shrink-0" />
+          <span className="flex-1 truncate font-medium">
+            {state.sheet_name || shortSheetId(state.spreadsheet_url)}
+          </span>
+          <span className="text-[10px] uppercase tracking-[0.18em] text-acc/70 shrink-0">
+            Abrir
+          </span>
+          <Icon name="arrow-right" size={13} className="shrink-0" />
         </a>
       )}
 
@@ -337,11 +348,15 @@ function IntervalControl({
   );
 }
 
-function formatAge(iso: string): string {
-  const past = new Date(iso).getTime();
-  if (isNaN(past)) return iso;
-  const secs = Math.max(0, Math.floor((Date.now() - past) / 1000));
-  if (secs < 60) return `hace ${secs}s`;
-  if (secs < 3600) return `hace ${Math.floor(secs / 60)} min`;
-  return `hace ${Math.floor(secs / 3600)} h`;
+/* ── Helper: identificador corto del Sheet (BRIEF · IoT) ──────────────
+   Cuando no tenemos el `sheet_name` legible (estado raro o sin sync),
+   mostramos un fallback derivado del spreadsheet_id que cabe en una
+   línea sin filtrar la URL completa. */
+function shortSheetId(url: string): string {
+  const m = url.match(/\/spreadsheets\/d\/([a-zA-Z0-9_-]+)/);
+  if (m) {
+    const id = m[1];
+    return `Sheet · ${id.slice(0, 8)}…${id.slice(-4)}`;
+  }
+  return "Hoja de cálculo";
 }

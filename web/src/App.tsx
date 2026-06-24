@@ -22,6 +22,7 @@ import { Onboarding } from "@/components/Onboarding";
 import { Sidebar } from "@/components/Sidebar";
 import { Toaster } from "@/components/Toaster";
 import { TopBar } from "@/components/TopBar";
+import { WallpaperLayer } from "@/components/WallpaperLayer";
 
 // ── Paneles bajo demanda ──────────────────────────────────────────────
 // Home es eager (es la vista por defecto al abrir Orion). Todo lo demás
@@ -58,6 +59,9 @@ const NotificationsPanel = lazy(() =>
 const CircuitPanel = lazy(() =>
   import("@/components/CircuitPanel").then((m) => ({ default: m.CircuitPanel })),
 );
+const DiagnosticsPanel = lazy(() =>
+  import("@/components/DiagnosticsPanel").then((m) => ({ default: m.DiagnosticsPanel })),
+);
 const SettingsPanel = lazy(() =>
   import("@/components/SettingsPanel").then((m) => ({ default: m.SettingsPanel })),
 );
@@ -67,6 +71,7 @@ import { useOrionSocket } from "@/hooks/useOrionSocket";
 import { useZoomShortcuts } from "@/hooks/useZoomShortcuts";
 import { QUERY_KEYS } from "@/query/keys";
 import { useOrionStore } from "@/stores/orion";
+import { usePersonalization } from "@/stores/personalization";
 import { useViewStore } from "@/stores/view";
 import { Icon } from "@/ui/Icon";
 import { CommandPalette } from "@/widgets/command-palette";
@@ -176,6 +181,45 @@ export default function App() {
     document.documentElement.dataset.eyeState = eyeState;
   }, [eyeState]);
 
+  // ── Personalización del usuario ─────────────────────────────────────
+  // Eye color override: si el usuario picó un swatch en Ajustes,
+  // escribimos en <html> inline:
+  //   · `--orion-pri` / `--orion-pri-glow` / `--orion-acc` — tinta TODO
+  //     el chrome (sidebar, badges, agent borders, focus rings, etc).
+  //   · `--ec-base-main` / `--ec-base-second` / `--ec-base-glow` — tinta
+  //     el Ojo en estado IDLE. Los estados activos (listening, thinking,
+  //     speaking, error) redeclaran sus vars directo en eye-core.css así
+  //     que mantienen su DNA de marca (cyan / magenta / verde-cian / rojo)
+  //     pase lo que pase con el override.
+  // Wallpaper override: si hay un wallpaper subido, ocultamos el
+  // NeuralBackground (sino el grid + anillos compiten con la imagen).
+  const eyeColorPri = usePersonalization((s) => s.eyeColorPri);
+  const eyeColorAcc = usePersonalization((s) => s.eyeColorAcc);
+  const hasWallpaper = usePersonalization((s) => s.wallpaper !== null);
+  useEffect(() => {
+    const root = document.documentElement;
+    if (eyeColorPri) {
+      root.style.setProperty("--orion-pri", eyeColorPri);
+      root.style.setProperty("--orion-pri-glow", eyeColorPri);
+      // Color del Ojo base (idle). Convertimos el triplete "R G B" en
+      // `rgb(R G B)` para que la cascada CSS lo trate como color real.
+      root.style.setProperty("--ec-base-main", `rgb(${eyeColorPri})`);
+      root.style.setProperty("--ec-base-glow", `rgb(${eyeColorPri} / 0.6)`);
+    } else {
+      root.style.removeProperty("--orion-pri");
+      root.style.removeProperty("--orion-pri-glow");
+      root.style.removeProperty("--ec-base-main");
+      root.style.removeProperty("--ec-base-glow");
+    }
+    if (eyeColorAcc) {
+      root.style.setProperty("--orion-acc", eyeColorAcc);
+      root.style.setProperty("--ec-base-second", `rgb(${eyeColorAcc})`);
+    } else {
+      root.style.removeProperty("--orion-acc");
+      root.style.removeProperty("--ec-base-second");
+    }
+  }, [eyeColorPri, eyeColorAcc]);
+
   // Bisagra mundo→ojo: dispara pulsos radiales por sensores nuevos,
   // notifs, tools, etc. Sin filtros se vuelve ruido — la lógica de
   // qué amerita pulso vive en useEventPulses.
@@ -210,13 +254,27 @@ export default function App() {
 
   return (
     <div className="relative h-full w-full overflow-hidden bg-bg text-text noise">
-      {/* ── Neural background GLOBAL — debajo del sidebar, topbar y main.
-          Posición absoluta sobre el viewport entero para que la grilla y
-          los anillos continúen visualmente por debajo del sidebar (que es
-          translúcido). */}
-      <div className="absolute inset-0 z-0">
-        <NeuralBackground intensity={view === "home" ? "full" : "ambient"} />
-      </div>
+      {/* ── Fondo del sistema — orden de capas (de atrás hacia adelante):
+          · Wallpaper del usuario (si subió uno) en z-0.
+          · NeuralBackground en z-0 (cae al fondo cuando no hay wallpaper;
+            si hay wallpaper lo ocultamos para que no compita visualmente).
+          · Overlay G1 en z-[1] sólo en paneles que no son Home/Conversación,
+            cuando NO hay wallpaper (el wallpaper ya trae su propio
+            overlay configurable + blur). */}
+      <WallpaperLayer />
+      {!hasWallpaper && (
+        <div className="absolute inset-0 z-0">
+          <NeuralBackground intensity={view === "home" || view === "chat" ? "full" : "ambient"} />
+        </div>
+      )}
+      {!hasWallpaper && view !== "home" && view !== "chat" && (
+        <div
+          aria-hidden
+          className="absolute inset-0 z-[1] pointer-events-none
+                     bg-bg/85 backdrop-blur-[28px]
+                     transition-opacity duration-300 ease-out-expo"
+        />
+      )}
 
       <div
         className="relative z-10 h-full w-full grid overflow-hidden"
@@ -278,7 +336,7 @@ export default function App() {
 
           <main
             key={view}
-            className="relative flex-1 overflow-hidden bg-transparent animate-fade-in"
+            className="relative flex-1 overflow-hidden bg-transparent animate-view-enter"
           >
             {/* Capa 0 — ojo ambiental detrás de las vistas != home,
               reacciona al estado real del backend. El NeuralBackground
@@ -313,6 +371,7 @@ export default function App() {
                     {view === "skills" && <SkillsPanel />}
                     {view === "notifications" && <NotificationsPanel />}
                     {view === "circuit" && <CircuitPanel />}
+                    {view === "diagnostics" && <DiagnosticsPanel />}
                     {view === "settings" && <SettingsPanel />}
                   </Suspense>
                 </ErrorBoundary>

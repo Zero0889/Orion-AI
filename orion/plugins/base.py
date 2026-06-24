@@ -143,7 +143,7 @@ class PluginRegistry:
             if py_file.name.startswith("_"):
                 continue
 
-            module_name = f"plugins.{py_file.stem}"
+            module_name = f"orion.plugins.{py_file.stem}"
             try:
                 if module_name in sys.modules:
                     module = importlib.reload(sys.modules[module_name])

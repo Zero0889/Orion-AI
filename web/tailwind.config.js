@@ -33,6 +33,34 @@ export default {
         "text-dim":cssVar("--orion-text-dim"),
         muted:     cssVar("--orion-muted"),
 
+        // ── Semantic system (BRIEF G3) — lógica, no estética. ──
+        // `inactive` es un gris azulado: estados deshabilitados JAMÁS rojo.
+        // `live` es el verde "conectado" que pulsa.
+        // `data-{a,b,c}` son tres luminosidades del MISMO acento, para que
+        // métricas relacionadas (CPU/Mem/Disco) se lean como serie, no como
+        // tres colores random.
+        "sem-error":    cssVar("--sem-error"),
+        "sem-warning":  cssVar("--sem-warning"),
+        "sem-success":  cssVar("--sem-success"),
+        "sem-inactive": cssVar("--sem-inactive"),
+        "sem-live":     cssVar("--sem-live"),
+        "sem-data-a":   cssVar("--sem-data-a"),
+        "sem-data-b":   cssVar("--sem-data-b"),
+        "sem-data-c":   cssVar("--sem-data-c"),
+
+        // ── Identidad por agente (BRIEF · Agentes) ──
+        "agent-researcher": cssVar("--agent-researcher"),
+        "agent-coder":      cssVar("--agent-coder"),
+        "agent-writer":     cssVar("--agent-writer"),
+        "agent-analyst":    cssVar("--agent-analyst"),
+        "agent-default":    cssVar("--agent-default"),
+
+        // ── Identidad por tipo de sensor IoT (BRIEF · IoT) ──
+        "iot-temp":     cssVar("--iot-temp"),
+        "iot-humidity": cssVar("--iot-humidity"),
+        "iot-light":    cssVar("--iot-light"),
+        "iot-actuator": cssVar("--iot-actuator"),
+
         // back-compat aliases (older code still references these names)
         panel:     cssVar("--orion-surface"),
         panel2:    cssVar("--orion-elevated"),
@@ -76,6 +104,9 @@ export default {
         "out-expo":  "cubic-bezier(0.16, 1, 0.3, 1)",
         "out-soft":  "cubic-bezier(0.32, 0.72, 0, 1)",
         "in-out-soft": "cubic-bezier(0.65, 0, 0.35, 1)",
+        // Spring "vision-OS": rebote sutil al final — bueno para hovers
+        // y entradas tipo card lift. Pareado con `--orion-ease-spring`.
+        "spring":    "cubic-bezier(0.34, 1.56, 0.64, 1)",
       },
       keyframes: {
         // ── ambient ───────────────────────────────────────────────
@@ -131,6 +162,13 @@ export default {
           from: { opacity: "0", transform: "translateX(8px)" },
           to:   { opacity: "1", transform: "translateX(0)" },
         },
+        // BRIEF §4 — page transition: fade + slide-left sutil al cambiar
+        // de vista. Distancia chica para no sentirse "deslizando" sino
+        // "asentándose" cuando un panel toma el escenario.
+        "view-enter": {
+          from: { opacity: "0", transform: "translateX(12px) scale(0.995)" },
+          to:   { opacity: "1", transform: "translateX(0) scale(1)" },
+        },
         "shimmer": {
           "0%":   { backgroundPosition: "-200% 0" },
           "100%": { backgroundPosition: "200% 0" },
@@ -159,6 +197,7 @@ export default {
         "fade-in-down": "fade-in-down 220ms cubic-bezier(0.16,1,0.3,1) both",
         "scale-in":     "scale-in 200ms cubic-bezier(0.16,1,0.3,1) both",
         "slide-in":     "slide-in-right 240ms cubic-bezier(0.16,1,0.3,1) both",
+        "view-enter":   "view-enter 180ms cubic-bezier(0.16,1,0.3,1) both",
         "shimmer":      "shimmer 2.2s linear infinite",
         "caret":        "caret 1.1s steps(1,end) infinite",
       },

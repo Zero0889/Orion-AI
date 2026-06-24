@@ -156,7 +156,9 @@ export const Button = forwardRef<
 });
 
 // ── Badge ─────────────────────────────────────────────────────────────
-type BadgeTone = "neutral" | "info" | "success" | "warn" | "danger" | "accent";
+// BRIEF G3: `inactive` (gris azulado) ≠ `danger` (rojo). Un estado
+// deshabilitado, en cooldown o "no disponible" SIEMPRE usa inactive.
+type BadgeTone = "neutral" | "info" | "success" | "warn" | "danger" | "accent" | "inactive";
 const BADGE: Record<BadgeTone, string> = {
   neutral: "bg-white/[0.04]   text-text-dim border-white/[0.06]",
   info: "bg-pri/10         text-pri       border-pri/30",
@@ -164,6 +166,7 @@ const BADGE: Record<BadgeTone, string> = {
   warn: "bg-warn/10        text-warn      border-warn/30",
   danger: "bg-danger/10      text-danger    border-danger/30",
   accent: "bg-acc/10         text-acc       border-acc/30",
+  inactive: "bg-sem-inactive/10 text-sem-inactive border-sem-inactive/30",
 };
 
 export function Badge({
@@ -200,7 +203,9 @@ export function Badge({
                     ? "bg-acc"
                     : tone === "info"
                       ? "bg-pri"
-                      : "bg-text-dim",
+                      : tone === "inactive"
+                        ? "bg-sem-inactive"
+                        : "bg-text-dim",
           )}
         />
       )}
@@ -291,15 +296,19 @@ export function SectionHeader({
       />
       <div className="min-w-0">
         {eyebrow && (
-          <div className="flex items-center gap-2 mb-1">
+          <div className="flex items-center gap-2 mb-1.5">
             <span className="h-1 w-1 rounded-full bg-pri/80 shadow-[0_0_4px_rgb(var(--orion-pri-glow))]" />
-            <div className="text-[10px] uppercase tracking-[0.28em] text-pri/85 font-semibold">
+            {/* BRIEF G5 — eyebrow = role "label" (10px, weight 500,
+                tracking 0.12em) con tinte pri. Mantenemos la voz de
+                marca en cada cabecera. */}
+            <div className="orion-label text-pri/85" style={{ letterSpacing: "0.22em" }}>
               {eyebrow}
             </div>
           </div>
         )}
-        <h2 className="text-lg font-semibold tracking-tight text-text">{title}</h2>
-        {hint && <p className="mt-1 text-xs text-text-dim/90">{hint}</p>}
+        {/* BRIEF G5 — H1 de panel: 24px, weight 600, tracking -0.01em. */}
+        <h2 className="orion-h1 truncate">{title}</h2>
+        {hint && <p className="orion-meta mt-1.5">{hint}</p>}
       </div>
       {action && <div className="flex items-center gap-2">{action}</div>}
     </header>

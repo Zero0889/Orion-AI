@@ -4,7 +4,7 @@
 
 ### Operador de Redes Inteligentes y Optimización Neural
 
-**Asistente de IA personal multimodal — voz en tiempo real, visión, control del sistema. Local, multiplataforma, sin suscripciones.**
+**Asistente de IA personal multimodal — voz en tiempo real, visión, control del sistema. Local, web-only, sin suscripciones.**
 
 [![License: CC BY-NC 4.0](https://img.shields.io/badge/license-CC%20BY--NC%204.0-blue.svg)](https://creativecommons.org/licenses/by-nc/4.0/)
 [![Python](https://img.shields.io/badge/python-3.11%20%7C%203.12-blue.svg)](https://www.python.org/)
@@ -23,9 +23,9 @@
 
 - [¿Qué es Orion?](#-qué-es-orion)
 - [Capacidades](#-capacidades)
-- [Novedades](#-novedades)
-- [Quick Start](#-quick-start)
-- [Interfaz web](#-interfaz-web)
+- [Quick Start (usuario final)](#-quick-start-usuario-final)
+- [Quick Start (desarrollador)](#-quick-start-desarrollador)
+- [Configuración](#-configuración)
 - [Arquitectura](#-arquitectura)
 - [Empaquetado nativo](#-empaquetado-nativo-tauri--pyinstaller)
 - [Requisitos](#-requisitos)
@@ -36,9 +36,11 @@
 
 ## 🧠 ¿Qué es Orion?
 
-Orion es un asistente de IA personal avanzado y multiplataforma que conecta tu sistema operativo con la intención humana. A través de diálogo natural, analiza tu pantalla, procesa documentos cargados y ejecuta flujos de trabajo complejos sobre una interfaz web adaptativa servida en local.
-
-No es solo un asistente — es una extensión de tu vida digital.
+Orion es un asistente de IA personal avanzado que conecta tu sistema operativo
+con la intención humana. A través de diálogo natural, analiza tu pantalla,
+procesa documentos cargados y ejecuta flujos de trabajo complejos sobre una
+interfaz web adaptativa servida en local. No es solo un asistente — es una
+extensión de tu vida digital.
 
 ---
 
@@ -46,121 +48,170 @@ No es solo un asistente — es una extensión de tu vida digital.
 
 | Feature | Descripción |
 |---|---|
-| 🎙️ Voz en tiempo real | Conversación con latencia ultra-baja en cualquier idioma |
-| 🖥️ Control del sistema | Lanza apps, gestiona archivos, ejecuta comandos de terminal |
-| 🧩 Tareas autónomas | Planificación de alto nivel para objetivos multi-paso |
+| 🎙️ Voz en tiempo real | Conversación con latencia ultra-baja (Gemini Live) |
+| 🖥️ Control del sistema | Lanza apps, gestiona archivos, ejecuta comandos |
+| 🧩 Tareas autónomas | Planificación multi-paso con agentes especializados |
 | 👁️ Conciencia visual | Procesado de pantalla y webcam en tiempo real |
-| 🧠 Memoria persistente | Recuerda proyectos, preferencias y contexto personal |
-| ⌨️ Input híbrido | Cambia entre teclado y voz sin fricción |
-| 🏠 IoT integrado | Control de dispositivos Wokwi/Arduino con admin CRUD |
-| 🔌 Ecosistema MCP | Skills, Agents y Notifications conectables vía Model Context Protocol |
+| 🧠 Memoria persistente | Recuerda proyectos, preferencias y contexto |
+| 📬 Bandeja unificada | Gmail · Classroom · Drive (OAuth opcional) |
+| 🏠 IoT integrado | Control de dispositivos ESP32/Arduino con CRUD |
+| 🔌 Ecosistema MCP | Skills, Agents y Notifications vía Model Context Protocol |
+| 📁 Diagnóstico in-app | Panel para ver logs y rutas sin abrir el CMD |
 
 ---
 
-## 🆕 Novedades
+## ⚡ Quick Start (usuario final)
 
-- 📂 **Gestión avanzada de archivos** — Drop de PDFs, código o imágenes para análisis, resumen o edición instantánea.
-- 🎨 **UI adaptativa** — Interfaz redimensionable y responsive, con transparencias y layouts customizables.
-- 🐧🍎 **Estabilidad cross-platform** — Fixes mayores para macOS y Linux. Acciones del sistema consistentes en los tres OS.
-- ⚡ **Motor optimizado** — 40% más rápido en tool-calling y generación de respuestas.
-- 🔧 **Ecosistema MCP completo** — Skills + Agents + Notifications con paneles dedicados.
+> Si solo querés usar Orion, bajá el instalador.
+
+1. Bajá el último release desde
+   [Releases](https://github.com/Zero0889/Orion-AI/releases) — elegí
+   **`Orion_X.Y.Z_x64-setup.exe`** (NSIS, recomendado).
+2. Ejecutalo y seguí los pasos. Se instala en `C:\Program Files\Orion\`.
+3. Abrí Orion desde el menú Inicio.
+4. La primera vez aparece un **wizard de bienvenida** pidiendo tu API key
+   de Gemini. Conseguila gratis en
+   [aistudio.google.com/app/apikey](https://aistudio.google.com/app/apikey)
+   y pegala.
+5. (Opcional) Para Gmail / Classroom / Drive, seguí
+   [`docs/SETUP_GOOGLE_OAUTH.md`](docs/SETUP_GOOGLE_OAUTH.md).
+
+> Si la ventana queda en negro o ves "backend no respondió", el problema
+> más común es el [VC++ Redistributable](https://aka.ms/vs/17/release/vc_redist.x64.exe).
+> La pantalla de error tiene un botón directo para descargarlo.
 
 ---
 
-## ⚡ Quick Start
+## 🛠️ Quick Start (desarrollador)
 
-```bash
-pip install -r requirements.txt
-playwright install
-python main.py
+### Prerrequisitos
+
+- **Python 3.11 o 3.12** — `py -3 --version`
+- **Node.js LTS** (18+) — `node --version`
+- **Git**
+- (Opcional para builds) **Rust + `cargo-tauri`** — `cargo install tauri-cli --version "^1.6"`
+
+### Setup en un solo comando
+
+```bat
+git clone https://github.com/Zero0889/Orion-AI.git
+cd Orion-AI
+setup.bat
 ```
 
-> ⚠️ **Nota de instalación:** para mantener el repo ligero, algunas dependencias específicas del SO no están en `requirements.txt`. Si te aparece un `ModuleNotFoundError`, instala el paquete que falta con `pip install <module_name>`.
+`setup.bat` hace:
 
----
+1. Crear `.venv` con Python.
+2. `pip install -r requirements.txt + requirements-dev.txt`.
+3. `cd web && npm install && npm run build`.
+4. Avisarte qué hacer después.
 
-## 🖥️ Interfaz web
+### Arrancar Orion
 
-Desde la **Fase 7** Orion es web-only: la UI vive en `web/` (React + TypeScript + Tailwind) y la sirve FastAPI desde el mismo puerto que la API. La antigua UI PyQt6 quedó en el historial de la rama `migration/web-ui`.
-
-```powershell
-python main.py
+```bat
+orion.bat
 ```
 
-Esto:
-1. Arranca el backend FastAPI en `http://127.0.0.1:8765`.
-2. Lanza `OrionLive` en un thread daemon (Gemini Live + audio).
-3. Abre tu navegador apuntando a la UI.
+`orion.bat` valida prerrequisitos en cada arranque — si falta `web/dist/` lo
+compila, si falta `.venv` lo crea. **No hace falta volver a correr
+`setup.bat`** salvo que borres algo a mano.
 
-Para procesos sidecar (Tauri) o despliegues sin GUI, define `ORION_NO_BROWSER=1` y nada se autoabre.
+### Frontend con HMR
 
-### Desarrollo del frontend
+Si vas a tocar React, corré Vite en paralelo:
 
-Hot reload sobre cambios en `web/src/`:
+```bat
+REM Terminal 1: backend
+python -m orion
 
-```bash
+REM Terminal 2: frontend con HMR
 cd web
-npm install      # solo la primera vez
-npm run dev      # http://localhost:5173 → backend en :8765
+npm run dev
 ```
 
-Para producción / Tauri: `npm run build` deja el bundle en `web/dist/` y el backend lo sirve bajo `/` automáticamente.
+Abrí `http://localhost:5173`. El proxy de Vite redirige `/api/*` y `/ws` al
+backend en `:8765`.
 
-### Atajo `.bat` en el escritorio
+---
 
-Doble click sin abrir terminal:
+## ⚙️ Configuración
 
-```batch
-@echo off
-cd /d C:\Users\zahir\OneDrive\Desktop\O.R.I.O.N
-call .venv\Scripts\activate.bat
-python main.py
-pause
-```
+| Modo | Ubicación |
+|---|---|
+| Desarrollo | `<repo>/config/`, `<repo>/data/` |
+| Instalado (frozen) | `%APPDATA%\Orion\config\`, `%APPDATA%\Orion\data\` |
 
-Guárdalo como `Orion-Web.bat`. Para añadir ícono: click derecho → **Crear acceso directo** → **Propiedades** → **Cambiar icono** → `src-tauri/icons/icon.ico`.
+Forzá otra ubicación con `ORION_DATA_HOME=C:\Path`.
+
+### API key de Gemini (obligatoria)
+
+Tres formas (por prioridad):
+
+1. Pegarla en el wizard de bienvenida (lo más fácil).
+2. Env var `ORION_GEMINI_KEY` — tiene prioridad sobre el archivo.
+3. Editar `config/api_keys.json` a mano:
+   ```json
+   { "gemini_api_key": "AIza..." }
+   ```
+
+Conseguila gratis en [aistudio.google.com/app/apikey](https://aistudio.google.com/app/apikey).
+
+### Google OAuth (opcional)
+
+Para Gmail / Classroom / Drive / Calendar / Sheets — setup completo (~5 min)
+documentado en [`docs/SETUP_GOOGLE_OAUTH.md`](docs/SETUP_GOOGLE_OAUTH.md).
+
+### Variables de entorno
+
+| Var | Default | Uso |
+|---|---|---|
+| `ORION_GEMINI_KEY` | (vacía) | API key de Gemini. Prioridad sobre el archivo. |
+| `ORION_DATA_HOME` | (auto) | Forzar ruta de config/data. |
+| `ORION_NO_BROWSER` | (vacía) | Si `=1`, no abre el navegador (Tauri lo setea). |
+| `ORION_PROJECTS_DIR` | `~/Desktop/OrionProjects` | Carpeta del agente Coder. |
+| `ORION_UPLOADS_DIR` | `<repo>/uploads` | Drop-zone para uploads. |
+| `ORION_GOOGLE_CLIENT_SECRET` | (auto) | Path al `client_secret.json` custom. |
 
 ---
 
 ## 🏗️ Arquitectura
 
 ```
-┌─────────────── Tauri app (~5 MB Rust) ────────────────┐
-│                                                       │
-│  WebView del SO (Edge/WebKit) ── http://127.0.0.1:8765│
-│                                          ▲            │
-│                                          │ spawn      │
-│                                          ▼            │
-│  Sidecar: orion-backend (PyInstaller) ──────────────  │
-│    ↳ main.py modo web                                 │
-│    ↳ FastAPI + uvicorn + WS + actions/ + IoT          │
-└───────────────────────────────────────────────────────┘
+┌─────────────── Tauri shell (Rust, ~5 MB) ──────────────┐
+│ WebView del SO ── http://127.0.0.1:8765                │
+│  ├─ spawnea orion-backend.exe (sidecar PyInstaller)    │
+│  └─ pantalla de error si backend no responde en 30s    │
+└──────────────────┬─────────────────────────────────────┘
+                   │
+       ┌───────────▼────────────────────────────────┐
+       │ Backend Python (FastAPI + uvicorn, :8765)  │
+       │  ├─ orion/server/    FastAPI app + WS      │
+       │  ├─ orion/runtime.py  OrionLive (Gemini)   │
+       │  ├─ orion/agent/      planner + executor   │
+       │  ├─ orion/adapters/   tools por dominio    │
+       │  ├─ orion/domain/     memory + notas       │
+       │  └─ orion/storage/    SQLite (WAL)         │
+       └───────────┬────────────────────────────────┘
+                   │
+       ┌───────────▼────────────────────────────────┐
+       │ Frontend React (web/, servido por FastAPI) │
+       │  ├─ Vite + Tailwind + Zustand + TanStack Q │
+       │  ├─ Tipos autogenerados desde OpenAPI      │
+       │  └─ 14 paneles (Chat, Notas, Diagnóstico…) │
+       └────────────────────────────────────────────┘
 ```
 
 **Stack principal:**
-- **Backend**: Python 3.11 · FastAPI · uvicorn · WebSocket
-- **Frontend**: React · TypeScript · Tailwind · Zustand
-- **Desktop**: Tauri 1.x (Rust) · PyInstaller (sidecar)
-- **LLM**: Gemini Live (multiprovedor vía abstracción)
+
+- **Backend**: Python 3.11+ · FastAPI · uvicorn · WebSocket · structlog
+- **Frontend**: React 18 · TypeScript · Vite · Tailwind · Zustand · TanStack Query
+- **Desktop**: Tauri 1.6 (Rust) · PyInstaller 6 (sidecar)
+- **LLM**: Gemini Live (multi-provider vía abstracción)
 - **Extensiones**: MCP (Model Context Protocol) · Skills · Agents
 
 ---
 
 ## 📦 Empaquetado nativo (Tauri + PyInstaller)
-
-Desde la **Fase 6** Orion puede distribuirse como aplicación de escritorio firmada con instalador `.msi` / `.dmg` / `.deb` / `.AppImage`.
-
-### Prerequisitos
-
-| Herramienta | Versión | Notas |
-|---|---|---|
-| Node.js | ≥ 18 | `npm` debe estar en el PATH |
-| Python  | 3.11  | virtualenv `.venv` activado |
-| Rust    | ≥ 1.70 | `rustup` lo más fácil — https://rustup.rs |
-| `cargo-tauri` | 1.x | `cargo install tauri-cli --version "^1.6"` |
-| Iconos | — | ver `src-tauri/icons/README.md` |
-
-### Build
 
 ```powershell
 # Windows
@@ -171,21 +222,19 @@ Desde la **Fase 6** Orion puede distribuirse como aplicación de escritorio firm
 ./scripts/build.sh
 ```
 
-El script hace los 4 pasos en orden:
+Pipeline (4 pasos):
+
 1. `npm run build` → `web/dist/`
 2. `pyinstaller packaging/orion_backend.spec` (modo **onefile**) → `dist/orion-backend.exe`
 3. Renombra el binario a `orion-backend-<target-triple>.exe` y lo copia a `src-tauri/binaries/`
-4. `cargo tauri build` → instalador final en `src-tauri/target/release/bundle/`
+4. `cargo tauri build` → instalador final en `src-tauri/target/release/bundle/`:
+   - `msi/Orion_X.Y.Z_x64_en-US.msi`
+   - `nsis/Orion_X.Y.Z_x64-setup.exe`
 
-> **Nota sobre onefile**: el backend va empaquetado como un único `.exe` autocontenido (~150 MB) con Python + todas las deps embebidas. PyInstaller lo extrae a `%TEMP%\_MEI*` la primera vez (3–5 s extra de arranque). Esto evita distribuir una carpeta `_internal/` aparte, que Tauri 1.x no maneja bien junto al `externalBin`.
-
-### Distribución
-
-- **Windows**: `.msi` o `.exe` (NSIS)
-- **macOS**: `.dmg` con bundle `.app`
-- **Linux**: `.deb` y `.AppImage`
-
-El binario final lleva todo dentro: no necesita Python instalado en la máquina del usuario.
+> **Nota sobre onefile**: el backend va empaquetado como un único `.exe`
+> autocontenido (~165 MB) con Python + deps embebidas. PyInstaller lo
+> extrae a `%TEMP%\_MEI*` la primera vez (3–5 s extra de arranque). Esto
+> evita distribuir una carpeta `_internal/` aparte.
 
 ---
 
@@ -193,9 +242,11 @@ El binario final lleva todo dentro: no necesita Python instalado en la máquina 
 
 | Requisito | Detalle |
 |---|---|
-| **SO** | Windows 10/11, macOS o Linux |
-| **Python** | 3.11 o 3.12 |
-| **Micrófono** | Necesario para interacción por voz |
+| **SO** | Windows 10/11 x64, macOS, o Linux |
+| **Python** | 3.11 o 3.12 (solo para desarrollo) |
+| **RAM** | 4 GB mínimo, 8 GB recomendado |
+| **VC++ Redist** | 2015-2022 ([descarga](https://aka.ms/vs/17/release/vc_redist.x64.exe)) |
+| **Micrófono** | Opcional (solo si querés voz) |
 | **API Key** | Clave gratuita de Gemini |
 
 ---
@@ -203,20 +254,49 @@ El binario final lleva todo dentro: no necesita Python instalado en la máquina 
 ## 🐛 Troubleshooting
 
 <details>
-<summary>Problemas comunes de empaquetado y arranque</summary>
+<summary>La ventana queda en negro o muestra "backend no respondió"</summary>
+
+- **VC++ Redistributable** faltante: bajá
+  [`vc_redist.x64.exe`](https://aka.ms/vs/17/release/vc_redist.x64.exe) y
+  reinstalá.
+- **Puerto 8765 ocupado**: cerrá lo que esté usando el puerto.
+- **Antivirus**: agregá `orion-backend.exe` a la whitelist. Algunos AV
+  agresivos lo flaggean por usar OpenCV + sounddevice.
+
+</details>
+
+<details>
+<summary>"deleted_client" o "invalid_client" en logs de Gmail/Classroom</summary>
+
+El OAuth Client ID que registraste fue borrado/invalidado en Google Cloud
+Console. Seguí los pasos del paso "Errores comunes" en
+[`docs/SETUP_GOOGLE_OAUTH.md`](docs/SETUP_GOOGLE_OAUTH.md).
+
+</details>
+
+<details>
+<summary>Quiero ver los logs</summary>
+
+- **Desde la UI**: panel **Diagnóstico** (sidebar) muestra el tail vivo +
+  botones para abrir la carpeta y copiar al portapapeles.
+- **Modo desarrollo**: `logs/orion.log` en el repo.
+- **Modo instalado**: `%APPDATA%\Orion\logs\orion.log`.
+
+Los logs rotan cada 5 MB con 3 archivos de backup.
+
+</details>
+
+<details>
+<summary>Problemas comunes de empaquetado y arranque (avanzado)</summary>
 
 | Síntoma | Causa habitual | Solución |
 |---|---|---|
 | `orion-backend sidecar no encontrado` | Olvidaste renombrar al target-triple. | Verifica `src-tauri/binaries/orion-backend-<triple>.exe`. |
-| Ventana se abre <1 s y desaparece, Edge se abre solo | Sidecar muere por path roto + el backend abre el navegador por defecto. | Asegúrate de que `RESOURCES_DIR` apunte a `sys._MEIPASS` en modo frozen, y que Tauri setea `ORION_NO_BROWSER=1` antes de spawnear (ya en `main.rs`). |
-| `{"detail":"Not Found"}` al abrir | `web/dist/` no se encuentra dentro del bundle. | Mismo fix: usar `RESOURCES_DIR` (no `BASE_DIR`) para buscar el frontend. |
-| `Set-ExecutionPolicy no se reconoce` | Estás en CMD, no en PowerShell. | Abre **PowerShell** (prompt empieza con `PS`), no `cmd.exe`. |
-| `package.json not found` en step 4 | `beforeBuildCommand` resolvía mal el path. | Cambiado a `npm --prefix web run build` en `tauri.conf.json`. |
-| `Acceso denegado` / `PermissionDenied` en `cargo tauri build` | Procesos viejos de Orion vivos, o OneDrive sincronizando `target/`. | `Stop-Process orion*`; pausa OneDrive; idealmente saca el proyecto de OneDrive. |
-| Falta icono al hacer `cargo tauri build` | No has generado los iconos. | `cargo tauri icon ruta\a\logo.png` (PNG cuadrado 1024×1024). |
-| PyInstaller no encuentra módulos de plugins | Carga dinámica que el análisis estático no detecta. | Ya añadido `collect_submodules("plugins")` en `packaging/orion_backend.spec`. |
-| `TerminatorExpectedAtEndOfString` al correr el build script | PowerShell 5.1 lee UTF-8 sin BOM como Windows-1252 y rompe caracteres especiales. | Usa solo ASCII en los `.ps1`, guárdalos con BOM, o actualiza a PowerShell 7. |
-| Pantalla blanca >30 s | Backend tardó demasiado en arrancar. | Mira logs del sidecar (Tauri los reenvía a stderr). |
+| `{"detail":"Not Found"}` al abrir | `web/dist/` no se encuentra dentro del bundle. | Asegúrate de que `RESOURCES_DIR` apunte a `sys._MEIPASS` en frozen. |
+| `Set-ExecutionPolicy no se reconoce` | Estás en CMD, no en PowerShell. | Abrí **PowerShell** (prompt empieza con `PS`). |
+| `Acceso denegado` en `cargo tauri build` | Procesos viejos vivos o OneDrive sincronizando `target/`. | `Stop-Process orion*`; pausá OneDrive. |
+| PyInstaller no encuentra módulos de plugins | Carga dinámica que el análisis estático no detecta. | Ya está `collect_submodules("orion.plugins")` en el spec. |
+| Pantalla blanca >30 s | Backend tardó demasiado en arrancar. | Mirá `%APPDATA%\Orion\logs\orion.log`. |
 
 </details>
 
@@ -232,3 +312,12 @@ Bajo licencia **[Creative Commons BY-NC 4.0](https://creativecommons.org/license
 ## 👤 Créditos
 
 Desarrollado como un asistente de IA personal de nueva generación.
+
+Tecnologías:
+[`gog`](https://github.com/rclone/gog) ·
+[Gemini Live](https://ai.google.dev/) ·
+[Tauri](https://tauri.app/) ·
+[FastAPI](https://fastapi.tiangolo.com/) ·
+[Vite](https://vitejs.dev/) ·
+[React](https://react.dev/) ·
+[Tailwind](https://tailwindcss.com/)

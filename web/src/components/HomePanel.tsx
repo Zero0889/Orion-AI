@@ -79,19 +79,28 @@ export function HomePanel() {
             <OrbHUD />
           </div>
 
-          {/* Greeting */}
-          <h1 className="mt-2 text-3xl md:text-4xl font-semibold tracking-tight text-text text-center animate-fade-in-up">
-            {greet()}
-            {muted ? "" : ", estoy operativo"}
-          </h1>
+          {/* Greeting — BRIEF Inicio: drama tipográfico real.
+              Línea 1 ("Buenas tardes") en orion-display 38px weight 300.
+              Línea 2 ("estoy operativo") en body 14px muted, como pulso
+              continuo del sistema. Sin agruparlas en el mismo nodo, sino
+              dos roles claramente jerárquicos. */}
+          <h1 className="orion-display mt-3 text-center animate-fade-in-up">{greet()}</h1>
+          {!muted && (
+            <p
+              className="orion-body text-text-dim/85 mt-1 text-center animate-fade-in-up"
+              style={{ animationDelay: "60ms" }}
+            >
+              estoy operativo
+            </p>
+          )}
           <div
-            className="mt-2 flex items-center gap-2 text-[10px] uppercase tracking-[0.28em] animate-fade-in-up"
-            style={{ animationDelay: "60ms" }}
+            className="mt-3 flex items-center gap-2 text-[10px] uppercase tracking-[0.28em] animate-fade-in-up"
+            style={{ animationDelay: "120ms" }}
           >
             <span
-              className={`h-1.5 w-1.5 rounded-full ${connected ? "bg-ok shadow-[0_0_8px_rgb(var(--orion-ok))] animate-pulse" : "bg-muted"}`}
+              className={`h-1.5 w-1.5 rounded-full ${connected ? "bg-sem-live shadow-[0_0_8px_rgb(var(--sem-live))] animate-pulse" : "bg-muted"}`}
             />
-            <span className={connected ? "text-ok/90" : "text-muted"}>
+            <span className={connected ? "text-sem-live/90" : "text-muted"}>
               {connected ? "Neural core estable" : "Reconectando…"}
             </span>
           </div>
@@ -248,67 +257,152 @@ function TelemetryCard({
   agentRunning: boolean;
   onSee: () => void;
 }) {
-  const rows = [
-    { label: "CPU", pct: tlast ? Math.round(tlast.cpu * 100) : null, tone: "pri" },
-    { label: "Memoria", pct: tlast ? Math.round(tlast.ram * 100) : null, tone: "acc" },
-    { label: "Disco", pct: tlast ? Math.round(tlast.disk * 100) : null, tone: "ok" },
+  // BRIEF Inicio · Telemetría como instrumentos de cockpit:
+  //   · CPU/Memoria/Disco como diales circulares en una fila (tres
+  //     luminosidades del MISMO acento — sem-data-{a,b,c}).
+  //   · Agentes / Nodos IoT como métricas operativas debajo en
+  //     barras (serie aparte, no se confunde con las del sistema).
+  const dials = [
+    { label: "CPU", pct: tlast ? Math.round(tlast.cpu * 100) : null, tone: "data-a" as const },
+    { label: "Memoria", pct: tlast ? Math.round(tlast.ram * 100) : null, tone: "data-b" as const },
+    { label: "Disco", pct: tlast ? Math.round(tlast.disk * 100) : null, tone: "data-c" as const },
+  ];
+  const bars = [
     {
       label: "Agentes",
       pct: agentRunning ? 100 : 0,
-      tone: "warn",
-      suffix: agentRunning ? "1 activo" : "0 activos",
+      tone: "live" as const,
+      readout: agentRunning ? "1 activo" : "0 activos",
     },
     {
       label: "Nodos IoT",
       pct: Math.min(100, sensorCount * 20),
-      tone: "acc",
-      suffix: `${sensorCount} ${sensorCount === 1 ? "online" : "online"}`,
+      tone: "acc" as const,
+      readout: `${sensorCount} online`,
     },
   ];
   return (
     <RailCard title="Telemetría del sistema" icon="telemetry" onSee={onSee} seeLabel="Detalle →">
+      <div className="flex items-end justify-between gap-2 mb-3">
+        {dials.map((d) => (
+          <TelemetryDial key={d.label} {...d} />
+        ))}
+      </div>
+      <div className="h-px bg-white/[0.04] mb-3" />
       <div className="flex flex-col gap-2.5">
-        {rows.map((r) => (
-          <TelemetryRow key={r.label} {...r} />
+        {bars.map((b) => (
+          <TelemetryBar key={b.label} {...b} />
         ))}
       </div>
     </RailCard>
   );
 }
 
-function TelemetryRow({
+/* ── TelemetryDial — gauge circular SVG estilo cockpit ─────────────
+   Anillo de fondo + anillo de progreso animado + número grande y
+   monoespaciado en el centro. El stroke ocupa 270° (de -135° a +135°)
+   dejando un hueco abajo — más legible que un círculo completo y se
+   lee como velocímetro. */
+function TelemetryDial({
   label,
   pct,
   tone,
-  suffix,
 }: {
   label: string;
   pct: number | null;
-  tone: string;
-  suffix?: string;
+  tone: "data-a" | "data-b" | "data-c" | "live" | "acc";
 }) {
-  const colorClass =
-    tone === "pri"
-      ? "bg-pri"
-      : tone === "acc"
-        ? "bg-acc"
-        : tone === "ok"
-          ? "bg-ok"
-          : tone === "warn"
-            ? "bg-warn"
-            : "bg-text-dim";
+  const SIZE = 78;
+  const STROKE = 5;
+  const R = (SIZE - STROKE) / 2;
+  const ARC_LEN = R * Math.PI * 1.5; // 270°
+  const value = pct == null ? 0 : Math.max(0, Math.min(100, pct));
+  const offset = ARC_LEN * (1 - value / 100);
+  const colorVar =
+    tone === "data-a"
+      ? "var(--sem-data-a)"
+      : tone === "data-b"
+        ? "var(--sem-data-b)"
+        : tone === "data-c"
+          ? "var(--sem-data-c)"
+          : tone === "live"
+            ? "var(--sem-live)"
+            : "var(--orion-acc)";
+  return (
+    <div className="flex flex-col items-center gap-1 min-w-0 flex-1">
+      <div className="relative" style={{ width: SIZE, height: SIZE }}>
+        <svg
+          viewBox={`0 0 ${SIZE} ${SIZE}`}
+          className="absolute inset-0"
+          style={{ transform: "rotate(135deg)" }}
+        >
+          <circle
+            cx={SIZE / 2}
+            cy={SIZE / 2}
+            r={R}
+            fill="none"
+            stroke="rgb(var(--orion-border) / 0.08)"
+            strokeWidth={STROKE}
+            strokeDasharray={`${ARC_LEN} ${R * 2 * Math.PI}`}
+            strokeLinecap="round"
+          />
+          <circle
+            cx={SIZE / 2}
+            cy={SIZE / 2}
+            r={R}
+            fill="none"
+            stroke={`rgb(${colorVar})`}
+            strokeWidth={STROKE}
+            strokeDasharray={`${ARC_LEN} ${R * 2 * Math.PI}`}
+            strokeDashoffset={offset}
+            strokeLinecap="round"
+            style={{
+              transition: "stroke-dashoffset 600ms cubic-bezier(0.22, 1, 0.36, 1)",
+              filter: `drop-shadow(0 0 6px rgb(${colorVar} / 0.5))`,
+            }}
+          />
+        </svg>
+        <div className="absolute inset-0 grid place-items-center text-center">
+          <div>
+            <div
+              className="orion-mono text-[18px] font-semibold leading-none"
+              style={{ color: `rgb(${colorVar})` }}
+            >
+              {pct == null ? "—" : pct}
+              <span className="text-[10px] text-text-dim/80 ml-0.5 font-mono">%</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div className="text-[9px] uppercase tracking-[0.18em] text-text-dim font-medium">
+        {label}
+      </div>
+    </div>
+  );
+}
+
+function TelemetryBar({
+  label,
+  pct,
+  tone,
+  readout,
+}: {
+  label: string;
+  pct: number;
+  tone: "live" | "acc";
+  readout: string;
+}) {
+  const colorClass = tone === "live" ? "bg-sem-live" : "bg-acc";
   return (
     <div>
       <div className="flex items-baseline justify-between text-[10px] uppercase tracking-[0.16em] mb-1">
         <span className="text-text-dim">{label}</span>
-        <span className="text-text font-mono tabular-nums">
-          {pct == null ? "—" : (suffix ?? `${pct}%`)}
-        </span>
+        <span className="text-text font-mono tabular-nums">{readout}</span>
       </div>
-      <div className="h-1.5 rounded-full bg-white/[0.04] overflow-hidden">
+      <div className="h-1 rounded-full bg-white/[0.04] overflow-hidden">
         <div
           className={`h-full ${colorClass} rounded-full transition-all duration-500`}
-          style={{ width: `${pct ?? 0}%` }}
+          style={{ width: `${pct}%` }}
         />
       </div>
     </div>
@@ -520,57 +614,68 @@ function QuickAction({
       className="group relative text-left rounded-xl overflow-hidden
                  border border-white/[0.06]
                  bg-[rgb(var(--orion-elevated)/0.55)] backdrop-blur-sm
-                 transition-all duration-200 ease-out-expo
+                 transition-all duration-300 ease-spring
                  hover:border-[rgb(var(--qa-accent)/0.45)]
-                 hover:bg-[rgb(var(--orion-elevated)/0.75)]
-                 hover:-translate-y-0.5
-                 hover:shadow-[0_8px_24px_-12px_rgb(var(--qa-accent)/0.55)]
+                 hover:bg-[rgb(var(--orion-elevated)/0.78)]
+                 hover:-translate-y-1
+                 hover:shadow-[0_18px_38px_-16px_rgb(var(--qa-accent)/0.65),0_0_0_1px_rgb(var(--qa-accent)/0.25)]
                  animate-fade-in-up"
     >
-      {/* HUD corner brackets — solo top-left y bottom-right para no abrumar */}
+      {/* HUD corner brackets — top-left + bottom-right, brillan en hover */}
       <span
         aria-hidden
-        className="absolute top-1.5 left-1.5 h-1.5 w-1.5 border-t border-l opacity-50 group-hover:opacity-100 transition-opacity"
+        className="absolute top-1.5 left-1.5 h-2 w-2 border-t border-l opacity-55 group-hover:opacity-100 transition-opacity"
         style={{ borderColor: `rgb(${accentVar})` }}
       />
       <span
         aria-hidden
-        className="absolute bottom-1.5 right-1.5 h-1.5 w-1.5 border-b border-r opacity-50 group-hover:opacity-100 transition-opacity"
+        className="absolute bottom-1.5 right-1.5 h-2 w-2 border-b border-r opacity-55 group-hover:opacity-100 transition-opacity"
         style={{ borderColor: `rgb(${accentVar})` }}
       />
 
-      {/* Glow lateral muy sutil al hover — tinte de color, no blanco. */}
+      {/* Sheen lateral al hover (tinte de color, no blanco) */}
       <span
         aria-hidden
         className="absolute inset-y-0 left-0 w-1 opacity-0 group-hover:opacity-100 transition-opacity duration-300"
-        style={{ background: `linear-gradient(to right, rgb(${accentVar}/0.5), transparent)` }}
+        style={{ background: `linear-gradient(to right, rgb(${accentVar}/0.55), transparent)` }}
+      />
+      {/* Halo radial detrás del icono al hover */}
+      <span
+        aria-hidden
+        className="absolute top-3 left-3 h-12 w-12 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-300 blur-xl pointer-events-none"
+        style={{ background: `radial-gradient(circle, rgb(${accentVar}/0.45), transparent 70%)` }}
       />
 
-      <div className="relative p-3.5">
-        <div className="flex items-center gap-3 mb-0.5">
+      <div className="relative p-4">
+        <div className="flex items-start gap-3">
           <span
-            className="grid place-items-center h-9 w-9 rounded-lg border transition-all duration-200"
+            className="grid place-items-center h-12 w-12 rounded-xl border transition-all duration-300
+                       group-hover:scale-[1.06]"
             style={{
-              backgroundColor: `rgb(${accentVar} / 0.13)`,
-              borderColor: `rgb(${accentVar} / 0.32)`,
+              backgroundColor: `rgb(${accentVar} / 0.15)`,
+              borderColor: `rgb(${accentVar} / 0.38)`,
               color: `rgb(${accentVar})`,
-              boxShadow: `inset 0 0 10px rgb(${accentVar}/0.10)`,
+              boxShadow: `inset 0 0 12px rgb(${accentVar}/0.14), 0 0 18px -6px rgb(${accentVar}/0.55)`,
             }}
           >
-            <Icon name={icon} size={16} />
+            <Icon name={icon} size={22} />
           </span>
-          <div className="min-w-0">
-            <div className="text-sm font-medium text-text truncate transition-colors">{label}</div>
-            <div className="text-[10px] text-text-dim/80 leading-snug truncate">{hint}</div>
+          <div className="min-w-0 pt-0.5">
+            <div className="text-sm font-semibold text-text truncate transition-colors leading-tight">
+              {label}
+            </div>
+            <div className="text-[11px] text-text-dim/85 leading-snug mt-0.5">{hint}</div>
           </div>
         </div>
-        {/* línea HUD horizontal abajo */}
-        <div
-          className="mt-2 h-px w-full"
-          style={{
-            background: `linear-gradient(to right, rgb(${accentVar}/0.35), transparent 80%)`,
-          }}
-        />
+        {/* Línea HUD horizontal — pulsa de izq a der en hover */}
+        <div className="mt-3.5 relative h-px overflow-hidden">
+          <div
+            className="absolute inset-0 transition-opacity duration-300 opacity-55 group-hover:opacity-100"
+            style={{
+              background: `linear-gradient(to right, rgb(${accentVar}/0.45), transparent 75%)`,
+            }}
+          />
+        </div>
       </div>
     </button>
   );

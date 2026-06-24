@@ -184,7 +184,13 @@ def build_app(bus: Any) -> FastAPI:
         skills,
     )
     from orion.server.routes import (
+        diagnostics as diagnostics_route,
+    )
+    from orion.server.routes import (
         notebooklm as notebooklm_route,
+    )
+    from orion.server.routes import (
+        onboarding as onboarding_route,
     )
     from orion.server.routes import (
         settings as settings_route,
@@ -203,6 +209,8 @@ def build_app(bus: Any) -> FastAPI:
     app.include_router(notebooklm_route.router, prefix="/api/notebooklm", tags=["notebooklm"])
     app.include_router(integrations.router, prefix="/api/integrations", tags=["integrations"])
     app.include_router(circuit.router, prefix="/api/circuit", tags=["circuit"])
+    app.include_router(onboarding_route.router, prefix="/api/onboarding", tags=["onboarding"])
+    app.include_router(diagnostics_route.router, prefix="/api/diagnostics", tags=["diagnostics"])
 
     # ── WebSocket hub ────────────────────────────────────────────────────
     from orion.server.ws import register_ws
