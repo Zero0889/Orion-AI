@@ -837,6 +837,143 @@ futuros cambios al frontend mobile.
 
 ---
 
+## 11A. Fase 6 bis — Telegram supergrupo Fases 2/3 (slash commands + chat libre LLM) (Junio 2026)
+
+Continuación natural de la Fase 6 inicial. Antes el supergrupo solo
+recibía notifs en topics. Ahora también acepta **comandos del user** y
+**chat libre con el LLM**, todo desde Telegram.
+
+### Fase 2 — Slash commands en topic Comandos (commit `a7242c6`)
+
+**Nuevo módulo:** `orion/server/telegram_commands.py`
+- `CommandSpec` (dataclass frozen) — `name`, `handler`, `description`,
+  `requires_auth`.
+- `CommandContext` (dataclass) — `sender_chat_id`, `args`, `raw_text`.
+- Registry `_REGISTRY: dict[str, CommandSpec]` (dict preserva insertion
+  order → afecta `/help`).
+- `dispatch(text, *, sender_chat_id, authorized_chat_id)` — punto de
+  entrada; nunca lanza (errores → texto al user).
+- `parse(text)` — robusto: case-insensitive, soporta `/cmd@bot_username`,
+  tolerante a whitespace.
+- 6 comandos read-only (todos requieren auth excepto `/help`):
+  - `/status` — usuarios + eventos hoy + último acceso.
+  - `/usuarios` — lista con `🟢/⚪` activo/pausado.
+  - `/pausar <slot>` — marca `active=False` (huella sigue en sensor pero
+    DENIED en bridge).
+  - `/activar <slot>` — reactiva.
+  - `/log [hoy]` — últimos 10 eventos.
+  - `/help` — público.
+
+**Bridge wire (`telegram_bridge.py`):**
+- `TelegramUpdate.from_user_id` agregado (separado de `chat_id` — en
+  grupos `chat_id` es del grupo, `from_user_id` es del sender).
+- `_should_dispatch_command(text, chat_id, thread_id)` matches:
+  - Chat privado con bot (cualquier `/cmd`).
+  - Supergrupo Y `thread_id == group.topics["commands"]`.
+- `_dispatch_slash_command()`: ejecuta + responde al MISMO topic con
+  `_send_async(..., thread_id=thread_id)`.
+
+**Tests** (`tests/test_telegram_commands.py`, 35 tests):
+- Parseo (incl. `/cmd@bot`, case-insensitive).
+- Auth (sender == authorized, también acepta string), `/help` público,
+  comandos desconocidos, slot fuera de rango, args inválidos.
+- Round-trip pausar↔activar.
+- Bridge: dispatch desde private chat + topic Comandos, NO desde otros
+  topics, bypass del brain cuando matchea.
+
+### Fase 3 — Chat libre con LLM en topic Chat (commit `a7242c6` + fix `c73c6a3` + fix `a96f461`)
+
+**Filtro nuevo en bridge:**
+- `_should_forward_to_brain(chat_id, thread_id)` — solo manda al brain
+  si viene de chat privado O del topic `chat` del supergrupo. Otros
+  topics (access/status/commands) **NO disparan brain** aunque manden
+  texto libre.
+- `_is_authorized_user(from_user_id)` — solo el `default_chat_id` (user
+  autorizado) puede chatear. Otros miembros del supergrupo que escriban
+  en topic Chat son **silenciosamente ignorados** (no gasta tokens, no
+  responde).
+
+**`_pending` deque cambió de tipo:**
+- Antes: `deque[int]` (solo chat_id).
+- Ahora: `deque[tuple[int, int | None]]` ((chat_id, thread_id)).
+- Las respuestas del brain vuelven al MISMO topic de donde vino la
+  pregunta, preservando `message_thread_id`.
+
+**Fix crítico — listener `chat.stream`** (commit `c73c6a3`):
+
+`chat_brain` emite respuestas via `bus.stream_chunk(role="orion", ...)`
+que publica eventos `chat.stream`, y SOLO persiste el log con
+`bus.persist_log_only(...)` (silencioso, sin publicar al bus). Esto se
+hizo en commit `8664938` para fixar el bug del chat duplicado.
+
+Resultado: el bridge solo escuchaba eventos `log` con prefijo "Orion:"
+y nunca recibía las respuestas del brain. Síntoma reportado por el
+user: "me sale en el apartado de conversación pero en la web, no me
+sale en telegram".
+
+Fix: `_handle_chat_stream(payload)` que acumula deltas por `turn_id`
+y al cerrar (`final=True`) manda el texto completo. Buffer
+`_stream_buffers: dict[turn_id, list[str]]` protegido por
+`_stream_lock`. Pop al cerrar para no leakear memoria.
+
+Soporta ambos patterns de emisión:
+- `chat_brain`: UN chunk con texto completo + chunk vacío `final=True`.
+- Live (Gemini): muchos chunks chicos token-por-token + `final=True`.
+
+**Fix crítico — espacios en respuestas de Live** (commit `a96f461`):
+
+Síntoma: "Hola. Sonlas11:31deldomingo,de juniode 2026." — palabras
+pegadas en la respuesta de Live.
+
+Causa: `_clean_transcript()` (en `orion/_helpers.py`) hace `.strip()`
+sobre cada chunk de Live antes de emitir. Live emite cada palabra como
+chunk separado, así que el `.strip()` borra los espacios entre
+palabras. Un naive `"".join(chunks)` los concatena sin espacio.
+
+Fix: nueva función `_smart_join(chunks)` que inserta un espacio entre
+chunks adyacentes solo si:
+- Último char del acumulado NO es whitespace, Y
+- Primer char del chunk nuevo es alfanumérico (o `¿`/`¡`).
+
+De ese modo:
+- `chat_brain` (un solo chunk) → texto pasa intacto.
+- Live (chunks sueltos sin espacios) → palabras separadas con `" "`.
+- Puntuación de cierre (`,`, `.`, `?`) queda pegada al token previo.
+
+**Tests** (`tests/test_telegram_chat_bridge.py`, 26 tests):
+- Filtro: chat privado/topic Chat forwardea; access/commands/general
+  NO; group sin topic chat configurado NO; legacy sin group NO.
+- Auth: solo el authorized user puede; `from_user_id` distinto
+  ignorado; `None` ignorado.
+- Inbound: chat topic + private chat → brain + entry correcto en
+  `_pending`; access topic + unauthorized → ignorado.
+- Reply routing: log "Orion: ..." legacy path; `chat.stream` (ambos
+  patterns chat_brain y Live); role="user" ignorado; buffer vacío NO
+  manda; turnos interleaved con su buffer propio por turn_id.
+- `_smart_join`: bug real reproducido y arreglado, preserva spaces
+  existentes, no agrega espacio antes de puntuación.
+
+### Setup que el user hizo en Telegram
+
+Para usar Fases 2 y 3 el user necesitó:
+1. **Crear topic Chat** en el supergrupo (no renombrar el General — el
+   default tiene `thread_id=None` y el routing requiere int).
+2. Mandar `/start@bot` adentro de cada topic nuevo.
+3. El bridge logueó `chat_id=X thread_id=Y` permitiendo mapear nombre
+   → thread_id manualmente.
+4. Config final: `access=4, commands=2, chat=55` (los thread_ids son
+   específicos a su grupo).
+
+### Sanity al cierre
+
+- Backend: **466 tests passing** (+54 nuevos: 35 commands + 26 chat
+  bridge total tras todos los fixes).
+- Frontend: 71 tests (sin cambio).
+- 3 commits en main: `a7242c6` (feat), `c73c6a3` (fix listener),
+  `a96f461` (fix spaces).
+
+---
+
 ## 12. Fase 7 — Gmail vía google-auth (bypass de gog CLI) (Junio 2026)
 
 Commit `1ed5ad9 refactor(notifications/gmail): usar google-auth directo, bypassear gog CLI`
@@ -973,19 +1110,20 @@ copiar el shape de `gmail.py`:
   pendiente desde Fase 1).
 
 ### Features pendientes
-- **Fase 2 del supergrupo Telegram** — slash commands en el topic
-  Comandos. Decidir cuáles: `/status` (resumen general), `/usuarios`
-  (lista enrolada), `/pausar N` (desactivar slot), `/abrir` (activar
-  relé del ESP32 remotamente), `/log hoy`. Auth a nivel de quién
-  manda el mensaje (solo el `chat_id` del user puede ejecutar comandos
-  sensibles).
-- **Fase 3 del supergrupo Telegram** — chat libre con LLM en el topic
-  Chat. Bridge entre `chat_brain` y Telegram. Cada mensaje del topic
-  Chat se inyecta al brain como input del user; la respuesta vuelve al
-  topic. Permitiría usar Orion desde el celu sin abrir el navegador.
-- **Resúmenes diarios + alertas IoT al topic Estado.** Job nocturno que
-  postea "Hoy entraron 4 personas, último acceso 20:13. Temperatura
-  promedio 22°C". Cron + adapter de resumen.
+- ✅ ~~Fase 2 del supergrupo Telegram (slash commands)~~ — **CERRADA**
+  (commit `a7242c6`, ver §11A).
+- ✅ ~~Fase 3 del supergrupo Telegram (chat libre LLM)~~ — **CERRADA**
+  (commits `a7242c6` + `c73c6a3` + `a96f461`, ver §11A).
+- **Fase 4 del supergrupo Telegram** — Topic Estado con resúmenes
+  diarios + alertas IoT. Job nocturno que postea "Hoy entraron 4
+  personas, último acceso 20:13. Temperatura promedio 22°C". Cron +
+  adapter de resumen.
+- **`/abrir` (extra)** — slash command futuro que activa el relé del
+  ESP32 remotamente. Requiere endpoint inbound en el ESP32 (HTTP
+  server o MQTT subscriber) — no factible con el sketch actual que es
+  solo cliente HTTP.
+- **Slash commands IoT** — `/temp`, `/humedad`, `/luz` que leen el
+  último valor de los sensores. Reusar patrón de `_cmd_status`.
 
 ### Mejoras de plataforma
 - **Migrar otros adapters Google a google-auth si fallan con gog** (Drive,
