@@ -15,7 +15,7 @@ Asistente de IA personal multimodal (voz en tiempo real con Gemini Live + visió
 **Stack:**
 - Backend: Python 3.11/3.12, FastAPI, uvicorn, SQLite (WAL), `google-genai`
 - Frontend: React 18, Vite, Tailwind, Zustand, openapi-typescript
-- Empaquetado: Tauri (dev) + PyInstaller (sidecar Python)
+- Empaquetado: ninguno — Orion corre como `python -m orion` + frontend Vite servido por FastAPI. Sin .exe ni .msi (Tauri y PyInstaller fueron eliminados deliberadamente para ahorrar ~3 GB de cache y simplificar el repo).
 - CI: GitHub Actions (matriz Linux/Windows × Python 3.11/3.12 + Node 20/22)
 
 ---
@@ -47,7 +47,7 @@ project-root/
 │   ├── plugins/  server/  storage/  utils/
 ├── config/                 # data: .json (api_keys, mcp_servers, etc.)
 ├── data/                   # state: SQLite + iot_sensor_log.csv + conversations.json
-├── tests/, scripts/, web/, src-tauri/, packaging/
+├── tests/, scripts/, web/
 ```
 
 **Movimientos clave:**
@@ -69,14 +69,20 @@ aplicarse. 17 strings `patch("module.X")` en tests también actualizadas.
 - `MEMORY_DIR` queda como alias de `DATA_DIR` (back-compat para legacy callers).
 - `actions/iot/sensor_log.py` y `sheets_sync.py` ahora usan `DATA_DIR / "iot_sensor_log.csv"`.
 
-**Build/CI/packaging actualizados:**
+**Build/CI actualizados:**
 - `pyproject.toml`: `packages.find.include = ["orion*"]`, `known-first-party = ["orion"]`, mypy overrides prefijo `orion.`, per-file-ignores `orion/__main__.py`.
 - `.github/workflows/ci.yml`: paths de mypy.
-- `packaging/orion_backend.spec` (PyInstaller): entry point + hidden imports + data files (prompt.txt en `orion/core/`).
 
 **Side-effect:** pre-commit auto-normalizó CRLF→LF en ~10 archivos varios
-(configs JSON, scripts, src-tauri) que tenían drift de line endings.
+(configs JSON, scripts) que tenían drift de line endings.
 Quedó incluido en el mismo commit.
+
+**Junio 2026 — Empaquetado eliminado:** Tauri (`src-tauri/`) + PyInstaller
+(`packaging/orion_backend.spec`) + scripts de build (`scripts/build.sh`,
+`scripts/build.ps1`) + outputs (`build/`, `dist/`) removidos del repo. Sin
+.exe ni .msi. Orion ahora corre exclusivamente como `python -m orion` con
+el frontend Vite servido por FastAPI desde `web/dist/`. Razón: el cache
+ocupaba ~3 GB y el flujo desktop no se usaba.
 
 **Sanity:** **333 tests passing** (mismo número que pre-refactor), ruff
 ok, mypy ok, CI verde en los 8 jobs (run [27909820247](https://github.com/Zero0889/Orion-AI/actions/runs/27909820247)).
@@ -367,10 +373,8 @@ O.R.I.O.N/
 │   └── conversations.json        # Legacy pre-SQLite, queda como export.
 │
 ├── scripts/
-│   └── dump_openapi.py           # → web/src/api/openapi.json (Fase 3D).
-│
-├── packaging/
-│   └── orion_backend.spec        # PyInstaller — entry orion/__main__.py.
+│   ├── dump_openapi.py           # → web/src/api/openapi.json (Fase 3D).
+│   └── audit_mobile.py           # Playwright audit del mobile (412x915).
 │
 ├── tests/
 │   ├── conftest.py               # Fixture autouse: SQLite tmp + mock sounddevice + extend SAFE_ROOTS.

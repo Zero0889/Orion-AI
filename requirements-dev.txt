@@ -1,5 +1,4 @@
-# Dependencias solo para desarrollo / empaquetado.
-# No las necesita el usuario final.
+# Dependencias solo para desarrollo. No las necesita el usuario final.
 
 # ── Tests ────────────────────────────────────────────────────────────
 pytest
@@ -8,6 +7,3 @@ pytest
 ruff
 mypy
 pre-commit
-
-# ── Empaquetado nativo (Tauri sidecar + ejecutable standalone) ───────
-pyinstaller

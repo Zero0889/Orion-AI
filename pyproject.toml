@@ -19,7 +19,7 @@ optional-dependencies = { dev = { file = ["requirements-dev.txt"] } }
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["orion*"]
-exclude = ["tests*", "web*", "tools*", "arduino*", "wokwi*", "packaging*", "scripts*", "src-tauri*", "docs*", "uploads*", "logs*", "skills*"]
+exclude = ["tests*", "web*", "tools*", "arduino*", "wokwi*", "scripts*", "docs*", "uploads*", "logs*", "skills*"]
 
 # ─────────────────────────────────────────────────────────────────────────
 # Ruff — lint + format. Reemplaza black/isort/flake8.
@@ -30,11 +30,8 @@ target-version = "py311"
 extend-exclude = [
     ".venv",
     "__pycache__",
-    "build",
-    "dist",
     "web/node_modules",
     "web/dist",
-    "src-tauri/target",
     "tools",
     "uploads",
     "logs",
@@ -118,13 +115,9 @@ check_untyped_defs = false      # bajar gradualmente
 disallow_untyped_defs = false
 exclude = [
     "^\\.venv/",
-    "^build/",
-    "^dist/",
     "^web/",
-    "^src-tauri/",
     "^tools/",
     "^tests/",
-    "^packaging/",
 ]
 
 # Módulos críticos: type-check más estricto que el resto, pero todavía sin
