@@ -1,4 +1,6 @@
-import { useEyePulseStore } from "./pulseStore";
+import { memo } from "react";
+
+import { EyePulses } from "./EyePulses";
 
 /**
  * EyeCore — el "ojo" cinemático de Orion.
@@ -57,7 +59,7 @@ const STATE_CLASS: Record<EyeState, string> = {
   error: "ec-state-error",
 };
 
-export function EyeCore({
+function EyeCoreImpl({
   state = "idle",
   background = false,
   frozen = false,
@@ -66,7 +68,6 @@ export function EyeCore({
   className = "",
   size = 300,
 }: Props) {
-  const pulses = useEyePulseStore((s) => s.active);
   const cls = [
     "ec-canvas",
     background ? "ec-bg" : "",
@@ -347,35 +348,10 @@ export function EyeCore({
               por estar dentro de <g clipPath>. */}
           <use href="#ec-data-particles" pointerEvents="none" />
 
-          <g className="ec-pulses" pointerEvents="none">
-            {pulses.map((p) => (
-              /* Por cada pulso renderizamos tres anillos con delay escalonado
-                 para que se vea una onda triple, no un trazo solo. */
-              <g key={p.id}>
-                <circle
-                  className={`ec-pulse-ring ec-pulse-${p.kind} ec-pulse-ring-1`}
-                  cx="200"
-                  cy="200"
-                  r="60"
-                  fill="none"
-                />
-                <circle
-                  className={`ec-pulse-ring ec-pulse-${p.kind} ec-pulse-ring-2`}
-                  cx="200"
-                  cy="200"
-                  r="60"
-                  fill="none"
-                />
-                <circle
-                  className={`ec-pulse-ring ec-pulse-${p.kind} ec-pulse-ring-3`}
-                  cx="200"
-                  cy="200"
-                  r="60"
-                  fill="none"
-                />
-              </g>
-            ))}
-          </g>
+          {/* Los pulsos viven en un sub-componente que se suscribe sólo
+              él al pulseStore — así el SVG estático (filamentos, anillos,
+              partículas) no se re-renderiza cuando llegan/expiran pulsos. */}
+          <EyePulses />
 
           <circle
             className="ec-dark-overlay"
@@ -457,3 +433,14 @@ export function EyeCore({
     </div>
   );
 }
+
+/**
+ * Memo: el SVG estático del ojo es caro de re-renderizar (36 filamentos,
+ * 8 partículas, ~12 anillos). Sólo debe re-rendearse cuando cambian las
+ * props que afectan el render (state, frozen, paused, palette, size,
+ * background, className). React.memo con la comparación shallow default
+ * cubre todos esos casos — `palette` se compara por referencia, así que
+ * el consumidor debe memoizarlo (todas las llamadas actuales pasan un
+ * objeto literal estable o no la pasan).
+ */
+export const EyeCore = memo(EyeCoreImpl);

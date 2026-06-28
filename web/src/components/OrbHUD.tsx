@@ -120,7 +120,7 @@ function FullOrb({
   const eyeState = modeToEyeState(mode);
 
   return (
-    <div className="relative flex flex-col items-center gap-7 select-none animate-fade-in">
+    <div className="orb-hud-container relative flex flex-col items-center gap-7 select-none animate-fade-in">
       <div className="relative h-[320px] w-[320px] grid place-items-center">
         {/* halo ambiental por detrás del ojo */}
         <div

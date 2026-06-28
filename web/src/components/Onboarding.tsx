@@ -26,6 +26,29 @@ import { Button } from "@/ui/primitives";
 
 const STATUS_POLL_MS = 1500;
 
+// Flag persistido: una vez que el usuario terminó el wizard (o arrancó
+// con todo ya configurado), no volvemos a mostrarlo en próximas sesiones.
+// Vive en localStorage para que sobreviva F5 y reinicios sin tocar el
+// backend. Reseteable manualmente borrando la entrada (DevTools) si
+// alguien quiere ver el wizard de nuevo.
+const ONBOARDING_DONE_KEY = "orion.onboarding_done";
+
+function readOnboardingDone(): boolean {
+  try {
+    return window.localStorage.getItem(ONBOARDING_DONE_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function markOnboardingDone(): void {
+  try {
+    window.localStorage.setItem(ONBOARDING_DONE_KEY, "1");
+  } catch {
+    /* localStorage no disponible (modo privado) — sin persistencia. */
+  }
+}
+
 type Step = 0 | 1 | 2 | 3 | 4;
 type BrainChoice = "gemini" | "deepseek" | "ollama";
 
@@ -35,7 +58,9 @@ export function Onboarding() {
   const [status, setStatus] = useState<OnboardingStatus | null>(null);
   const [reachable, setReachable] = useState<boolean | null>(null);
   const [step, setStep] = useState<Step | null>(null);
-  const [dismissed, setDismissed] = useState(false);
+  // Inicia ya "dismissed" si el usuario completó el wizard alguna vez.
+  // Así no parpadea ni siquiera por un frame.
+  const [dismissed, setDismissed] = useState<boolean>(() => readOnboardingDone());
   // Cerebro que el usuario eligió en el step 1. Hasta entonces queda en
   // null y el step 2 muestra el placeholder.
   const [brainChoice, setBrainChoice] = useState<BrainChoice | null>(null);
@@ -67,14 +92,19 @@ export function Onboarding() {
 
   // ── Decisión del step inicial ──────────────────────────────────────
   // Una sola vez cuando el primer status llega:
-  //   - ready → ya tiene cerebro válido (Gemini o no), saltamos a integraciones.
-  //   - no ready → arrancamos en welcome.
+  //   - ready → el cerebro ya está configurado (Gemini key, DeepSeek u
+  //     Ollama). Persistimos el flag y dismiss → el usuario va directo a
+  //     la app sin pasar por el wizard. Esto cubre el caso "ya me
+  //     onboardié antes" y también el caso "tengo env var Gemini
+  //     pre-configurada" donde el wizard nunca debería aparecer.
+  //   - no ready → arrancamos en welcome (primer arranque real).
   useEffect(() => {
     if (status === null) return;
     if (step !== null) return;
     if (status.ready) {
       setConfigured(true);
-      setStep(3);
+      markOnboardingDone();
+      setDismissed(true);
     } else {
       setStep(0);
     }
@@ -118,6 +148,7 @@ export function Onboarding() {
           <DoneStep
             onClose={() => {
               setConfigured(true);
+              markOnboardingDone();
               setDismissed(true);
             }}
           />

@@ -98,9 +98,12 @@ export function DiagnosticsPanel() {
         {info && <InfoGrid info={info} />}
 
         <Surface level={2} className="p-0 overflow-hidden">
-          <div className="flex items-center justify-between px-3 py-2 border-b border-white/[0.06]">
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] uppercase tracking-[0.18em] text-text-dim">
+          <div
+            className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2
+                       px-3 py-2 border-b border-white/[0.06]"
+          >
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="text-[10px] uppercase tracking-[0.18em] text-text-dim shrink-0">
                 Log activo
               </span>
               {logTail?.path && (
@@ -109,7 +112,7 @@ export function DiagnosticsPanel() {
                 </code>
               )}
             </div>
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-1 flex-wrap shrink-0">
               {TAIL_LINES_OPTIONS.map((n) => (
                 <button
                   key={n}

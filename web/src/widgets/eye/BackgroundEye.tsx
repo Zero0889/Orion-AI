@@ -8,44 +8,44 @@
  * Reacciona al estado real del backend (escuchando / pensando /
  * hablando / error), exactamente igual que el OrbHUD del Inicio, así
  * el usuario nunca pierde feedback visual de qué está haciendo Orion.
+ *
+ * Performance: la derivación de eyeState vive en `useEyeState` (hook
+ * compartido con TopBar/App). La detección de "chat vacío" se hace por
+ * **selector boolean** sobre el store de mensajes — antes este componente
+ * leía el array completo y se re-renderizaba con cada chunk del stream
+ * de Gemini, lo que repintaba el SVG entero (con sus 36 filamentos,
+ * partículas y anillos animados) varias veces por segundo durante la
+ * conversación.
  */
 
-import { useInteractionStore } from "@/stores/interaction";
+import { memo } from "react";
+
 import { useOrionStore } from "@/stores/orion";
 import { useViewStore } from "@/stores/view";
 
-import { EyeCore, type EyeState } from "./EyeCore";
+import { EyeCore } from "./EyeCore";
+import { useEyeState } from "./useEyeState";
 
-export function BackgroundEye() {
-  const state = useOrionStore((s) => s.state);
-  const muted = useOrionStore((s) => s.muted);
+function selectHasRealMessage(s: ReturnType<typeof useOrionStore.getState>): boolean {
+  for (const m of s.messages) {
+    if (m.role === "user" || m.role === "ai") return true;
+  }
+  return false;
+}
+
+export const BackgroundEye = memo(function BackgroundEye() {
+  const eyeState = useEyeState();
   const connected = useOrionStore((s) => s.connected);
-  const messages = useOrionStore((s) => s.messages);
   const view = useViewStore((s) => s.view);
-
-  const activeTool = useInteractionStore((s) => s.tool);
-  const activeAgent = useInteractionStore((s) => s.agent);
-
-  const eyeState: EyeState =
-    !connected || muted
-      ? "idle"
-      : activeTool
-        ? "thinking"
-        : activeAgent?.status === "running"
-          ? "thinking"
-          : state === "ESCUCHANDO"
-            ? "listening"
-            : state === "PENSANDO"
-              ? "thinking"
-              : state === "HABLANDO"
-                ? "speaking"
-                : "idle";
+  // Boolean derivado: Zustand sólo re-renderea cuando el bool cambia
+  // (no en cada chunk del chat stream).
+  const hasRealMessage = useOrionStore(selectHasRealMessage);
 
   // En la vista "chat", el ojo grande solo aparece después del primer
   // turno real (usuario o IA). En el estado inicial — el Hero — el ojo
   // queda invisible para que la composición empiece limpia y el ojo
   // "cobre vida" recién al enviar el primer mensaje.
-  const chatEmpty = view === "chat" && !messages.some((m) => m.role === "user" || m.role === "ai");
+  const chatEmpty = view === "chat" && !hasRealMessage;
 
   return (
     <div
@@ -55,4 +55,4 @@ export function BackgroundEye() {
       <EyeCore state={eyeState} background frozen={!connected} />
     </div>
   );
-}
+});

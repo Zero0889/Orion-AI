@@ -1234,6 +1234,16 @@ input[type="number"] {
      opacidad y clipeado al borde derecho — cualquier movimiento se lee
      como "el ojo se desplaza", no como respiración. */
   animation: none;
+  /* Perf: las 3 capas de drop-shadow del `.ec-canvas` base son carísimas
+     cuando el SVG cubre 130vh × 130vh — la GPU debe rasterizar y aplicar
+     3 pasos de sombra cada frame. A 13 % de opacidad el glow ni se lee,
+     así que cancelamos el filter heredado. Mantenemos `will-change` para
+     que el navegador tenga el layer compositado. Quitar este filter
+     elimina la mayor parte del costo GPU del BackgroundEye en PC.
+     `!important` porque los selectores de estado (`.ec-state-listening`,
+     etc.) abajo redefinen `filter` y ganan por orden de cascada. */
+  filter: none !important;
+  will-change: opacity;
 }
 /* En background ocultamos elementos que sin contexto se leen sueltos:
    los ticks HUD cardinales (los "+") y las partículas de datos. */
@@ -1676,5 +1686,61 @@ input[type="number"] {
     animation-duration: 0.001ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 60ms !important;
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   MOBILE — pantallas chicas (≤ 640 px). El layout es desktop-first;
+   acá apagamos las capas más caras (BackgroundEye gigante, neural
+   background animado a full, filtros de blur) y achicamos el centerpiece
+   del Hero. El sidebar queda en su modo collapsed (72 px) — la nav
+   sigue siendo accesible sin tapar el contenido.
+   ══════════════════════════════════════════════════════════════════════ */
+@media (max-width: 640px) {
+  /* Apaga el ojo gigante de fondo. A 130vh × 130vh con drop-shadows
+     cuesta GPU incluso a 13 % de opacidad — en mobile no se justifica. */
+  .ec-canvas.ec-bg {
+    display: none !important;
+  }
+
+  /* El NeuralBackground baja a su intensidad ambient incluso en Home/Chat
+     para que no consuma main thread mientras scrolleás. */
+  .neural-bg-full {
+    opacity: 0.35 !important;
+  }
+
+  /* Centerpiece (OrbHUD) más chico — el ojo ocupa pantalla entera en
+     mobile y come jerarquía visual al hero. */
+  .orb-hud-container {
+    transform: scale(0.62);
+    transform-origin: top center;
+    margin-bottom: -8vh;
+  }
+
+  /* Hero del Inicio — ajustes tipográficos. */
+  .orion-display {
+    font-size: 1.75rem !important;
+    line-height: 1.1 !important;
+  }
+
+  /* Reducir el padding global del shell para ganar ancho. */
+  main {
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+  }
+
+  /* Scanlines: a baja densidad y sin movimiento — el patrón CRT en mobile
+     se nota como ruido feo, no como atmósfera. */
+  .scanlines {
+    opacity: 0.15 !important;
+    animation: none !important;
+  }
+
+  /* Backdrop-filter en surfaces glass es de los efectos más caros en
+     GPU móviles. Lo bajamos a blur chico — visualmente similar, mucho
+     menos costo. */
+  .surface-glass {
+    backdrop-filter: blur(8px) saturate(120%) !important;
+    -webkit-backdrop-filter: blur(8px) saturate(120%) !important;
   }
 }

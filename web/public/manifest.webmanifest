@@ -1,0 +1,22 @@
+{
+  "name": "O.R.I.O.N",
+  "short_name": "Orion",
+  "description": "Sistema operativo de inteligencia artificial.",
+  "lang": "es",
+  "dir": "ltr",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#000000",
+  "theme_color": "#000000",
+  "categories": ["productivity", "utilities"],
+  "icons": [
+    {
+      "src": "/icons/orion.svg",
+      "type": "image/svg+xml",
+      "sizes": "any",
+      "purpose": "any maskable"
+    }
+  ]
+}

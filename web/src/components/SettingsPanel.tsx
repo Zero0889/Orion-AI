@@ -9,7 +9,14 @@
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 
-import { api, type NotebookLMStatus, type SharingState, type ThemeInfo } from "@/api/rest";
+import {
+  api,
+  type NotebookLMStatus,
+  type SharingState,
+  type TelegramConfigPatch,
+  type TelegramState,
+  type ThemeInfo,
+} from "@/api/rest";
 import { BrainSection } from "@/components/BrainSection";
 import { GogAccountsCard } from "@/components/GogAccountsCard";
 import { deriveAccent, extractDominantColor } from "@/lib/imageColor";
@@ -98,9 +105,14 @@ export function SettingsPanel() {
         }
       />
 
-      <div className="grid grid-cols-[220px_1fr] flex-1 overflow-hidden">
+      {/* Mobile: sub-nav arriba como pestañas horizontales scroll-x.
+          Desktop: layout clásico [sub-nav 220 | contenido]. */}
+      <div className="flex flex-col md:grid md:grid-cols-[220px_1fr] flex-1 overflow-hidden">
         {/* sub-nav */}
-        <nav className="border-r border-white/[0.06] p-3 flex flex-col gap-1">
+        <nav
+          className="md:border-r border-b md:border-b-0 border-white/[0.06] p-3
+                     flex flex-wrap md:flex-nowrap md:flex-col gap-1 shrink-0"
+        >
           {TABS.map((t) => {
             const isActive = tab === t.id;
             return (
@@ -108,7 +120,7 @@ export function SettingsPanel() {
                 key={t.id}
                 onClick={() => setTab(t.id)}
                 className={[
-                  "group flex items-center gap-3 rounded-lg px-3 h-9 text-sm border",
+                  "group flex items-center gap-3 rounded-lg px-3 h-9 text-sm border shrink-0 whitespace-nowrap",
                   "transition-all duration-200 ease-out-expo",
                   isActive
                     ? "bg-elevated text-text border-white/[0.06] shadow-rim"
@@ -127,7 +139,7 @@ export function SettingsPanel() {
         </nav>
 
         {/* content */}
-        <div className="overflow-y-auto scrollbar-thin px-6 py-6">
+        <div className="overflow-y-auto scrollbar-thin px-4 sm:px-6 py-4 sm:py-6 min-w-0">
           {error && (
             <div className="mb-4 flex items-start gap-2 p-3 rounded-md border border-danger/30 bg-danger/10 text-xs text-danger">
               <Icon name="alert" size={14} className="mt-0.5 shrink-0" />
@@ -894,10 +906,252 @@ function Integrations() {
   return (
     <Section title="Integraciones">
       <div className="flex flex-col gap-3">
+        <TelegramCard />
         <GogAccountsCard />
         <NotebookLMCard />
       </div>
     </Section>
+  );
+}
+
+// ── Telegram bridge ──────────────────────────────────────────────────────
+
+function TelegramCard() {
+  const [state, setState] = useState<TelegramState | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [token, setToken] = useState("");
+  const [chatId, setChatId] = useState("");
+  const [forward, setForward] = useState(true);
+  const [enabled, setEnabled] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [editingToken, setEditingToken] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [okMsg, setOkMsg] = useState<string | null>(null);
+
+  async function refresh() {
+    try {
+      const s = await api.getTelegram();
+      setState(s);
+      // Si nunca tocamos los campos, los hidratamos desde el server.
+      setChatId((prev) => prev || s.default_chat_id);
+      setForward(s.forward_notifications);
+      setEnabled(s.enabled);
+      setError(null);
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    refresh();
+  }, []);
+
+  async function save() {
+    setBusy(true);
+    setError(null);
+    setOkMsg(null);
+    try {
+      const patch: Partial<TelegramConfigPatch> = {
+        default_chat_id: chatId.trim(),
+        forward_notifications: forward,
+        enabled,
+      };
+      // Sólo mandamos el token si el usuario lo está editando — si lo
+      // dejamos vacío y mandamos string vacío, borraríamos el guardado.
+      if (editingToken && token.trim()) {
+        patch.bot_token = token.trim();
+      }
+      const fresh = await api.setTelegram(patch);
+      setState(fresh);
+      setToken("");
+      setEditingToken(false);
+      setOkMsg("Configuración guardada.");
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function sendTest() {
+    setBusy(true);
+    setError(null);
+    setOkMsg(null);
+    try {
+      await api.testTelegram();
+      setOkMsg("Mensaje de prueba enviado. Revisá Telegram.");
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (loading) {
+    return <div className="skeleton h-32" />;
+  }
+
+  const hasToken = state?.has_token ?? false;
+  const isRunning = state?.running ?? false;
+
+  return (
+    <Surface level={2} className="p-5">
+      <div className="flex items-start justify-between gap-4 mb-4">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <Icon name="chat" size={16} className={isRunning ? "text-pri" : "text-text-dim"} />
+            <span className="text-sm font-semibold text-text">Telegram</span>
+            {isRunning && (
+              <Badge tone="success" dot>
+                conectado
+              </Badge>
+            )}
+            {state?.bot_username && <Badge tone="info">@{state.bot_username}</Badge>}
+          </div>
+          <div className="text-[11px] text-muted mt-0.5">
+            Orion te manda mensajes y responde a los que vos le escribas desde el chat del bot.
+          </div>
+        </div>
+        <Switch
+          on={enabled}
+          onClick={() => {
+            // No dejamos activar sin token. Si no hay token y el usuario
+            // tampoco lo está editando, ignoramos el click.
+            if (!hasToken && !editingToken) return;
+            setEnabled((v) => !v);
+          }}
+        />
+      </div>
+
+      {/* Setup hint si nunca configuró */}
+      {!hasToken && !editingToken && (
+        <div className="mb-4 p-3 rounded-md border border-pri/20 bg-pri/[0.04] text-[12px] text-text-dim leading-relaxed">
+          <ol className="ml-4 list-decimal space-y-1">
+            <li>
+              En Telegram, abrí{" "}
+              <a
+                href="https://t.me/BotFather"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-pri underline-offset-2 hover:underline"
+              >
+                @BotFather
+              </a>{" "}
+              y mandá <code className="text-acc">/newbot</code>.
+            </li>
+            <li>
+              Te da un token tipo <code className="text-acc">123456:ABC-DEF...</code>. Pegalo abajo.
+            </li>
+            <li>
+              Abrí el chat con tu bot y mandale cualquier mensaje. Después abrí{" "}
+              <code className="text-acc">https://api.telegram.org/bot&lt;TOKEN&gt;/getUpdates</code>{" "}
+              en el browser para ver tu <code className="text-acc">chat.id</code> y pegalo abajo.
+            </li>
+          </ol>
+        </div>
+      )}
+
+      {/* Token */}
+      <div className="mb-3">
+        <label className="block text-[10px] uppercase tracking-[0.22em] text-text-dim mb-2">
+          Bot token
+        </label>
+        {hasToken && !editingToken ? (
+          <div className="flex items-center gap-2">
+            <code className="flex-1 px-3 h-10 grid place-items-center rounded-md bg-elevated border border-white/[0.08] font-mono text-sm text-acc/90 truncate">
+              ...{state?.token_preview || "***"}
+            </code>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => {
+                setEditingToken(true);
+                setToken("");
+              }}
+            >
+              Cambiar
+            </Button>
+          </div>
+        ) : (
+          <input
+            value={token}
+            onChange={(e) => setToken(e.target.value)}
+            placeholder="123456:ABC-DEF..."
+            type="password"
+            autoFocus={editingToken}
+            disabled={busy}
+            className="w-full rounded-md bg-elevated border border-white/[0.08]
+                       px-3 h-10 text-sm font-mono placeholder-muted
+                       focus:outline-none focus:border-pri/40 transition-colors"
+          />
+        )}
+      </div>
+
+      {/* Chat ID */}
+      <div className="mb-3">
+        <label className="block text-[10px] uppercase tracking-[0.22em] text-text-dim mb-2">
+          Chat ID por defecto
+        </label>
+        <input
+          value={chatId}
+          onChange={(e) => setChatId(e.target.value)}
+          placeholder="123456789"
+          disabled={busy}
+          className="w-full rounded-md bg-elevated border border-white/[0.08]
+                     px-3 h-10 text-sm font-mono placeholder-muted
+                     focus:outline-none focus:border-pri/40 transition-colors"
+        />
+      </div>
+
+      {/* Forward notifications */}
+      <div className="flex items-center justify-between p-3 rounded-md border border-white/[0.06] bg-white/[0.02] mb-4">
+        <div className="min-w-0">
+          <div className="text-sm text-text font-medium">Reenviar notificaciones</div>
+          <div className="text-[11px] text-muted mt-0.5">
+            Si activado, las notificaciones (sensores, Gmail, etc.) también te llegan por Telegram.
+          </div>
+        </div>
+        <Switch on={forward} onClick={() => setForward((v) => !v)} />
+      </div>
+
+      {/* Actions */}
+      <div className="flex items-center justify-between gap-2">
+        <Button
+          variant="secondary"
+          size="sm"
+          icon="paperclip"
+          onClick={sendTest}
+          disabled={!isRunning || busy}
+        >
+          Mandar mensaje de prueba
+        </Button>
+        <Button variant="primary" size="sm" icon="check" onClick={save} loading={busy}>
+          Guardar
+        </Button>
+      </div>
+
+      {/* Mensajes */}
+      {error && (
+        <div className="mt-3 text-[11px] text-danger flex items-start gap-1.5">
+          <Icon name="alert" size={12} className="mt-0.5 shrink-0" />
+          <span>{error}</span>
+        </div>
+      )}
+      {okMsg && (
+        <div className="mt-3 text-[11px] text-ok flex items-start gap-1.5">
+          <Icon name="check" size={12} className="mt-0.5 shrink-0" />
+          <span>{okMsg}</span>
+        </div>
+      )}
+      {state?.bot_error && !error && (
+        <div className="mt-3 text-[11px] text-warn flex items-start gap-1.5">
+          <Icon name="alert" size={12} className="mt-0.5 shrink-0" />
+          <span>Telegram: {state.bot_error}</span>
+        </div>
+      )}
+    </Surface>
   );
 }
 

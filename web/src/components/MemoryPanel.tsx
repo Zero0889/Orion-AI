@@ -333,42 +333,47 @@ export function MemoryPanel() {
         )}
       </div>
 
-      {/* ── Composer — se ilumina cuando hay clave seleccionada ───── */}
-      <div className="px-6 py-3 border-t border-white/[0.06] bg-bg/70">
-        <div className="flex gap-2">
+      {/* ── Composer — se ilumina cuando hay clave seleccionada ─────
+          En mobile stackeamos clave (full width) sobre el row valor+Guardar
+          para que el botón no quede empujado fuera del viewport. */}
+      <div className="px-4 sm:px-6 py-3 border-t border-white/[0.06] bg-bg/70">
+        <div className="flex flex-col sm:flex-row gap-2">
           <input
             type="text"
             value={newKey}
             onChange={(e) => setNewKey(e.target.value)}
             placeholder="clave (snake_case)"
-            className="w-44 rounded-md bg-elevated border border-white/[0.08]
+            className="w-full sm:w-44 rounded-md bg-elevated border border-white/[0.08]
                        px-3 h-9 text-sm placeholder-muted font-mono
                        focus:outline-none focus:border-pri/40 transition-colors"
           />
-          <input
-            ref={valRef}
-            type="text"
-            value={newVal}
-            onChange={(e) => setNewVal(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") addNew();
-            }}
-            placeholder={`valor (categoría: ${active.label.toLowerCase()})`}
-            className={[
-              "flex-1 rounded-md border px-3 h-9 text-sm placeholder-muted",
-              "focus:outline-none focus:border-pri/40 transition-colors",
-              newKey.trim() ? "bg-pri/5 border-pri/30" : "bg-elevated border-white/[0.08]",
-            ].join(" ")}
-          />
-          <Button
-            variant="primary"
-            size="md"
-            icon="plus"
-            onClick={addNew}
-            disabled={!newKey.trim() || !newVal.trim()}
-          >
-            Guardar
-          </Button>
+          <div className="flex gap-2 min-w-0">
+            <input
+              ref={valRef}
+              type="text"
+              value={newVal}
+              onChange={(e) => setNewVal(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") addNew();
+              }}
+              placeholder={`valor (categoría: ${active.label.toLowerCase()})`}
+              className={[
+                "flex-1 min-w-0 rounded-md border px-3 h-9 text-sm placeholder-muted",
+                "focus:outline-none focus:border-pri/40 transition-colors",
+                newKey.trim() ? "bg-pri/5 border-pri/30" : "bg-elevated border-white/[0.08]",
+              ].join(" ")}
+            />
+            <Button
+              variant="primary"
+              size="md"
+              icon="plus"
+              onClick={addNew}
+              disabled={!newKey.trim() || !newVal.trim()}
+              className="shrink-0"
+            >
+              Guardar
+            </Button>
+          </div>
         </div>
       </div>
     </div>

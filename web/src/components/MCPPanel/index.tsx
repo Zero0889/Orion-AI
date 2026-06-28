@@ -190,7 +190,12 @@ export function MCPPanel() {
       />
 
       {/* ── Tabs ─────────────────────────────────────────────────── */}
-      <div className="px-6 pt-3 flex items-center gap-1 border-b border-white/[0.05]">
+      {/* overflow-x-auto + shrink-0 evita que el último tab se corte
+          ("Exp regi…") cuando la suma de tabs excede el viewport mobile. */}
+      <div
+        className="px-4 sm:px-6 pt-3 flex items-center gap-1 border-b border-white/[0.05]
+                   overflow-x-auto scrollbar-thin"
+      >
         <TabButton active={tab === "installed"} onClick={() => setTab("installed")}>
           <Icon name="plug" size={13} />
           Instalados
@@ -284,7 +289,7 @@ function TabButton({
     <button
       onClick={onClick}
       className={[
-        "relative inline-flex items-center gap-1.5 px-3 h-8 text-xs font-medium",
+        "relative inline-flex items-center gap-1.5 px-3 h-8 text-xs font-medium shrink-0 whitespace-nowrap",
         "rounded-t-md transition-colors duration-150",
         active ? "text-text bg-elevated/40" : "text-text-dim hover:text-text hover:bg-white/[0.03]",
       ].join(" ")}

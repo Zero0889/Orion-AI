@@ -8,7 +8,7 @@
 
 import { useEffect, useRef } from "react";
 
-import { OrionSocket, inferBackendUrl } from "@/api/ws";
+import { OrionSocket, buildWsUrl } from "@/api/ws";
 import { useOrionStore } from "@/stores/orion";
 import type { ServerEvent } from "@/types";
 
@@ -16,7 +16,9 @@ export function useOrionSocket(): (type: string, payload?: Record<string, unknow
   const socketRef = useRef<OrionSocket | null>(null);
 
   useEffect(() => {
-    const { ws: wsUrl } = inferBackendUrl();
+    // `buildWsUrl` agrega ?device=&client_id= al handshake — el backend
+    // los lee para que Orion adapte la respuesta al dispositivo.
+    const wsUrl = buildWsUrl();
     const dispatch = useOrionStore.getState().applyEvent;
     const setConn = useOrionStore.getState().setConnected;
 

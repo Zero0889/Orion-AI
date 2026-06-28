@@ -25,6 +25,7 @@ const VIEW_TITLE: Record<View, { eyebrow: string; title: string }> = {
   telemetry: { eyebrow: "Sistema", title: "Telemetría" },
   agents: { eyebrow: "Sistema", title: "Agentes autónomos" },
   iot: { eyebrow: "Sistema", title: "IoT" },
+  access: { eyebrow: "Sistema", title: "Acceso por huella" },
   mcp: { eyebrow: "Sistema", title: "Servidores MCP" },
   skills: { eyebrow: "Sistema", title: "Skills" },
   notifications: { eyebrow: "Sistema", title: "Notificaciones" },
@@ -83,32 +84,34 @@ export function TopBar({ version, collapsed, onToggleRail, onToggleMute, onInter
 
   return (
     <header
-      className="relative h-14 flex items-center gap-3 px-3 border-b border-white/[0.06]
+      className="relative h-14 flex items-center gap-1.5 sm:gap-3 px-2 sm:px-3 border-b border-white/[0.06]
                           bg-gradient-to-r from-bg/80 via-bg/60 to-bg/80 backdrop-blur-md chrome-edge-bottom"
     >
-      {/* rail toggle */}
+      {/* rail toggle / drawer trigger en mobile */}
       <button
         onClick={onToggleRail}
         title={collapsed ? "Expandir barra lateral" : "Contraer barra lateral"}
-        className="h-8 w-8 grid place-items-center rounded-md text-text-dim
+        className="shrink-0 h-8 w-8 grid place-items-center rounded-md text-text-dim
                    hover:text-text hover:bg-white/[0.04] transition-colors"
       >
         <Icon name="panel-left" size={16} />
       </button>
 
-      {/* workspace title */}
-      <div className="min-w-0 flex flex-col leading-tight">
-        <div className="text-[10px] uppercase tracking-[0.24em] text-pri/70">{eyebrow}</div>
+      {/* workspace title — min-w-0 + flex-1 para que pueda encogerse y
+          truncar correctamente en mobile en vez de empujar a otros items. */}
+      <div className="min-w-0 flex-1 flex flex-col leading-tight">
+        <div className="text-[10px] uppercase tracking-[0.24em] text-pri/70 truncate">
+          {eyebrow}
+        </div>
         <div className="text-sm font-semibold tracking-tight text-text truncate">{title}</div>
       </div>
 
-      <div className="flex-1" />
-
-      {/* search → abre el Command Palette */}
+      {/* search → abre el Command Palette. En mobile: solo icono (sin pill). */}
       <button
         onClick={openPalette}
         title="Abrir buscador de comandos (Ctrl+K o Ctrl+/)"
-        className="flex items-center gap-2 h-8 px-3 rounded-md
+        aria-label="Buscar"
+        className="shrink-0 hidden sm:flex items-center gap-2 h-8 px-3 rounded-md
                    border border-white/[0.06] bg-elevated/60 text-xs text-text-dim
                    hover:border-pri/40 hover:text-text hover:bg-elevated transition-all"
       >
@@ -116,28 +119,44 @@ export function TopBar({ version, collapsed, onToggleRail, onToggleMute, onInter
         <span className="hidden md:inline">Buscar</span>
         <Kbd>⌘K</Kbd>
       </button>
+      <button
+        onClick={openPalette}
+        title="Buscar (Ctrl+K)"
+        aria-label="Buscar"
+        className="shrink-0 sm:hidden h-8 w-8 grid place-items-center rounded-md text-text-dim
+                   hover:text-text hover:bg-white/[0.04] transition-colors"
+      >
+        <Icon name="search" size={16} />
+      </button>
 
-      {/* voice controls */}
+      {/* voice controls — el botón de interrumpir se oculta en mobile
+          para que el título tenga espacio. El de mic queda siempre. */}
       <Button
         size="icon"
         variant={muted ? "danger" : "ghost"}
         onClick={onToggleMute}
         title={muted ? "Activar micrófono" : "Silenciar micrófono"}
+        className="shrink-0"
       >
         <Icon name={muted ? "mic-off" : "mic"} size={16} />
       </Button>
-      <Button size="icon" variant="ghost" onClick={onInterrupt} title="Interrumpir">
+      <Button
+        size="icon"
+        variant="ghost"
+        onClick={onInterrupt}
+        title="Interrumpir"
+        className="shrink-0 hidden sm:inline-flex"
+      >
         <Icon name="stop" size={16} />
       </Button>
 
-      {/* divider */}
-      <span className="h-6 w-px bg-white/[0.08] mx-1" />
+      {/* divider — solo desktop */}
+      <span className="hidden sm:block h-6 w-px bg-white/[0.08] mx-1" />
 
-      {/* mini eye status — el MISMO ojo del Inicio, en miniatura y
-          QUIETO (paused). No se mueve nunca; sólo cambia de color con
-          el estado real de Orion (idle / escuchando / pensando /
-          hablando / error). Sin conexión vira a azul sobrio. */}
-      <div title={`Orion: ${state}`} className="grid place-items-center">
+      {/* mini eye status — solo desktop. En mobile el ojo del fondo /
+          backgrounds ya comunica estado; un segundo mini-ojo en la barra
+          le come 34 px de ancho al título y empuja a "M." truncado. */}
+      <div title={`Orion: ${state}`} className="hidden sm:grid place-items-center shrink-0">
         <EyeCore size={34} state={eyeState} paused={!eyeFrozen} frozen={eyeFrozen} />
       </div>
 

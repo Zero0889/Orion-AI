@@ -229,9 +229,17 @@ export function HistoryPanel() {
         }
       />
 
-      <div className="grid grid-cols-[320px_1fr] flex-1 overflow-hidden">
+      {/* Mobile: una sola columna; mostramos la lista o el detalle según
+          haya una conversación activa. Desktop: split clásico. */}
+      <div className="md:grid md:grid-cols-[320px_1fr] flex-1 overflow-hidden flex flex-col">
         {/* ── lista ─────────────────────────────────────────────── */}
-        <aside className="border-r border-white/[0.06] overflow-y-auto scrollbar-thin p-3">
+        <aside
+          className={[
+            "md:border-r border-white/[0.06] overflow-y-auto scrollbar-thin p-3 flex-1 md:flex-none min-h-0",
+            // En mobile la ocultamos si hay detalle activo.
+            active ? "hidden md:block" : "block",
+          ].join(" ")}
+        >
           {list.length === 0 && (
             <Empty
               icon="history"
@@ -260,7 +268,24 @@ export function HistoryPanel() {
         </aside>
 
         {/* ── detalle ───────────────────────────────────────────── */}
-        <main className="overflow-y-auto scrollbar-thin">
+        <main
+          className={[
+            "overflow-y-auto scrollbar-thin flex-1 min-w-0",
+            // En mobile mostramos el detalle SOLO si hay activo.
+            active ? "block" : "hidden md:block",
+          ].join(" ")}
+        >
+          {/* Volver a la lista — visible solo en mobile cuando hay detail */}
+          {detail && (
+            <button
+              onClick={() => setActive(null)}
+              className="md:hidden flex items-center gap-1.5 px-4 pt-3 text-xs text-text-dim
+                         hover:text-text transition-colors"
+            >
+              <Icon name="chevron-right" size={14} className="rotate-180" />
+              Volver a la lista
+            </button>
+          )}
           {!detail ? (
             <div className="h-full grid place-items-center">
               <Empty

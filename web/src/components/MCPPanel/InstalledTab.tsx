@@ -158,38 +158,38 @@ function ServerCard({
 
   return (
     <Surface level={2} className="overflow-hidden">
-      {/* header */}
-      <div className="flex items-center gap-3 px-4 py-3">
-        <div
-          className="grid place-items-center h-9 w-9 rounded-md bg-elevated/60
-                        border border-white/[0.05] text-pri shrink-0"
-        >
-          <Icon name="plug" size={16} />
-        </div>
-
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            <div className="text-sm font-medium tracking-tight text-text truncate">{server.id}</div>
-            <StatusPill tone={statusTone} label={statusLabel} />
-            {server.tool_count > 0 && <Badge tone="info">{server.tool_count} tools</Badge>}
-          </div>
-          {/* BRIEF · MCP: el comando npm completo
-              (`npx -y @modelcontextprotocol/server-foo`) llena la
-              fila sin aportar. Mostramos solo el package name (o el
-              último arg legible) y dejamos el comando completo en el
-              tooltip + en la sección expandida. */}
+      {/* header — en mobile stackeamos info arriba y acciones abajo.
+          En desktop quedan en una sola row como antes. */}
+      <div className="flex flex-col sm:flex-row sm:items-center gap-3 px-4 py-3">
+        <div className="flex items-start gap-3 flex-1 min-w-0">
           <div
-            className="text-[11px] text-text-dim truncate font-mono"
-            title={`${server.command} ${server.args.join(" ")}`.trim()}
+            className="grid place-items-center h-9 w-9 rounded-md bg-elevated/60
+                          border border-white/[0.05] text-pri shrink-0"
           >
-            {shortenCommand(server.command, server.args)}
+            <Icon name="plug" size={16} />
           </div>
-          {server.error && (
-            <div className="text-[11px] text-danger mt-1 truncate">{server.error}</div>
-          )}
+
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <div className="text-sm font-medium tracking-tight text-text truncate">
+                {server.id}
+              </div>
+              <StatusPill tone={statusTone} label={statusLabel} />
+              {server.tool_count > 0 && <Badge tone="info">{server.tool_count} tools</Badge>}
+            </div>
+            <div
+              className="text-[11px] text-text-dim truncate font-mono"
+              title={`${server.command} ${server.args.join(" ")}`.trim()}
+            >
+              {shortenCommand(server.command, server.args)}
+            </div>
+            {server.error && (
+              <div className="text-[11px] text-danger mt-1 truncate">{server.error}</div>
+            )}
+          </div>
         </div>
 
-        <div className="flex items-center gap-1 shrink-0">
+        <div className="flex items-center gap-1 shrink-0 self-end sm:self-auto">
           <Switch
             on={server.enabled}
             onClick={onToggleEnabled}

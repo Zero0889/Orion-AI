@@ -265,6 +265,9 @@ export function Skeleton({ className }: { className?: string }) {
 }
 
 // ── Section header ────────────────────────────────────────────────────
+// En mobile las acciones se stackean DEBAJO del título — si se mantienen
+// inline a la derecha, el div del texto se aplasta a ~100 px y el `hint`
+// rompe una palabra por línea ("Sube / una / imagen / de…").
 export function SectionHeader({
   eyebrow,
   title,
@@ -278,7 +281,8 @@ export function SectionHeader({
 }) {
   return (
     <header
-      className="relative flex items-end justify-between px-6 py-5
+      className="relative flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between
+                 px-4 py-4 sm:px-6 sm:py-5
                  border-b border-white/[0.06]
                  bg-gradient-to-b from-[rgb(var(--orion-pri)/0.04)] to-transparent"
     >
@@ -294,23 +298,21 @@ export function SectionHeader({
         className="absolute top-0 left-0 right-0 h-px
                    bg-gradient-to-r from-transparent via-pri/20 to-transparent"
       />
-      <div className="min-w-0">
+      <div className="min-w-0 flex-1">
         {eyebrow && (
           <div className="flex items-center gap-2 mb-1.5">
             <span className="h-1 w-1 rounded-full bg-pri/80 shadow-[0_0_4px_rgb(var(--orion-pri-glow))]" />
-            {/* BRIEF G5 — eyebrow = role "label" (10px, weight 500,
-                tracking 0.12em) con tinte pri. Mantenemos la voz de
-                marca en cada cabecera. */}
-            <div className="orion-label text-pri/85" style={{ letterSpacing: "0.22em" }}>
+            <div className="orion-label text-pri/85 truncate" style={{ letterSpacing: "0.22em" }}>
               {eyebrow}
             </div>
           </div>
         )}
-        {/* BRIEF G5 — H1 de panel: 24px, weight 600, tracking -0.01em. */}
         <h2 className="orion-h1 truncate">{title}</h2>
         {hint && <p className="orion-meta mt-1.5">{hint}</p>}
       </div>
-      {action && <div className="flex items-center gap-2">{action}</div>}
+      {action && (
+        <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap sm:shrink-0">{action}</div>
+      )}
     </header>
   );
 }

@@ -49,6 +49,9 @@ const AgentsPanel = lazy(() =>
   import("@/components/AgentsPanel").then((m) => ({ default: m.AgentsPanel })),
 );
 const IoTPanel = lazy(() => import("@/components/IoTPanel").then((m) => ({ default: m.IoTPanel })));
+const AccessPanel = lazy(() =>
+  import("@/components/AccessPanel").then((m) => ({ default: m.AccessPanel })),
+);
 const MCPPanel = lazy(() => import("@/components/MCPPanel").then((m) => ({ default: m.MCPPanel })));
 const SkillsPanel = lazy(() =>
   import("@/components/SkillsPanel").then((m) => ({ default: m.SkillsPanel })),
@@ -67,6 +70,7 @@ const SettingsPanel = lazy(() =>
 );
 import { useQuery } from "@tanstack/react-query";
 
+import { useIsMobile } from "@/hooks/useIsMobile";
 import { useOrionSocket } from "@/hooks/useOrionSocket";
 import { useZoomShortcuts } from "@/hooks/useZoomShortcuts";
 import { QUERY_KEYS } from "@/query/keys";
@@ -130,10 +134,21 @@ export default function App() {
   const send = useOrionSocket();
   const view = useViewStore((s) => s.view);
   const muted = useOrionStore((s) => s.muted);
+  const isMobile = useIsMobile();
   const [version, setVersion] = useState<string>("");
-  const [collapsed, setCollapsed] = useState<boolean>(
-    () => typeof window !== "undefined" && window.localStorage.getItem(RAIL_KEY) === "1",
-  );
+  // Desktop: el rail puede estar colapsado (72 px) o expandido (264 px).
+  // Mobile: el sidebar vive fuera del flujo como drawer overlay — no
+  // ocupa columna del grid. `collapsed` solo aplica en desktop.
+  const [collapsed, setCollapsed] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    return window.localStorage.getItem(RAIL_KEY) === "1";
+  });
+  // En mobile el sidebar es un drawer que se abre/cierra desde el TopBar.
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  // Cerramos el drawer al cambiar de vista o al pasar a desktop.
+  useEffect(() => {
+    setDrawerOpen(false);
+  }, [view, isMobile]);
 
   useEffect(() => {
     const { http } = inferBackendUrl();
@@ -229,6 +244,33 @@ export default function App() {
   // el chrome. Persiste el factor en localStorage.
   useZoomShortcuts();
 
+  // ── Audio remoto: arma el AudioContext al primer gesto del usuario ──
+  // Chrome/Safari bloquean audio sin gesto. Cuando el usuario clickea o
+  // toca la pantalla por primera vez, resumimos el contexto y a partir
+  // de ahí los chunks PCM que llegan por WS se reproducen. En desktop
+  // este código corre igual pero el handler de `audio.chunk` lo skipea
+  // (sounddevice local ya reproduce la voz).
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    let done = false;
+    const handler = () => {
+      if (done) return;
+      done = true;
+      void import("@/audio/audioPlayer").then((m) => m.armAudioPlayer());
+      window.removeEventListener("click", handler);
+      window.removeEventListener("touchend", handler);
+      window.removeEventListener("keydown", handler);
+    };
+    window.addEventListener("click", handler);
+    window.addEventListener("touchend", handler);
+    window.addEventListener("keydown", handler);
+    return () => {
+      window.removeEventListener("click", handler);
+      window.removeEventListener("touchend", handler);
+      window.removeEventListener("keydown", handler);
+    };
+  }, []);
+
   // Prefetch del panel "Conversación" cuando el browser está idle. Es
   // de lejos la siguiente vista más probable después de Inicio (el
   // input del Home redirige ahí). Con requestIdleCallback no robamos
@@ -250,7 +292,10 @@ export default function App() {
     };
   }, []);
 
+  // En desktop el rail es columna del grid; en mobile el sidebar es un
+  // overlay fixed que no consume ninguna columna — el main toma el 100%.
   const railW = collapsed ? "72px" : "264px";
+  const gridCols = isMobile ? "1fr" : `${railW} 1fr`;
 
   return (
     <div className="relative h-full w-full overflow-hidden bg-bg text-text noise">
@@ -264,7 +309,14 @@ export default function App() {
       <WallpaperLayer />
       {!hasWallpaper && (
         <div className="absolute inset-0 z-0">
-          <NeuralBackground intensity={view === "home" || view === "chat" ? "full" : "ambient"} />
+          {/* En mobile siempre ambient: los anillos rotando y los nodos
+              animados consumen GPU y son una de las causas principales del
+              lag percibido en el celu. */}
+          <NeuralBackground
+            intensity={
+              isMobile ? "ambient" : view === "home" || view === "chat" ? "full" : "ambient"
+            }
+          />
         </div>
       )}
       {!hasWallpaper && view !== "home" && view !== "chat" && (
@@ -276,60 +328,65 @@ export default function App() {
         />
       )}
 
+      {/* ── Backdrop + drawer mobile ─────────────────────────────────
+          Viven FUERA del wrapper z-10 — sino el aside (z-40) queda
+          atrapado en el stacking context del wrapper y el backdrop
+          (z-30) lo dibuja encima, interceptando todos los clicks de
+          los items de la sidebar. */}
+      {isMobile && drawerOpen && (
+        <button
+          aria-label="Cerrar menú"
+          onClick={() => setDrawerOpen(false)}
+          className="fixed inset-0 z-30 bg-bg/70 backdrop-blur-sm animate-fade-in"
+        />
+      )}
+      {isMobile && (
+        <aside
+          className={[
+            "fixed inset-y-0 left-0 z-40 w-[280px] flex flex-col p-3",
+            "border-r border-white/[0.06] bg-sunken/95 backdrop-blur-md",
+            "chrome-edge-right min-h-0 overflow-hidden shadow-2xl",
+            "transition-transform duration-300 ease-out-expo",
+            drawerOpen ? "translate-x-0" : "-translate-x-full",
+          ].join(" ")}
+        >
+          {renderSidebarContents({
+            collapsed: false,
+            isMobile: true,
+            version,
+            muted,
+            onCloseDrawer: () => setDrawerOpen(false),
+          })}
+        </aside>
+      )}
+
       <div
         className="relative z-10 h-full w-full grid overflow-hidden"
-        style={{ gridTemplateColumns: `${railW} 1fr` }}
+        style={{ gridTemplateColumns: gridCols }}
       >
-        {/* ── Sidebar ───────────────────────────────────────────────── */}
-        {/* min-h-0 + flex column con un scroller interno: brand pinned arriba,
-          footer (tema + sistema) pinned abajo, y los items navegables hacen
-          scroll cuando crecen — esto sobrevive a cualquier nivel de zoom.
-          bg translúcido para que el NeuralBackground se vea atrás. */}
-        <aside className="relative flex flex-col p-3 border-r border-white/[0.06] bg-sunken/25 backdrop-blur-md chrome-edge-right min-h-0 overflow-hidden">
-          {/* brand */}
-          <div
-            className={
-              collapsed
-                ? "flex justify-center py-2 mb-3 shrink-0"
-                : "flex items-center gap-2.5 px-2 py-2 mb-4 shrink-0"
-            }
+        {/* ── Sidebar (desktop) ─────────────────────────────────────
+            En mobile ya se renderizó arriba como sibling fixed; esta
+            rama se salta. */}
+        {!isMobile && (
+          <aside
+            className="relative flex flex-col p-3 border-r border-white/[0.06] bg-sunken/25
+                       backdrop-blur-md chrome-edge-right min-h-0 overflow-hidden"
           >
-            <BrandMark />
-            {!collapsed && (
-              <div className="leading-tight">
-                <div className="text-[13px] font-semibold tracking-[0.18em] text-text">ORION</div>
-                <div className="text-[9px] uppercase tracking-[0.22em] text-muted numeric">
-                  OS · v{version || "…"}
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* scroll area: ocupa todo el espacio entre brand y footer; si los
-            items no caben, scrollea acá sin tapar el footer. */}
-          <div className="flex-1 min-h-0 overflow-y-auto scrollbar-thin -mx-1 px-1">
-            <Sidebar collapsed={collapsed} />
-          </div>
-
-          {/* status footer — sticky por estructura (flex column con el scroller
-            arriba), con un fade superior que sugiere que hay más por scrollear. */}
-          <div className="relative flex flex-col gap-2 pt-3 shrink-0">
-            <div
-              aria-hidden
-              className="pointer-events-none absolute -top-4 left-0 right-0 h-4
-                       bg-gradient-to-b from-transparent to-[rgb(var(--orion-sunken)/0.9)]"
-            />
-            {!collapsed && <ThemeToggle />}
-            <FooterStatus collapsed={collapsed} muted={muted} />
-          </div>
-        </aside>
+            {renderSidebarContents({
+              collapsed,
+              isMobile: false,
+              version,
+              muted,
+            })}
+          </aside>
+        )}
 
         {/* ── Main column ───────────────────────────────────────────── */}
         <div className="flex flex-col overflow-hidden">
           <TopBar
             version={version}
             collapsed={collapsed}
-            onToggleRail={() => setCollapsed((v) => !v)}
+            onToggleRail={() => (isMobile ? setDrawerOpen((v) => !v) : setCollapsed((v) => !v))}
             onToggleMute={() => send("mute", { value: !muted })}
             onInterrupt={() => send("interrupt")}
           />
@@ -340,8 +397,9 @@ export default function App() {
           >
             {/* Capa 0 — ojo ambiental detrás de las vistas != home,
               reacciona al estado real del backend. El NeuralBackground
-              vive a nivel raíz, debajo de todo. */}
-            {view !== "home" && <BackgroundEye />}
+              vive a nivel raíz, debajo de todo. En mobile lo skipeamos
+              entero (el SVG ocupa 130vh × 130vh con filtros caros). */}
+            {view !== "home" && !isMobile && <BackgroundEye />}
 
             {/* Capa 1 — las vistas viven sobre el fondo, en su propio plano.
               Home es eager (sin Suspense); el resto va dentro del
@@ -367,6 +425,7 @@ export default function App() {
                     {view === "telemetry" && <TelemetryPanel />}
                     {view === "agents" && <AgentsPanel />}
                     {view === "iot" && <IoTPanel />}
+                    {view === "access" && <AccessPanel />}
                     {view === "mcp" && <MCPPanel />}
                     {view === "skills" && <SkillsPanel />}
                     {view === "notifications" && <NotificationsPanel />}
@@ -391,6 +450,70 @@ export default function App() {
           (z-9999) pero por encima de toda la UI. pointer-events:none. */}
       <div className="scanlines" aria-hidden />
     </div>
+  );
+}
+
+/* ─── Contenido del sidebar — usado tanto por el desktop rail como por
+   el drawer mobile. Centraliza la jerarquía (brand · nav · footer) en
+   un único renderer para que cualquier cambio futuro al sidebar se
+   refleje automáticamente en ambas variantes. */
+function renderSidebarContents({
+  collapsed,
+  isMobile,
+  version,
+  muted,
+  onCloseDrawer,
+}: {
+  collapsed: boolean;
+  isMobile: boolean;
+  version: string;
+  muted: boolean;
+  onCloseDrawer?: () => void;
+}) {
+  return (
+    <>
+      <div
+        className={
+          collapsed
+            ? "flex justify-center py-2 mb-3 shrink-0"
+            : "flex items-center gap-2.5 px-2 py-2 mb-4 shrink-0"
+        }
+      >
+        <BrandMark />
+        {!collapsed && (
+          <div className="leading-tight flex-1 min-w-0">
+            <div className="text-[13px] font-semibold tracking-[0.18em] text-text">ORION</div>
+            <div className="text-[9px] uppercase tracking-[0.22em] text-muted numeric">
+              OS · v{version || "…"}
+            </div>
+          </div>
+        )}
+        {isMobile && onCloseDrawer && (
+          <button
+            onClick={onCloseDrawer}
+            aria-label="Cerrar menú"
+            className="ml-auto h-8 w-8 grid place-items-center rounded-md text-text-dim
+                       hover:text-text hover:bg-white/[0.06] transition-colors"
+          >
+            <Icon name="close" size={16} />
+          </button>
+        )}
+      </div>
+
+      <div className="flex-1 min-h-0 overflow-y-auto scrollbar-thin -mx-1 px-1">
+        <Sidebar collapsed={collapsed} />
+      </div>
+
+      <div className="relative flex flex-col gap-2 pt-3 shrink-0">
+        <div
+          aria-hidden
+          className="pointer-events-none absolute -top-4 left-0 right-0 h-4
+                     bg-gradient-to-b from-transparent to-[rgb(var(--orion-sunken)/0.9)]"
+        />
+        {!collapsed && <ThemeToggle />}
+        <FooterStatus collapsed={collapsed} muted={muted} />
+      </div>
+    </>
   );
 }
 

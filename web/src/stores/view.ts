@@ -16,6 +16,7 @@ export type View =
   | "telemetry"
   | "agents"
   | "iot"
+  | "access"
   | "mcp"
   | "skills"
   | "notifications"

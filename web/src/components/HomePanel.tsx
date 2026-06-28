@@ -34,7 +34,11 @@ function greet(): string {
 export function HomePanel() {
   const setView = useViewStore((s) => s.setView);
   const tlast = useOrionStore((s) => s.telemetry.last);
-  const sensors = useOrionStore((s) => s.iotSensors);
+  // Sólo necesitamos el conteo — leer el objeto completo dispararía un
+  // re-render de HomePanel cada vez que cualquier sensor reporta, aunque
+  // la lista de devices no haya cambiado. Selector que devuelve un número
+  // → Zustand sólo re-renderea cuando el número cambia.
+  const sensorCount = useOrionStore((s) => Object.keys(s.iotSensors).length);
   const unread = useOrionStore((s) => s.unreadNotifs);
   const muted = useOrionStore((s) => s.muted);
   const connected = useOrionStore((s) => s.connected);
@@ -53,8 +57,6 @@ export function HomePanel() {
       alive = false;
     };
   }, []);
-
-  const sensorCount = Object.keys(sensors).length;
 
   function submitDraft() {
     const text = draft.trim();

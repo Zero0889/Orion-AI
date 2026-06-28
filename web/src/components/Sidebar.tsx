@@ -49,6 +49,7 @@ const SECTIONS: Section[] = [
       { id: "telemetry", label: "Telemetría", icon: "telemetry" },
       { id: "agents", label: "Agentes", icon: "agents" },
       { id: "iot", label: "IoT", icon: "iot" },
+      { id: "access", label: "Acceso", icon: "shield" },
       { id: "mcp", label: "MCP", icon: "plug" },
       { id: "skills", label: "Skills", icon: "sparkles" },
       { id: "notifications", label: "Notificaciones", icon: "bell" },
