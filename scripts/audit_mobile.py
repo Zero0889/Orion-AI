@@ -46,6 +46,7 @@ VIEWS = [
     ("telemetry", "Telemetría"),
     ("agents", "Agentes"),
     ("iot", "IoT"),
+    ("access", "Acceso"),
     ("mcp", "MCP"),
     ("skills", "Skills"),
     ("notifications", "Notificaciones"),
