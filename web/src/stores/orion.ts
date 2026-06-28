@@ -35,6 +35,12 @@ import type { ChatMessage, LogRole, OrionState, ServerEvent } from "@/types";
 
 const MAX_MESSAGES = 300;
 
+// Throttle por dispositivo para `iot.sensor` (ver case del switch).
+// 250 ms = máx ~4 Hz por device — suficiente para sparklines fluidos
+// sin que ESP32 con loops rápidos saturen el render tree.
+const SENSOR_THROTTLE_MS = 250;
+const _sensorThrottle = new Map<string, number>();
+
 interface State {
   // Estado expuesto a los componentes
   state: OrionState;
@@ -250,6 +256,14 @@ export const useOrionStore = create<State>((set, get) => ({
         queryClient.invalidateQueries({ queryKey: QUERY_KEYS.memory });
         break;
       }
+      case "access.event":
+      case "access.user_changed": {
+        // Prefix-match: ["access"] invalida también ["access","events",...]
+        // y ["access","daily",...]. Los 2 tabs del panel se refrescan
+        // automáticamente cuando llega un nuevo evento del ESP32.
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.access.all });
+        break;
+      }
       case "conversation.deleted":
       case "conversation.load": {
         queryClient.invalidateQueries({ queryKey: QUERY_KEYS.conversations });
@@ -353,9 +367,44 @@ export const useOrionStore = create<State>((set, get) => ({
         const device = String(payload?.device ?? "");
         const value = String(payload?.value ?? "");
         if (!device) break;
+        // Throttle defensivo: si un ESP32 reporta a >4 Hz, cada write
+        // cascadea por HomePanel, IoTPanel y useEventPulses. 250ms por
+        // device sigue siendo más rápido que el ojo humano para sparklines
+        // y el DeviceCard, pero acota el costo en escenarios de stress.
+        const now = Date.now();
+        const last = _sensorThrottle.get(device) ?? 0;
+        if (now - last < SENSOR_THROTTLE_MS) break;
+        _sensorThrottle.set(device, now);
         set((s) => ({
-          iotSensors: { ...s.iotSensors, [device]: { value, ts: Date.now() / 1000 } },
+          iotSensors: { ...s.iotSensors, [device]: { value, ts: now / 1000 } },
         }));
+        break;
+      }
+      case "audio.chunk": {
+        // Stream de audio remoto: el backend manda PCM 16-bit mono base64
+        // por cada chunk de Gemini Live. En el desktop la PC ya lo
+        // reproduce por sounddevice, así que no lo tocamos (sonaría
+        // doble). En móvil/tablet/watch es el único camino para oír a
+        // Orion — vía Web Audio API.
+        if (typeof window === "undefined") break;
+        // detectDevice() no se importa estáticamente para no inflar el
+        // bundle inicial con la lógica de audio cuando el usuario nunca
+        // habla con voz.
+        import("@/api/ws").then(({ detectDevice }) => {
+          const device = detectDevice();
+          if (device === "desktop") return; // PC: el sounddevice local manda.
+          const b64 = String(payload?.pcm_b64 ?? "");
+          const sr = Number(payload?.sr ?? 24000);
+          if (!b64) return;
+          import("@/audio/audioPlayer").then((m) => m.playPcmChunk(b64, sr));
+        });
+        break;
+      }
+      case "audio.end": {
+        // El backend cerró el turno de audio. Por ahora no-op (los
+        // chunks pendientes están agendados y se drenan solos).
+        if (typeof window === "undefined") break;
+        import("@/audio/audioPlayer").then((m) => m.markAudioTurnEnd());
         break;
       }
       case "telemetry": {

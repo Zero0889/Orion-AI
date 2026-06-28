@@ -137,3 +137,68 @@ export function inferBackendUrl(): { http: string; ws: string } {
     ws: `${wsProto}//${loc.host}/ws`,
   };
 }
+
+// ── Device + client_id detection ─────────────────────────────────────
+// El backend (orion.core.client_context) lee ?device=&client_id=
+// del handshake y los propaga al prompt builder para que Orion adapte
+// la respuesta al dispositivo (móvil → más corta, voz-first; desktop
+// → larga, con detalle).
+
+export type DeviceKind = "desktop" | "mobile" | "tablet" | "watch" | "tv" | "unknown";
+
+const CLIENT_ID_KEY = "orion.client_id";
+
+/** Detecta el tipo de dispositivo por user-agent + matchMedia. Heurística
+ *  pragmática — no perfecta, pero suficiente para adaptar el prompt. Si
+ *  no podemos identificarlo, devolvemos "unknown" y el backend deja al
+ *  prompt sin override. */
+export function detectDevice(): DeviceKind {
+  if (typeof navigator === "undefined" || typeof window === "undefined") return "unknown";
+  const ua = navigator.userAgent;
+  // Smartwatch (Wear OS, Apple Watch — raro, pero soportado).
+  if (/watch/i.test(ua)) return "watch";
+  // TV (Tizen, WebOS, Android TV).
+  if (/smart-?tv|tizen|webos|hbbtv|google.*tv/i.test(ua)) return "tv";
+  // Tablet primero — iPad moderno reporta MacIntel + touch.
+  const isTouch =
+    "maxTouchPoints" in navigator && (navigator as { maxTouchPoints?: number }).maxTouchPoints! > 1;
+  if (/ipad|tablet/i.test(ua)) return "tablet";
+  if (isTouch && /macintosh/i.test(ua)) return "tablet"; // iPadOS 13+ enmascara como Mac.
+  // Móvil: incluye iPhone, Android (no tablet).
+  if (/mobi|iphone|ipod|android.*mobile/i.test(ua)) return "mobile";
+  // Android sin "Mobile" usualmente es tablet.
+  if (/android/i.test(ua)) return "tablet";
+  return "desktop";
+}
+
+/** Devuelve un client_id persistente en localStorage. La primera carga
+ *  genera uno; las siguientes lo reusan. Si localStorage no está
+ *  disponible (modo privado de algunos browsers), devuelve "" — el
+ *  backend lo trata como cliente legacy. */
+export function getClientId(): string {
+  try {
+    const existing = window.localStorage.getItem(CLIENT_ID_KEY);
+    if (existing) return existing;
+    const fresh =
+      typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+        ? crypto.randomUUID().slice(0, 12)
+        : `c${Date.now().toString(36)}`;
+    window.localStorage.setItem(CLIENT_ID_KEY, fresh);
+    return fresh;
+  } catch {
+    return "";
+  }
+}
+
+/** Toma la URL base del WS de `inferBackendUrl` y le agrega los query
+ *  params de identificación. El backend (ws.py) los lee del handshake. */
+export function buildWsUrl(): string {
+  const { ws } = inferBackendUrl();
+  const device = detectDevice();
+  const clientId = getClientId();
+  const params = new URLSearchParams();
+  if (device !== "unknown") params.set("device", device);
+  if (clientId) params.set("client_id", clientId);
+  const qs = params.toString();
+  return qs ? `${ws}?${qs}` : ws;
+}

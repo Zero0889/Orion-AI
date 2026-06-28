@@ -131,6 +131,14 @@ def _isolated_sqlite_db(tmp_path, monkeypatch):
     except ImportError:
         pass
 
+    try:
+        from orion.adapters.iot import access_control as _ac
+
+        _ac._reset_for_tests()
+        _reset_helpers.append(_ac._reset_for_tests)
+    except ImportError:
+        pass
+
     yield db_path
 
     # Cleanup: limpia singletons para que el próximo test arranque limpio.

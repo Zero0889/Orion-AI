@@ -490,6 +490,45 @@
         "title": "DiagnosticsInfo",
         "type": "object"
       },
+      "EventIn": {
+        "description": "Payload que manda el ESP32 cada vez que el sensor lee una huella.",
+        "properties": {
+          "confidence": {
+            "default": 0,
+            "maximum": 10000.0,
+            "minimum": 0.0,
+            "title": "Confidence",
+            "type": "integer"
+          },
+          "esp_id": {
+            "default": "",
+            "maxLength": 40,
+            "title": "Esp Id",
+            "type": "string"
+          },
+          "event_type": {
+            "default": "GRANTED",
+            "enum": [
+              "GRANTED",
+              "DENIED",
+              "ENROLLED"
+            ],
+            "title": "Event Type",
+            "type": "string"
+          },
+          "fingerprint_id": {
+            "maximum": 127.0,
+            "minimum": -1.0,
+            "title": "Fingerprint Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "fingerprint_id"
+        ],
+        "title": "EventIn",
+        "type": "object"
+      },
       "FromImageRequest": {
         "properties": {
           "image_path": {
@@ -977,6 +1016,70 @@
         "title": "StartAuthBody",
         "type": "object"
       },
+      "TelegramConfigBody": {
+        "properties": {
+          "bot_token": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bot Token"
+          },
+          "default_chat_id": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Chat Id"
+          },
+          "enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Enabled"
+          },
+          "forward_notifications": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Forward Notifications"
+          }
+        },
+        "title": "TelegramConfigBody",
+        "type": "object"
+      },
+      "TelegramTestBody": {
+        "properties": {
+          "message": {
+            "default": "🤖 Hola desde Orion. Telegram bridge activo.",
+            "maxLength": 500,
+            "title": "Message",
+            "type": "string"
+          }
+        },
+        "title": "TelegramTestBody",
+        "type": "object"
+      },
       "ThemePatch": {
         "properties": {
           "name": {
@@ -1094,6 +1197,80 @@
         "title": "TransportBody",
         "type": "object"
       },
+      "UserCreate": {
+        "properties": {
+          "active": {
+            "default": true,
+            "title": "Active",
+            "type": "boolean"
+          },
+          "fingerprint_id": {
+            "maximum": 127.0,
+            "minimum": 0.0,
+            "title": "Fingerprint Id",
+            "type": "integer"
+          },
+          "name": {
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "phone": {
+            "default": "",
+            "maxLength": 40,
+            "title": "Phone",
+            "type": "string"
+          }
+        },
+        "required": [
+          "fingerprint_id",
+          "name"
+        ],
+        "title": "UserCreate",
+        "type": "object"
+      },
+      "UserUpdate": {
+        "properties": {
+          "active": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Active"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "maxLength": 80,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "phone": {
+            "anyOf": [
+              {
+                "maxLength": 40,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone"
+          }
+        },
+        "title": "UserUpdate",
+        "type": "object"
+      },
       "ValidationError": {
         "properties": {
           "ctx": {
@@ -1143,6 +1320,506 @@
   },
   "openapi": "3.1.0",
   "paths": {
+    "/api/access/daily": {
+      "get": {
+        "operationId": "daily_api_access_daily_get",
+        "parameters": [
+          {
+            "description": "YYYY-MM-DD; >= since",
+            "in": "query",
+            "name": "since",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "YYYY-MM-DD; >= since",
+              "title": "Since"
+            }
+          },
+          {
+            "in": "query",
+            "name": "fingerprint_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maximum": 127,
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Fingerprint Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "title": "Response Daily Api Access Daily Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Daily",
+        "tags": [
+          "access"
+        ]
+      }
+    },
+    "/api/access/event": {
+      "post": {
+        "description": "Endpoint que el ESP32 invoca después de cada lectura del AS608.",
+        "operationId": "post_event_api_access_event_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EventIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Post Event Api Access Event Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Post Event",
+        "tags": [
+          "access"
+        ]
+      }
+    },
+    "/api/access/events": {
+      "get": {
+        "operationId": "get_events_api_access_events_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 100,
+              "maximum": 1000,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "minimum": 0,
+              "title": "Offset",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "fingerprint_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maximum": 127,
+                  "minimum": -1,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Fingerprint Id"
+            }
+          },
+          {
+            "description": "ISO timestamp; >= since",
+            "in": "query",
+            "name": "since",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "ISO timestamp; >= since",
+              "title": "Since"
+            }
+          },
+          {
+            "in": "query",
+            "name": "event_type",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Event Type"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Get Events Api Access Events Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Events",
+        "tags": [
+          "access"
+        ]
+      }
+    },
+    "/api/access/events/count": {
+      "get": {
+        "operationId": "events_count_api_access_events_count_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Events Count Api Access Events Count Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Events Count",
+        "tags": [
+          "access"
+        ]
+      }
+    },
+    "/api/access/export.csv": {
+      "get": {
+        "operationId": "export_csv_api_access_export_csv_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "since",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Since"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Export Csv",
+        "tags": [
+          "access"
+        ]
+      }
+    },
+    "/api/access/export.xlsx": {
+      "get": {
+        "description": "Exporta la tabla diaria como XLSX con dos hojas:\n- \"Reporte diario\": una fila por usuario/día (la tabla que pidió el user)\n- \"Eventos crudos\": todos los registros con confidencia/esp_id/tipo\n\nRequiere ``openpyxl`` (lo agregamos a pyproject como dep opcional —\nsi no está instalado devolvemos 503 con instrucción clara).",
+        "operationId": "export_xlsx_api_access_export_xlsx_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "since",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Since"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Export Xlsx",
+        "tags": [
+          "access"
+        ]
+      }
+    },
+    "/api/access/users": {
+      "get": {
+        "operationId": "list_users_api_access_users_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "title": "Response List Users Api Access Users Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Users",
+        "tags": [
+          "access"
+        ]
+      },
+      "post": {
+        "operationId": "create_user_api_access_users_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UserCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Create User Api Access Users Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create User",
+        "tags": [
+          "access"
+        ]
+      }
+    },
+    "/api/access/users/{user_id}": {
+      "delete": {
+        "operationId": "remove_user_api_access_users__user_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "user_id",
+            "required": true,
+            "schema": {
+              "title": "User Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Remove User",
+        "tags": [
+          "access"
+        ]
+      },
+      "patch": {
+        "operationId": "patch_user_api_access_users__user_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "user_id",
+            "required": true,
+            "schema": {
+              "title": "User Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UserUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Patch User Api Access Users  User Id  Patch",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Patch User",
+        "tags": [
+          "access"
+        ]
+      }
+    },
     "/api/agent/orchestra": {
       "get": {
         "description": "Lista TODOS los agentes definidos (habilitados e inhabilitados).\n\nLa UI necesita ver también los inhabilitados para poder reactivarlos\no editarlos sin tener que tocar agents.json a mano.",
@@ -4344,6 +5021,116 @@
         "summary": "Post Sharing Endpoint",
         "tags": [
           "settings"
+        ]
+      }
+    },
+    "/api/settings/telegram": {
+      "get": {
+        "description": "Estado actual del bridge + config (token enmascarado).",
+        "operationId": "get_telegram_state_api_settings_telegram_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Get Telegram State Api Settings Telegram Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Telegram State",
+        "tags": [
+          "telegram"
+        ]
+      },
+      "put": {
+        "description": "Patch parcial: solo se sobreescriben los campos que llegan no-None.",
+        "operationId": "patch_telegram_api_settings_telegram_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TelegramConfigBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Patch Telegram Api Settings Telegram Put",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Patch Telegram",
+        "tags": [
+          "telegram"
+        ]
+      }
+    },
+    "/api/settings/telegram/test": {
+      "post": {
+        "description": "Manda un mensaje al chat configurado para validar que todo conecta.",
+        "operationId": "test_telegram_api_settings_telegram_test_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TelegramTestBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Test Telegram Api Settings Telegram Test Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Test Telegram",
+        "tags": [
+          "telegram"
         ]
       }
     },

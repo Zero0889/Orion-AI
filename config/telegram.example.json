@@ -1,0 +1,19 @@
+{
+  "_comment": "EJEMPLO de config/telegram.json. Copia este archivo y reemplaza los valores. El real está en .gitignore.",
+
+  "bot_token": "123456789:ABCDEF1234567890ABCDEF1234567890",
+  "default_chat_id": "123456789",
+  "forward_notifications": true,
+  "enabled": false,
+
+  "_group_explain": "OPCIONAL: si tenés un supergrupo con forum-topics, definílo acá. Cada topic se identifica por nombre lógico (access/status/commands/chat) y su message_thread_id. Si un topic NO está en este dict, el caller hace fallback a default_chat_id.",
+  "group": {
+    "chat_id": "-1001234567890",
+    "topics": {
+      "access": 2,
+      "status": 5,
+      "commands": 8,
+      "chat": 11
+    }
+  }
+}

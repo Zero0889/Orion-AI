@@ -34,4 +34,11 @@ export const QUERY_KEYS = {
   orchestra: ["orchestra"] as const,
   mcpServers: ["mcp", "servers"] as const,
   settingsBrain: ["settings", "brain"] as const,
+  access: {
+    all: ["access"] as const,
+    users: ["access", "users"] as const,
+    events: (opts?: { since?: string; limit?: number; offset?: number }) =>
+      ["access", "events", opts ?? {}] as const,
+    daily: (since?: string) => ["access", "daily", since ?? "all"] as const,
+  },
 } as const;

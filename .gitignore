@@ -22,15 +22,13 @@ config/api_keys.json
 config/credentials.json
 config/gdrive_token.json
 config/providers.json
+config/telegram.json
+config/access.json
 
 # ── Drop-zone web (Fase 4): archivos subidos por el usuario ─────────────────
 uploads/
 
-# ── Build artifacts (Fase 6: Tauri + PyInstaller) ──────────────────────────
-build/
-dist/
-src-tauri/target/
-src-tauri/binaries/
+# ── Build artifacts ────────────────────────────────────────────────────────
 web/node_modules/
 web/dist/
 

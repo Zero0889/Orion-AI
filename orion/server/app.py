@@ -171,6 +171,7 @@ def build_app(bus: Any) -> FastAPI:
 
     # ── Routers ───────────────────────────────────────────────────────────
     from orion.server.routes import (
+        access,
         agent,
         circuit,
         conversations,
@@ -198,6 +199,9 @@ def build_app(bus: Any) -> FastAPI:
     from orion.server.routes import (
         brain as brain_route,
     )
+    from orion.server.routes import (
+        telegram as telegram_route,
+    )
 
     app.include_router(memory.router, prefix="/api/memory", tags=["memory"])
     app.include_router(notes.router, prefix="/api/notes", tags=["notes"])
@@ -215,8 +219,10 @@ def build_app(bus: Any) -> FastAPI:
     app.include_router(notebooklm_route.router, prefix="/api/notebooklm", tags=["notebooklm"])
     app.include_router(integrations.router, prefix="/api/integrations", tags=["integrations"])
     app.include_router(circuit.router, prefix="/api/circuit", tags=["circuit"])
+    app.include_router(access.router, prefix="/api/access", tags=["access"])
     app.include_router(onboarding_route.router, prefix="/api/onboarding", tags=["onboarding"])
     app.include_router(diagnostics_route.router, prefix="/api/diagnostics", tags=["diagnostics"])
+    app.include_router(telegram_route.router, prefix="/api/settings", tags=["telegram"])
 
     # ── WebSocket hub ────────────────────────────────────────────────────
     from orion.server.ws import register_ws
@@ -231,6 +237,16 @@ def build_app(bus: Any) -> FastAPI:
         start_poller()
     except Exception as e:
         log.warning("Notification poller no arrancó: %s", e)
+
+    # ── Telegram bridge (long-poll + hook bus) ──────────────────────────
+    # Arranca solo si config/telegram.json tiene token + chat_id + enabled.
+    # Reloadable en caliente desde PUT /api/settings/telegram sin reiniciar.
+    try:
+        from orion.server.telegram_bridge import init_bridge as init_tg_bridge
+
+        init_tg_bridge(bus)
+    except Exception as e:
+        log.warning("Telegram bridge no arrancó: %s", e)
 
     # ── Frontend estático (Fase 2: si web/dist existe, se sirve aquí) ────
     # En modo dev (Vite en :5173) este bloque no aplica — el usuario abre

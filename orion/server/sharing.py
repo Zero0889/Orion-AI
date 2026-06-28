@@ -25,6 +25,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
 from orion.config import CONFIG_DIR
+from orion.server.access_auth import is_authed_request
 
 # ── Persistencia ────────────────────────────────────────────────────────────
 
@@ -143,6 +144,14 @@ class SharingMiddleware:
 
     async def __call__(self, scope, receive, send):
         if scope["type"] not in ("http", "websocket"):
+            await self.app(scope, receive, send)
+            return
+
+        # Bypass autenticado: el endpoint /api/access/event acepta POSTs
+        # desde cualquier IP si traen el header X-Orion-Access-Token con
+        # el secreto de config/access.json. Esto deja entrar al ESP32 que
+        # vive en la LAN sin abrir la whitelist global a 192.168/16.
+        if is_authed_request(scope):
             await self.app(scope, receive, send)
             return
 

@@ -4,6 +4,155 @@
  */
 
 export interface paths {
+  "/api/access/daily": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Daily */
+    get: operations["daily_api_access_daily_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/access/event": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Post Event
+     * @description Endpoint que el ESP32 invoca después de cada lectura del AS608.
+     */
+    post: operations["post_event_api_access_event_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/access/events": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get Events */
+    get: operations["get_events_api_access_events_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/access/events/count": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Events Count */
+    get: operations["events_count_api_access_events_count_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/access/export.csv": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Export Csv */
+    get: operations["export_csv_api_access_export_csv_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/access/export.xlsx": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Export Xlsx
+     * @description Exporta la tabla diaria como XLSX con dos hojas:
+     *     - "Reporte diario": una fila por usuario/día (la tabla que pidió el user)
+     *     - "Eventos crudos": todos los registros con confidencia/esp_id/tipo
+     *
+     *     Requiere ``openpyxl`` (lo agregamos a pyproject como dep opcional —
+     *     si no está instalado devolvemos 503 con instrucción clara).
+     */
+    get: operations["export_xlsx_api_access_export_xlsx_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/access/users": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List Users */
+    get: operations["list_users_api_access_users_get"];
+    put?: never;
+    /** Create User */
+    post: operations["create_user_api_access_users_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/access/users/{user_id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    /** Remove User */
+    delete: operations["remove_user_api_access_users__user_id__delete"];
+    options?: never;
+    head?: never;
+    /** Patch User */
+    patch: operations["patch_user_api_access_users__user_id__patch"];
+    trace?: never;
+  };
   "/api/agent/orchestra": {
     parameters: {
       query?: never;
@@ -1543,6 +1692,50 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/settings/telegram": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Telegram State
+     * @description Estado actual del bridge + config (token enmascarado).
+     */
+    get: operations["get_telegram_state_api_settings_telegram_get"];
+    /**
+     * Patch Telegram
+     * @description Patch parcial: solo se sobreescriben los campos que llegan no-None.
+     */
+    put: operations["patch_telegram_api_settings_telegram_put"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/settings/telegram/test": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Test Telegram
+     * @description Manda un mensaje al chat configurado para validar que todo conecta.
+     */
+    post: operations["test_telegram_api_settings_telegram_test_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/settings/theme": {
     parameters: {
       query?: never;
@@ -1914,6 +2107,30 @@ export interface components {
       /** Sys Executable */
       sys_executable: string;
     };
+    /**
+     * EventIn
+     * @description Payload que manda el ESP32 cada vez que el sensor lee una huella.
+     */
+    EventIn: {
+      /**
+       * Confidence
+       * @default 0
+       */
+      confidence: number;
+      /**
+       * Esp Id
+       * @default
+       */
+      esp_id: string;
+      /**
+       * Event Type
+       * @default GRANTED
+       * @enum {string}
+       */
+      event_type: "GRANTED" | "DENIED" | "ENROLLED";
+      /** Fingerprint Id */
+      fingerprint_id: number;
+    };
     /** FromImageRequest */
     FromImageRequest: {
       /**
@@ -2124,6 +2341,25 @@ export interface components {
       /** Services */
       services?: string[] | null;
     };
+    /** TelegramConfigBody */
+    TelegramConfigBody: {
+      /** Bot Token */
+      bot_token?: string | null;
+      /** Default Chat Id */
+      default_chat_id?: string | null;
+      /** Enabled */
+      enabled?: boolean | null;
+      /** Forward Notifications */
+      forward_notifications?: boolean | null;
+    };
+    /** TelegramTestBody */
+    TelegramTestBody: {
+      /**
+       * Message
+       * @default 🤖 Hola desde Orion. Telegram bridge activo.
+       */
+      message: string;
+    };
     /** ThemePatch */
     ThemePatch: {
       /** Name */
@@ -2156,6 +2392,32 @@ export interface components {
       /** Username */
       username?: string | null;
     };
+    /** UserCreate */
+    UserCreate: {
+      /**
+       * Active
+       * @default true
+       */
+      active: boolean;
+      /** Fingerprint Id */
+      fingerprint_id: number;
+      /** Name */
+      name: string;
+      /**
+       * Phone
+       * @default
+       */
+      phone: string;
+    };
+    /** UserUpdate */
+    UserUpdate: {
+      /** Active */
+      active?: boolean | null;
+      /** Name */
+      name?: string | null;
+      /** Phone */
+      phone?: string | null;
+    };
     /** ValidationError */
     ValidationError: {
       /** Context */
@@ -2178,6 +2440,321 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+  daily_api_access_daily_get: {
+    parameters: {
+      query?: {
+        /** @description YYYY-MM-DD; >= since */
+        since?: string | null;
+        fingerprint_id?: number | null;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            [key: string]: unknown;
+          }[];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  post_event_api_access_event_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["EventIn"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            [key: string]: unknown;
+          };
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  get_events_api_access_events_get: {
+    parameters: {
+      query?: {
+        limit?: number;
+        offset?: number;
+        fingerprint_id?: number | null;
+        /** @description ISO timestamp; >= since */
+        since?: string | null;
+        event_type?: string | null;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            [key: string]: unknown;
+          };
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  events_count_api_access_events_count_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            [key: string]: unknown;
+          };
+        };
+      };
+    };
+  };
+  export_csv_api_access_export_csv_get: {
+    parameters: {
+      query?: {
+        since?: string | null;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  export_xlsx_api_access_export_xlsx_get: {
+    parameters: {
+      query?: {
+        since?: string | null;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  list_users_api_access_users_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            [key: string]: unknown;
+          }[];
+        };
+      };
+    };
+  };
+  create_user_api_access_users_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["UserCreate"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            [key: string]: unknown;
+          };
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  remove_user_api_access_users__user_id__delete: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        user_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  patch_user_api_access_users__user_id__patch: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        user_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["UserUpdate"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            [key: string]: unknown;
+          };
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
   list_orchestra_api_agent_orchestra_get: {
     parameters: {
       query?: never;
@@ -4721,6 +5298,98 @@ export interface operations {
     requestBody: {
       content: {
         "application/json": components["schemas"]["SharingBody"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            [key: string]: unknown;
+          };
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  get_telegram_state_api_settings_telegram_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            [key: string]: unknown;
+          };
+        };
+      };
+    };
+  };
+  patch_telegram_api_settings_telegram_put: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["TelegramConfigBody"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            [key: string]: unknown;
+          };
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  test_telegram_api_settings_telegram_test_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["TelegramTestBody"];
       };
     };
     responses: {

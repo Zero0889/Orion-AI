@@ -1,0 +1,7 @@
+{
+  "_comment": "EJEMPLO de config/access.json. Copia este archivo y reemplaza el secret. El real está en .gitignore.",
+  "_what": "shared_secret debe coincidir con la constante ACCESS_TOKEN del sketch del ESP32. Solo POST /api/access/event lo usa para bypassear el filtro de IP — el resto del backend sigue protegido por SharingMiddleware.",
+  "_rotate": "Para rotarlo: generá uno nuevo con `python -c \"import secrets; print(secrets.token_urlsafe(32))\"`, ponelo acá, y flasheá el ESP32 con el mismo valor.",
+
+  "shared_secret": "REEMPLAZAR_POR_TOKEN_URL_SAFE_DE_32_BYTES"
+}

@@ -120,6 +120,17 @@ export const api = {
       ...(prompt ? { prompt } : {}),
     }),
 
+  // Telegram bridge (mensajería bidireccional)
+  getTelegram: () => request<TelegramState>("GET", "/api/settings/telegram"),
+  setTelegram: (patch: Partial<TelegramConfigPatch>) =>
+    request<TelegramState>("PUT", "/api/settings/telegram", patch),
+  testTelegram: (message?: string) =>
+    request<{ ok: boolean; result?: Record<string, unknown> }>(
+      "POST",
+      "/api/settings/telegram/test",
+      message ? { message } : {},
+    ),
+
   // Agent — chat directo + orquesta CRUD
   listOrchestra: () => request<Array<OrchestraAgent>>("GET", "/api/agent/orchestra"),
   listProviders: () => request<Array<ProviderCatalog>>("GET", "/api/agent/providers"),
@@ -312,6 +323,40 @@ export const api = {
     request<LogTailResult>("GET", `/api/diagnostics/log/tail?lines=${lines}`),
   diagnosticsOpenLogFolder: () =>
     request<{ ok: true; path: string }>("POST", "/api/diagnostics/log/open-folder"),
+
+  // ── Access control (sistema de huella + Telegram) ─────────────────
+  accessUsers: () => request<AccessUser[]>("GET", "/api/access/users"),
+  accessCreateUser: (body: {
+    fingerprint_id: number;
+    name: string;
+    phone?: string;
+    active?: boolean;
+  }) => request<AccessUser>("POST", "/api/access/users", body),
+  accessUpdateUser: (id: string, body: { name?: string; phone?: string; active?: boolean }) =>
+    request<AccessUser>("PATCH", `/api/access/users/${id}`, body),
+  accessDeleteUser: (id: string) => request<void>("DELETE", `/api/access/users/${id}`),
+  accessListEvents: (
+    opts: {
+      limit?: number;
+      offset?: number;
+      fingerprint_id?: number;
+      since?: string;
+      event_type?: string;
+    } = {},
+  ) => {
+    const q = new URLSearchParams();
+    if (opts.limit) q.set("limit", String(opts.limit));
+    if (opts.offset) q.set("offset", String(opts.offset));
+    if (opts.fingerprint_id !== undefined) q.set("fingerprint_id", String(opts.fingerprint_id));
+    if (opts.since) q.set("since", opts.since);
+    if (opts.event_type) q.set("event_type", opts.event_type);
+    const qs = q.toString();
+    return request<AccessEventsPage>("GET", `/api/access/events${qs ? "?" + qs : ""}`);
+  },
+  accessDaily: (since?: string) => {
+    const qs = since ? `?since=${encodeURIComponent(since)}` : "";
+    return request<AccessDailyRow[]>("GET", `/api/access/daily${qs}`);
+  },
 
   // ── Circuit-from-image ─────────────────────────────────────────────
   circuitFromImage: (imagePath: string, outputs?: Array<"spice" | "kicad">) =>
@@ -564,6 +609,26 @@ export interface SharingState {
   enabled: boolean;
   tailscale_ip: string | null;
   port: number;
+}
+
+export interface TelegramState {
+  enabled: boolean;
+  configured: boolean;
+  has_token: boolean;
+  token_preview: string;
+  default_chat_id: string;
+  forward_notifications: boolean;
+  running: boolean;
+  bot_username: string | null;
+  bot_ok: boolean;
+  bot_error: string | null;
+}
+
+export interface TelegramConfigPatch {
+  bot_token: string;
+  default_chat_id: string;
+  forward_notifications: boolean;
+  enabled: boolean;
 }
 
 export interface OrchestraAgent {
@@ -864,4 +929,46 @@ export interface MCPRecipe {
   prompts: MCPRecipePrompt[];
   env_required: MCPRecipeEnv[];
   official: boolean;
+}
+
+// ── Access control (huella + Telegram) ────────────────────────────────
+// Mapping huella↔persona + registros crudos + reporte diario.
+
+export interface AccessUser {
+  id: string;
+  fingerprint_id: number; // 0-127, slot del AS608
+  name: string;
+  phone: string;
+  active: boolean;
+  created: string;
+}
+
+export type AccessEventType = "GRANTED" | "DENIED" | "ENROLLED";
+
+export interface AccessEvent {
+  id: string;
+  fingerprint_id: number; // -1 si el sensor no reconoció
+  event_type: AccessEventType;
+  esp_id: string;
+  confidence: number;
+  timestamp: string;
+  user_name: string | null;
+}
+
+export interface AccessEventsPage {
+  items: AccessEvent[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+export interface AccessDailyRow {
+  fingerprint_id: number;
+  name: string;
+  fecha: string; // YYYY-MM-DD
+  entrada: string; // HH:MM
+  salida: string; // HH:MM
+  tiempo_minutos: number;
+  tiempo_legible: string; // "8 h 57 min"
+  eventos_dia: number;
 }
