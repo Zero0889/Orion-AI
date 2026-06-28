@@ -86,9 +86,11 @@ class TelegramBridge:
         self._stop = threading.Event()
         self._poll_thread: threading.Thread | None = None
         self._last_update_id: int = 0
-        # Cola de chat_ids esperando respuesta. FIFO porque mensajes
-        # llegan ordenados; mantenemos un cap defensivo.
-        self._pending: deque[int] = deque(maxlen=PENDING_CAP)
+        # Cola de (chat_id, thread_id) esperando respuesta del brain. FIFO
+        # porque mensajes llegan ordenados; el thread_id se preserva para
+        # responder al mismo topic del supergrupo de donde vino la
+        # pregunta (chat privado → thread_id None, Telegram lo ignora).
+        self._pending: deque[tuple[int, int | None]] = deque(maxlen=PENDING_CAP)
         self._pending_lock = threading.Lock()
         self._hook_installed = False
 
@@ -180,6 +182,7 @@ class TelegramBridge:
                     u.text,
                     u.from_first_name or u.from_username,
                     u.message_thread_id,
+                    u.from_user_id,
                 )
 
     # ── Inbound: TG → bus ────────────────────────────────────────────────
@@ -190,11 +193,50 @@ class TelegramBridge:
         text: str,
         sender: str | None,
         thread_id: int | None = None,
+        from_user_id: int | None = None,
     ) -> None:
-        """Mensaje del usuario en Telegram → texto al cerebro."""
+        """Mensaje del usuario en Telegram → texto al cerebro o slash command."""
         text = text.strip()
         if not text:
             return
+
+        log.info(
+            "TG inbound: chat_id=%s thread_id=%s from_user_id=%s sender=%r len=%d text=%r",
+            chat_id,
+            thread_id,
+            from_user_id,
+            sender or "?",
+            len(text),
+            text[:80],
+        )
+
+        # ── Slash commands: si el msg viene del topic Comandos del
+        #    supergrupo Y empieza con "/", lo dispatcheamos en vez de
+        #    mandarlo al cerebro.
+        if self._should_dispatch_command(text, chat_id, thread_id):
+            self._dispatch_slash_command(text, chat_id, thread_id, from_user_id)
+            return
+
+        # ── Forward al brain: solo si viene del chat privado del user
+        #    o del topic Chat del supergrupo. Topics de notifs (access /
+        #    status / comandos) NO disparan el LLM aunque manden texto
+        #    libre, así nadie por error termina conversando con Orion
+        #    desde el topic Acceso.
+        if not self._should_forward_to_brain(chat_id, thread_id):
+            log.debug(
+                "TG ignorado (no es chat privado ni topic Chat): chat_id=%s thread_id=%s",
+                chat_id,
+                thread_id,
+            )
+            return
+
+        # Auth: solo el user autorizado puede chatear con el brain.
+        # Sin esto, cualquiera del supergrupo podría hablarle a Orion y
+        # gastar tokens del LLM.
+        if not self._is_authorized_user(from_user_id):
+            log.warning("TG chat rechazado: from_user_id=%s no autorizado", from_user_id)
+            return
+
         # Marcar device para que el prompt builder use el hint "móvil".
         # Importante: importamos acá adentro para no engancharnos al
         # client_context al cargar el módulo (evita ciclos en tests).
@@ -208,20 +250,98 @@ class TelegramBridge:
             log.debug("set_last_client falló (sigo igual): %s", e)
 
         with self._pending_lock:
-            self._pending.append(chat_id)
+            self._pending.append((chat_id, thread_id))
 
-        log.info(
-            "TG inbound: chat_id=%s thread_id=%s sender=%r len=%d text=%r",
-            chat_id,
-            thread_id,
-            sender or "?",
-            len(text),
-            text[:80],
-        )
         try:
             self.bus.submit_user_text(text)
         except Exception:
             log.exception("submit_user_text crasheó desde Telegram")
+
+    def _should_forward_to_brain(self, chat_id: int, thread_id: int | None) -> bool:
+        """Decide si el mensaje (no-comando) debe ir al brain.
+
+        Reglas:
+          1. Chat privado con el bot (chat_id == default_chat_id, sin thread).
+          2. Topic Chat del supergrupo (chat_id == group.chat_id Y
+             thread_id == group.topics["chat"]).
+        Cualquier otro topic (access/status/commands) NO dispara brain.
+        """
+        cfg = self._cfg
+        if cfg is None:
+            return False
+        if cfg.default_chat_id and str(chat_id) == str(cfg.default_chat_id):
+            return True
+        if cfg.group and str(chat_id) == str(cfg.group.chat_id):
+            chat_thread = cfg.group.topics.get("chat")
+            if chat_thread is not None and thread_id == chat_thread:
+                return True
+        return False
+
+    def _is_authorized_user(self, from_user_id: int | None) -> bool:
+        """True si el sender es el user autorizado (`default_chat_id`)."""
+        cfg = self._cfg
+        if cfg is None or from_user_id is None:
+            return False
+        try:
+            return int(from_user_id) == int(cfg.default_chat_id)
+        except (TypeError, ValueError):
+            return False
+
+    def _should_dispatch_command(
+        self,
+        text: str,
+        chat_id: int,
+        thread_id: int | None,
+    ) -> bool:
+        """Decide si el mensaje es un slash command que debe ir al dispatcher.
+
+        Regla: viene del topic mapeado como ``"commands"`` en el supergrupo
+        Y empieza con ``"/"``. En chats privados ALSO permitimos slash
+        commands (más fácil de testear desde el chat 1:1 con el bot).
+        """
+        from orion.server import telegram_commands as tc
+
+        if not tc.is_command(text):
+            return False
+
+        cfg = self._cfg
+        if cfg is None:
+            return False
+
+        # Chat privado con el bot: siempre permitir comandos.
+        if cfg.default_chat_id and str(chat_id) == str(cfg.default_chat_id):
+            return True
+
+        # Supergrupo: solo desde el topic Comandos.
+        if cfg.group and str(chat_id) == str(cfg.group.chat_id):
+            commands_thread = cfg.group.topics.get("commands")
+            if commands_thread is not None and thread_id == commands_thread:
+                return True
+
+        return False
+
+    def _dispatch_slash_command(
+        self,
+        text: str,
+        chat_id: int,
+        thread_id: int | None,
+        from_user_id: int | None,
+    ) -> None:
+        """Ejecuta un slash command y responde al mismo topic/chat."""
+        from orion.server import telegram_commands as tc
+
+        cfg = self._cfg
+        sender_for_auth = from_user_id if from_user_id is not None else chat_id
+        authorized = cfg.default_chat_id if cfg is not None else None
+
+        reply = tc.dispatch(
+            text,
+            sender_chat_id=int(sender_for_auth),
+            authorized_chat_id=authorized,
+        )
+
+        # Mandar la respuesta al mismo chat/topic de donde vino.
+        self._send_async(chat_id, reply, thread_id=thread_id)
 
     # ── Outbound: bus → TG ───────────────────────────────────────────────
 
@@ -235,7 +355,7 @@ class TelegramBridge:
 
     def _maybe_forward_orion_reply(self, payload: dict) -> None:
         """Si llega un log de Orion y tenemos un chat pendiente, lo
-        reenviamos al usuario por Telegram."""
+        reenviamos al mismo chat/topic de donde vino la pregunta."""
         text = str(payload.get("text") or "")
         tl = text.lower()
         if not (tl.startswith("orion:") or tl.startswith("o.r.i.o.n:")):
@@ -247,8 +367,8 @@ class TelegramBridge:
         with self._pending_lock:
             if not self._pending:
                 return
-            chat_id = self._pending.popleft()
-        self._send_async(chat_id, body)
+            chat_id, thread_id = self._pending.popleft()
+        self._send_async(chat_id, body, thread_id=thread_id)
 
     def _maybe_forward_notification(self, payload: dict) -> None:
         cfg = self._cfg
@@ -287,16 +407,26 @@ class TelegramBridge:
 
     # ── HTTP fire-and-forget ─────────────────────────────────────────────
 
-    def _send_async(self, chat_id: int | str, text: str) -> None:
+    def _send_async(
+        self,
+        chat_id: int | str,
+        text: str,
+        *,
+        thread_id: int | None = None,
+    ) -> None:
         """Manda en un thread daemon para no bloquear al productor del
-        evento (que puede ser el WS drain loop o el thread del LLM)."""
+        evento (que puede ser el WS drain loop o el thread del LLM).
+
+        ``thread_id`` propaga al ``message_thread_id`` de Telegram — útil
+        para responder a un topic específico dentro de un supergrupo.
+        """
         client = self._client
         if client is None:
             return
 
         def _go() -> None:
             try:
-                client.send_message(chat_id, text)
+                client.send_message(chat_id, text, message_thread_id=thread_id)
             except Exception as e:
                 log.warning("Telegram send falló (chat_id=%s): %s", chat_id, e)
 

@@ -45,13 +45,19 @@ class TelegramUpdate:
 
     update_id: int
     chat_id: int | None
+    """ID del chat donde llegó el mensaje. En un chat privado coincide con
+    ``from_user_id``; en grupos/supergrupos es el ID del grupo (negativo)."""
+
     text: str | None
     from_username: str | None
     from_first_name: str | None
-    # ``message_thread_id`` está presente cuando el mensaje vino de un topic
-    # de un supergrupo con forum-topics. None para chats privados o el
-    # general del grupo.
+    from_user_id: int | None = None
+    """ID personal del usuario que mandó el mensaje. SIEMPRE distinto al
+    chat_id en grupos. Usar este para auth de comandos (el del user real)."""
+
     message_thread_id: int | None = None
+    """Presente cuando el mensaje vino de un topic de un supergrupo con
+    forum-topics. None para chats privados o el general del grupo."""
 
 
 # ── Cliente HTTP ────────────────────────────────────────────────────────
@@ -157,6 +163,7 @@ class TelegramClient:
                     text=msg.get("text"),
                     from_username=sender.get("username"),
                     from_first_name=sender.get("first_name"),
+                    from_user_id=sender.get("id"),
                     message_thread_id=msg.get("message_thread_id"),
                 )
             )
