@@ -1,26 +1,83 @@
-"""Gmail adapter — envuelve ``gog gmail search`` para listar no-leídos.
+"""Gmail adapter — usa google-auth + googleapiclient directamente.
 
-Detalles del CLI ``gog`` (v0.22.0) que importan para no romper acá:
+Histórico: antes envolvía ``gog gmail search`` (CLI), pero en algunas
+instalaciones el subprocess hereda env vars de forma inconsistente y gog
+no puede leer el refresh token del keyring file-backend. Reescribimos
+para usar la API de Google directamente (mismo patrón que classroom.py).
 
-* La flag JSON es ``-j`` y es **global** — debe ir ANTES del subcomando
-  (``gog -j gmail search ...``), no al final. Si la ponés al final, gog
-  la interpreta como query arg y devuelve texto.
-* La estructura del JSON tiene clave ``threads`` (no ``messages``), y
-  cada item trae ``id``, ``date`` ("YYYY-MM-DD HH:MM"), ``from``,
-  ``subject``, ``labels``, ``messageCount``. Sin ``snippet`` por defecto.
-* En Windows el output puede incluir bytes no-cp1252 (emojis en
-  subjects). Hay que forzar ``encoding="utf-8"`` con ``errors="replace"``
-  o el reader thread del subprocess explota y deja ``stdout=None``.
+Requiere ``tools/gmail/token.json`` en formato de google-auth (refresh
+token + client_id + client_secret + token_uri + scopes). Si falta, el
+adapter reporta ``is_configured = False`` y el poller lo skipea.
 """
 
 from __future__ import annotations
 
+import contextlib
 import json
-import os
-import subprocess
+import time
 from datetime import datetime
 
+from orion.config import BASE_DIR
+from orion.core.logger import get_logger
+
 from .base import NotificationAdapter, NotificationItem
+
+log = get_logger("gmail")
+
+_TOKEN_PATH = BASE_DIR / "tools" / "gmail" / "token.json"
+
+
+def _is_revocation_error(exc: BaseException) -> bool:
+    """Distingue tokens muertos vs glitches transitorios. Solo borramos en
+    revocación explícita (idem patrón de classroom.py)."""
+    msg = str(exc).lower()
+    return any(s in msg for s in ("invalid_grant", "revoked", "deleted_client"))
+
+
+def _load_creds():
+    """Carga credentials del token.json; refresca si expiró. Devuelve None
+    si no hay token o si el refresh falla transient."""
+    try:
+        from google.auth.transport.requests import Request
+        from google.oauth2.credentials import Credentials
+    except ImportError as e:
+        raise RuntimeError(
+            "Falta google-auth. Reinstalá deps: pip install -r requirements.txt"
+        ) from e
+
+    if not _TOKEN_PATH.exists():
+        return None
+    try:
+        creds = Credentials.from_authorized_user_file(str(_TOKEN_PATH))
+    except (ValueError, OSError, json.JSONDecodeError) as e:
+        log.warning("Gmail token parse falló (NO borro): %s", e)
+        return None
+
+    if creds and creds.valid:
+        return creds
+
+    if creds and creds.expired and creds.refresh_token:
+        try:
+            creds.refresh(Request())
+        except Exception as e:
+            if _is_revocation_error(e):
+                log.warning("Gmail token revocado, lo borro: %s", e)
+                with contextlib.suppress(OSError):
+                    _TOKEN_PATH.unlink(missing_ok=True)
+                return None
+            log.warning("Gmail refresh transient falló (NO borro): %s", e)
+            return None
+
+        # Persistir el creds actualizado (incluye nuevo access_token)
+        try:
+            tmp = _TOKEN_PATH.with_suffix(".tmp")
+            tmp.write_text(creds.to_json(), encoding="utf-8")
+            tmp.replace(_TOKEN_PATH)
+        except OSError as e:
+            log.warning("No pude persistir token.json refrescado: %s", e)
+        return creds
+
+    return None
 
 
 class GmailAdapter(NotificationAdapter):
@@ -29,85 +86,84 @@ class GmailAdapter(NotificationAdapter):
         return "gmail"
 
     def is_configured(self) -> bool:
-        from orion.core.cli_installer import cli_path
-
-        return cli_path("gog") is not None
+        return _TOKEN_PATH.exists()
 
     def fetch(self, *, max_items: int = 20) -> list[NotificationItem]:
-        from orion.core.cli_installer import cli_path, extra_path_dirs
-
-        gog = cli_path("gog")
-        if gog is None:
-            raise RuntimeError("Binario `gog` no instalado. Andá a Skills → gog.")
-
-        env = os.environ.copy()
-        extras = extra_path_dirs()
-        if extras:
-            env["PATH"] = os.pathsep.join(extras + [env.get("PATH", "")])
-
-        # -j VA ANTES del subcomando porque es global flag de gog.
-        cmd = [gog, "-j", "gmail", "search", "is:unread", "--max", str(max_items)]
-        try:
-            r = subprocess.run(
-                cmd,
-                capture_output=True,
-                env=env,
-                timeout=30,
-                # Encoding explícito: emojis en subjects revientan cp1252.
-                encoding="utf-8",
-                errors="replace",
-            )
-        except FileNotFoundError as e:
-            raise RuntimeError(f"No pude ejecutar `gog`: {e}") from e
-        except subprocess.TimeoutExpired as e:
-            raise RuntimeError("`gog gmail search` superó el timeout (30s).") from e
-
-        stdout = r.stdout or ""
-        stderr = r.stderr or ""
-
-        if r.returncode != 0:
-            # Auth no hecho, sin red, scope falta — todo cae acá.
-            err = (stderr or stdout).strip()
-            raise RuntimeError(f"`gog gmail search` falló: {err[:300]}")
-
-        out = stdout.strip()
-        if not out:
-            return []
-
-        try:
-            data = json.loads(out)
-        except json.JSONDecodeError as e:
+        creds = _load_creds()
+        if creds is None:
             raise RuntimeError(
-                f"gog devolvió output no-JSON. Primeros 200 chars: {out[:200]!r}"
-            ) from e
+                "Gmail sin token. Re-autorizá la cuenta desde el panel de Notificaciones."
+            )
 
-        # gog v0.22 devuelve {nextPageToken, threads:[...]}.
-        threads = data.get("threads") if isinstance(data, dict) else data
-        if not isinstance(threads, list):
-            return []
+        try:
+            from googleapiclient.discovery import build
+            from googleapiclient.errors import HttpError
+        except ImportError as e:
+            raise RuntimeError("Falta googleapiclient. pip install google-api-python-client") from e
 
+        try:
+            svc = build("gmail", "v1", credentials=creds, cache_discovery=False)
+            res = (
+                svc.users()
+                .threads()
+                .list(userId="me", q="is:unread", maxResults=max_items)
+                .execute()
+            )
+        except HttpError as e:
+            raise RuntimeError(f"Gmail API falló: {e}") from e
+
+        threads = res.get("threads", []) or []
         items: list[NotificationItem] = []
+
         for t in threads[:max_items]:
-            if not isinstance(t, dict):
+            tid = str(t.get("id") or "").strip()
+            if not tid:
                 continue
-            mid = str(t.get("id") or "").strip()
-            if not mid:
+            # Pedir metadata del primer mensaje (subject, from, internalDate)
+            try:
+                msg = (
+                    svc.users()
+                    .threads()
+                    .get(
+                        userId="me",
+                        id=tid,
+                        format="metadata",
+                        metadataHeaders=["From", "Subject", "Date"],
+                    )
+                    .execute()
+                )
+            except HttpError as e:
+                log.warning("Gmail thread %s falló: %s", tid, e)
                 continue
-            subject = (t.get("subject") or "(sin asunto)").strip()
-            sender = (t.get("from") or "").strip()
-            ts = _parse_gog_date(t.get("date"))
+
+            messages = msg.get("messages", []) or []
+            if not messages:
+                continue
+            first = messages[0]
+            headers = {h["name"]: h["value"] for h in first.get("payload", {}).get("headers", [])}
+            sender = headers.get("From", "").strip()
+            subject = (headers.get("Subject") or "(sin asunto)").strip()
+            # internalDate es ms desde epoch
+            internal = first.get("internalDate")
+            try:
+                ts = float(internal) / 1000.0 if internal else time.time()
+            except (TypeError, ValueError):
+                ts = time.time()
+            # snippet del último mensaje del thread (más nuevo)
+            snippet = (msg.get("snippet") or "").strip()
+
             items.append(
                 NotificationItem(
-                    uid=f"gmail:{mid}",
+                    uid=f"gmail:{tid}",
                     source="gmail",
                     title=f"✉️ {sender}: {subject}" if sender else f"✉️ {subject}",
-                    summary="",  # gog -j no trae snippet en search
-                    url=f"https://mail.google.com/mail/u/0/#inbox/{mid}",
+                    summary=snippet[:200],
+                    url=f"https://mail.google.com/mail/u/0/#inbox/{tid}",
                     received_ts=ts,
                     metadata={
-                        "thread_id": mid,
-                        "labels": list(t.get("labels") or []),
-                        "message_count": int(t.get("messageCount") or 1),
+                        "thread_id": tid,
+                        "labels": list(first.get("labelIds") or []),
+                        "message_count": len(messages),
                     },
                 )
             )
@@ -115,14 +171,10 @@ class GmailAdapter(NotificationAdapter):
 
 
 def _parse_gog_date(s: str | None) -> float:
-    """gog devuelve fechas tipo '2026-06-07 09:28'. Si falla, usamos ahora."""
+    """Helper legacy — sigue exportado por si algún test viejo lo importa."""
     if not s:
-        import time as _time
-
-        return _time.time()
+        return time.time()
     try:
         return datetime.strptime(s.strip(), "%Y-%m-%d %H:%M").timestamp()
     except (ValueError, TypeError):
-        import time as _time
-
-        return _time.time()
+        return time.time()

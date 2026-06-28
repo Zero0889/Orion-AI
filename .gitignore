@@ -24,6 +24,8 @@ config/gdrive_token.json
 config/providers.json
 config/telegram.json
 config/access.json
+config/gog.env
+tools/gmail/
 
 # ── Drop-zone web (Fase 4): archivos subidos por el usuario ─────────────────
 uploads/
