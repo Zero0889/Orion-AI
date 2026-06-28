@@ -383,7 +383,7 @@ class TelegramBridge:
             if delta:
                 buf.append(delta)
             if is_final:
-                text = "".join(self._stream_buffers.pop(turn_id, []))
+                text = _smart_join(self._stream_buffers.pop(turn_id, []))
             else:
                 text = None
 
@@ -517,3 +517,35 @@ _BOOT_SETTLE_S = 0.5
 
 def settle() -> None:
     time.sleep(_BOOT_SETTLE_S)
+
+
+def _smart_join(chunks: list[str]) -> str:
+    """Joinea chunks de streaming preservando espacios cuando faltan.
+
+    Live (Gemini) emite cada palabra/token como chunk separado y
+    `_clean_transcript` les hace `.strip()`, así que las palabras llegan
+    sin espacios entre sí. Un naive `"".join()` produciría
+    "Sonlas11:31deldomingo".
+
+    chat_brain en cambio emite UN chunk con el texto completo + un chunk
+    vacío con `final=True`. Ahí ya viene con sus espacios.
+
+    Heurística: agregamos un espacio entre dos chunks **solo si el nuevo
+    chunk empieza con alfanumérico Y el chunk anterior no terminaba en
+    whitespace**. La puntuación de cierre (",", ".", "?", etc.) queda
+    pegada a la palabra anterior; la siguiente palabra recibe su espacio.
+
+      ["Son", "las", "11:31"]      → "Son las 11:31"
+      ["Hola.", "Son"]              → "Hola. Son"
+      ["Hola Zahir", ", ", "qué"]   → "Hola Zahir, qué"
+      ["Hola Zahir, qué tal?"]      → "Hola Zahir, qué tal?"  (chunk único)
+      ["domingo,", "de", "junio"]   → "domingo, de junio"
+    """
+    result = ""
+    for chunk in chunks:
+        if not chunk:
+            continue
+        if result and not result[-1].isspace() and (chunk[0].isalnum() or chunk[0] in "¿¡"):
+            result += " "
+        result += chunk
+    return result

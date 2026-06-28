@@ -310,19 +310,56 @@ def test_chat_stream_chat_brain_pattern_routed_to_topic(cfg_with_topics):
 
 
 def test_chat_stream_live_pattern_accumulates_many_deltas(cfg_with_topics):
-    """Gemini Live emite muchos chunks pequeños. Acumular todos."""
+    """Gemini Live emite muchos chunks pequeños sin espacios (ver
+    `_clean_transcript` que les hace .strip()). El bridge debe restituir
+    los espacios entre palabras."""
     bridge = _make_bridge(cfg_with_topics)
     with bridge._pending_lock:
         bridge._pending.append((AUTHED_USER, None))
 
-    for chunk in ["Hola ", "Zahir", ", ", "qué ", "tal?"]:
+    for chunk in ["Hola", "Zahir", "qué", "tal?"]:
         bridge._handle_chat_stream(
             {"role": "orion", "turn_id": "t2", "delta": chunk, "final": False}
         )
     bridge._handle_chat_stream({"role": "orion", "turn_id": "t2", "delta": "", "final": True})
     assert _wait_for_send(bridge)
     args, _ = bridge._client.send_message.call_args
+    # _smart_join restituye los espacios entre palabras pegadas
+    assert args[1] == "Hola Zahir qué tal?"
+
+
+def test_chat_stream_smart_join_preserves_existing_spaces(cfg_with_topics):
+    """Si los chunks YA traen espacios (chat_brain), no agregamos extras."""
+    bridge = _make_bridge(cfg_with_topics)
+    with bridge._pending_lock:
+        bridge._pending.append((AUTHED_USER, None))
+
+    # Mezcla: algunos chunks con space al final, otros sin
+    for chunk in ["Hola ", "Zahir", ", ", "qué", " tal?"]:
+        bridge._handle_chat_stream(
+            {"role": "orion", "turn_id": "t-mix", "delta": chunk, "final": False}
+        )
+    bridge._handle_chat_stream({"role": "orion", "turn_id": "t-mix", "delta": "", "final": True})
+    assert _wait_for_send(bridge)
+    args, _ = bridge._client.send_message.call_args
     assert args[1] == "Hola Zahir, qué tal?"
+
+
+def test_chat_stream_real_bug_scenario(cfg_with_topics):
+    """El bug reportado: 'Son las 11:31 del domingo' llegaba a Telegram
+    como 'Sonlas11:31deldomingo'. Verifica que _smart_join lo arregla."""
+    bridge = _make_bridge(cfg_with_topics)
+    with bridge._pending_lock:
+        bridge._pending.append((AUTHED_USER, None))
+
+    for chunk in ["Hola.", "Son", "las", "11:31", "del", "domingo"]:
+        bridge._handle_chat_stream(
+            {"role": "orion", "turn_id": "tbug", "delta": chunk, "final": False}
+        )
+    bridge._handle_chat_stream({"role": "orion", "turn_id": "tbug", "delta": "", "final": True})
+    assert _wait_for_send(bridge)
+    args, _ = bridge._client.send_message.call_args
+    assert args[1] == "Hola. Son las 11:31 del domingo"
 
 
 def test_chat_stream_role_user_ignored(cfg_with_topics):
