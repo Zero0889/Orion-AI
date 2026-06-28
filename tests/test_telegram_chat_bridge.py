@@ -271,3 +271,113 @@ def test_orion_reply_non_orion_prefix_ignored(cfg_with_topics):
     # _pending sigue intacta porque no era una reply de Orion
     assert len(bridge._pending) == 1
     assert not bridge._client.send_message.called
+
+
+# ── _handle_chat_stream (path moderno de chat_brain) ───────────────────
+
+
+def _wait_for_send(bridge, timeout_s: float = 1.0) -> bool:
+    """Espera a que el thread daemon de _send_async dispare send_message."""
+    import time as _t
+
+    deadline = _t.time() + timeout_s
+    while _t.time() < deadline:
+        if bridge._client.send_message.called:
+            return True
+        _t.sleep(0.02)
+    return False
+
+
+def test_chat_stream_chat_brain_pattern_routed_to_topic(cfg_with_topics):
+    """chat_brain emite UN chunk con todo el texto + un chunk vacío con
+    final=True. El bridge debe acumular y mandar al cerrar."""
+    bridge = _make_bridge(cfg_with_topics)
+    with bridge._pending_lock:
+        bridge._pending.append((GROUP_CHAT, CHAT_THREAD))
+
+    bridge._handle_chat_stream(
+        {"role": "orion", "turn_id": "t1", "delta": "Son las 6 PM.", "final": False}
+    )
+    # Aún no se envía nada porque final=False
+    assert not bridge._client.send_message.called
+
+    bridge._handle_chat_stream({"role": "orion", "turn_id": "t1", "delta": "", "final": True})
+    assert _wait_for_send(bridge)
+    args, kwargs = bridge._client.send_message.call_args
+    assert args[0] == GROUP_CHAT
+    assert args[1] == "Son las 6 PM."
+    assert kwargs.get("message_thread_id") == CHAT_THREAD
+
+
+def test_chat_stream_live_pattern_accumulates_many_deltas(cfg_with_topics):
+    """Gemini Live emite muchos chunks pequeños. Acumular todos."""
+    bridge = _make_bridge(cfg_with_topics)
+    with bridge._pending_lock:
+        bridge._pending.append((AUTHED_USER, None))
+
+    for chunk in ["Hola ", "Zahir", ", ", "qué ", "tal?"]:
+        bridge._handle_chat_stream(
+            {"role": "orion", "turn_id": "t2", "delta": chunk, "final": False}
+        )
+    bridge._handle_chat_stream({"role": "orion", "turn_id": "t2", "delta": "", "final": True})
+    assert _wait_for_send(bridge)
+    args, _ = bridge._client.send_message.call_args
+    assert args[1] == "Hola Zahir, qué tal?"
+
+
+def test_chat_stream_role_user_ignored(cfg_with_topics):
+    """Chunks con role='user' son el eco del mensaje del usuario — no
+    debemos reenviarlos a Telegram."""
+    bridge = _make_bridge(cfg_with_topics)
+    with bridge._pending_lock:
+        bridge._pending.append((AUTHED_USER, None))
+
+    bridge._handle_chat_stream(
+        {"role": "user", "turn_id": "t3", "delta": "qué hora es?", "final": True}
+    )
+    assert not bridge._client.send_message.called
+    # El pending sigue intacto esperando la respuesta de Orion
+    assert len(bridge._pending) == 1
+
+
+def test_chat_stream_empty_buffer_does_nothing(cfg_with_topics):
+    """Si llega un final=True sin deltas previas con contenido, no
+    enviamos un mensaje vacío."""
+    bridge = _make_bridge(cfg_with_topics)
+    with bridge._pending_lock:
+        bridge._pending.append((AUTHED_USER, None))
+
+    bridge._handle_chat_stream({"role": "orion", "turn_id": "t4", "delta": "", "final": True})
+    assert not bridge._client.send_message.called
+
+
+def test_chat_stream_interleaved_turns(cfg_with_topics):
+    """Dos turnos overlapping (en paralelo): cada uno mantiene su buffer
+    propio por turn_id."""
+    bridge = _make_bridge(cfg_with_topics)
+    with bridge._pending_lock:
+        bridge._pending.append((AUTHED_USER, None))
+        bridge._pending.append((GROUP_CHAT, CHAT_THREAD))
+
+    bridge._handle_chat_stream(
+        {"role": "orion", "turn_id": "tA", "delta": "Respuesta A", "final": False}
+    )
+    bridge._handle_chat_stream(
+        {"role": "orion", "turn_id": "tB", "delta": "Respuesta B", "final": False}
+    )
+    bridge._handle_chat_stream({"role": "orion", "turn_id": "tA", "delta": "", "final": True})
+    # Primer final → primer pending. Verificar.
+    assert _wait_for_send(bridge)
+    args1, _ = bridge._client.send_message.call_args_list[0]
+    assert args1[1] == "Respuesta A"
+
+    bridge._handle_chat_stream({"role": "orion", "turn_id": "tB", "delta": "", "final": True})
+    # El segundo final → segundo pending.
+    import time as _t
+
+    deadline = _t.time() + 1.0
+    while _t.time() < deadline and bridge._client.send_message.call_count < 2:
+        _t.sleep(0.02)
+    assert bridge._client.send_message.call_count == 2
+    args2, _ = bridge._client.send_message.call_args_list[1]
+    assert args2[1] == "Respuesta B"

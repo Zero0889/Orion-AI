@@ -92,6 +92,14 @@ class TelegramBridge:
         # pregunta (chat privado → thread_id None, Telegram lo ignora).
         self._pending: deque[tuple[int, int | None]] = deque(maxlen=PENDING_CAP)
         self._pending_lock = threading.Lock()
+        # Buffers de streaming por turn_id. chat_brain emite stream_chunk
+        # con `delta` parcial y `final=True` para cerrar. Acumulamos por
+        # turn_id y, al cerrar, mandamos el texto completo a Telegram.
+        # Live emite muchos deltas chicos; chat_brain emite uno solo con el
+        # texto completo + un chunk vacío con final=True. Ambos quedan
+        # cubiertos por el mismo buffer.
+        self._stream_buffers: dict[str, list[str]] = {}
+        self._stream_lock = threading.Lock()
         self._hook_installed = False
 
     # ── Lifecycle ────────────────────────────────────────────────────────
@@ -349,9 +357,47 @@ class TelegramBridge:
         """Hook sync llamado desde ``bus.publish``. Mantenerlo rápido —
         cualquier I/O lenta debería ir a un thread."""
         if event_type == "log":
+            # Path legacy — algunos paths emiten `log` con "Orion: ..."
             self._maybe_forward_orion_reply(payload)
+        elif event_type == "chat.stream":
+            # Path moderno: `chat_brain` y Live emiten chunks via
+            # `bus.stream_chunk` y NO `log` (para evitar el bug del chat
+            # duplicado, ver commit 8664938). Acumulamos por turn_id.
+            self._handle_chat_stream(payload)
         elif event_type == "notification.new":
             self._maybe_forward_notification(payload)
+
+    def _handle_chat_stream(self, payload: dict) -> None:
+        """Acumula chunks de la respuesta del brain por ``turn_id`` y
+        envía a Telegram cuando llega el chunk con ``final=True``."""
+        if payload.get("role") != "orion":
+            return
+        turn_id = str(payload.get("turn_id") or "")
+        if not turn_id:
+            return
+        delta = str(payload.get("delta") or "")
+        is_final = bool(payload.get("final"))
+
+        with self._stream_lock:
+            buf = self._stream_buffers.setdefault(turn_id, [])
+            if delta:
+                buf.append(delta)
+            if is_final:
+                text = "".join(self._stream_buffers.pop(turn_id, []))
+            else:
+                text = None
+
+        if text is None:
+            return  # aún no es el chunk final
+        text = text.strip()
+        if not text:
+            return
+
+        with self._pending_lock:
+            if not self._pending:
+                return
+            chat_id, thread_id = self._pending.popleft()
+        self._send_async(chat_id, text, thread_id=thread_id)
 
     def _maybe_forward_orion_reply(self, payload: dict) -> None:
         """Si llega un log de Orion y tenemos un chat pendiente, lo
