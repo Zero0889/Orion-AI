@@ -933,42 +933,14 @@ export interface MCPRecipe {
 
 // ── Access control (huella + Telegram) ────────────────────────────────
 // Mapping huella↔persona + registros crudos + reporte diario.
+//
+// Estos tipos se exportan como re-mapeo de `Schemas[...]` autogenerados
+// desde el OpenAPI del backend (ver `routes/access.py::AccessUserOut`,
+// `AccessEventOut`, etc.). Si el backend renombra un campo, TS marca
+// drift en el siguiente `npm run gen:api`.
 
-export interface AccessUser {
-  id: string;
-  fingerprint_id: number; // 0-127, slot del AS608
-  name: string;
-  phone: string;
-  active: boolean;
-  created: string;
-}
-
-export type AccessEventType = "GRANTED" | "DENIED" | "ENROLLED";
-
-export interface AccessEvent {
-  id: string;
-  fingerprint_id: number; // -1 si el sensor no reconoció
-  event_type: AccessEventType;
-  esp_id: string;
-  confidence: number;
-  timestamp: string;
-  user_name: string | null;
-}
-
-export interface AccessEventsPage {
-  items: AccessEvent[];
-  total: number;
-  limit: number;
-  offset: number;
-}
-
-export interface AccessDailyRow {
-  fingerprint_id: number;
-  name: string;
-  fecha: string; // YYYY-MM-DD
-  entrada: string; // HH:MM
-  salida: string; // HH:MM
-  tiempo_minutos: number;
-  tiempo_legible: string; // "8 h 57 min"
-  eventos_dia: number;
-}
+export type AccessUser = Schemas["AccessUserOut"];
+export type AccessEvent = Schemas["AccessEventOut"];
+export type AccessEventType = AccessEvent["event_type"];
+export type AccessEventsPage = Schemas["AccessEventsPageOut"];
+export type AccessDailyRow = Schemas["AccessDailyRowOut"];

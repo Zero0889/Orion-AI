@@ -69,16 +69,61 @@ class EventIn(BaseModel):
     confidence: int = Field(default=0, ge=0, le=10_000)
 
 
+# ── Response models (para que aparezcan en el OpenAPI y se generen
+#    como Schemas[] en el frontend) ──────────────────────────────────────
+
+
+class AccessUserOut(BaseModel):
+    id: str
+    fingerprint_id: int
+    name: str
+    phone: str
+    active: bool
+    created: str
+
+
+class AccessEventOut(BaseModel):
+    id: str
+    fingerprint_id: int  # -1 si el sensor no reconoció
+    event_type: Literal["GRANTED", "DENIED", "ENROLLED"]
+    esp_id: str
+    confidence: int
+    timestamp: str
+    user_name: str | None
+
+
+class AccessEventsPageOut(BaseModel):
+    items: list[AccessEventOut]
+    total: int
+    limit: int
+    offset: int
+
+
+class AccessEventsCountOut(BaseModel):
+    count: int
+
+
+class AccessDailyRowOut(BaseModel):
+    fingerprint_id: int
+    name: str
+    fecha: str  # YYYY-MM-DD
+    entrada: str  # HH:MM
+    salida: str  # HH:MM
+    tiempo_minutos: int
+    tiempo_legible: str  # "8 h 57 min"
+    eventos_dia: int
+
+
 # ── Users ────────────────────────────────────────────────────────────────
 
 
-@router.get("/users")
-def list_users() -> list[dict]:
+@router.get("/users", response_model=list[AccessUserOut])
+def list_users():
     return [u.to_dict() for u in ac.list_users()]
 
 
-@router.post("/users", status_code=201)
-def create_user(body: UserCreate, request: Request) -> dict:
+@router.post("/users", status_code=201, response_model=AccessUserOut)
+def create_user(body: UserCreate, request: Request):
     try:
         user = ac.add_user(
             fingerprint_id=body.fingerprint_id,
@@ -92,8 +137,8 @@ def create_user(body: UserCreate, request: Request) -> dict:
     return user.to_dict()
 
 
-@router.patch("/users/{user_id}")
-def patch_user(user_id: str, body: UserUpdate, request: Request) -> dict:
+@router.patch("/users/{user_id}", response_model=AccessUserOut)
+def patch_user(user_id: str, body: UserUpdate, request: Request):
     try:
         user = ac.update_user(
             user_id,
@@ -122,8 +167,8 @@ def remove_user(user_id: str, request: Request) -> None:
 # ── Events ───────────────────────────────────────────────────────────────
 
 
-@router.post("/event", status_code=201)
-def post_event(body: EventIn, request: Request) -> dict:
+@router.post("/event", status_code=201, response_model=AccessEventOut)
+def post_event(body: EventIn, request: Request):
     """Endpoint que el ESP32 invoca después de cada lectura del AS608."""
     try:
         ev = ac.record_event(
@@ -139,14 +184,14 @@ def post_event(body: EventIn, request: Request) -> dict:
     return ev.to_dict()
 
 
-@router.get("/events")
+@router.get("/events", response_model=AccessEventsPageOut)
 def get_events(
     limit: int = Query(default=100, ge=1, le=1000),
     offset: int = Query(default=0, ge=0),
     fingerprint_id: int | None = Query(default=None, ge=-1, le=127),
     since: str | None = Query(default=None, description="ISO timestamp; >= since"),
     event_type: str | None = Query(default=None),
-) -> dict:
+):
     et: ac.EventType | None = None
     if event_type:
         if event_type not in ac.VALID_EVENT_TYPES:
@@ -159,19 +204,19 @@ def get_events(
     return {"items": [e.to_dict() for e in items], "total": total, "limit": limit, "offset": offset}
 
 
-@router.get("/events/count")
-def events_count() -> dict:
+@router.get("/events/count", response_model=AccessEventsCountOut)
+def events_count():
     return {"count": ac.count_events()}
 
 
 # ── Reporte diario (la "tabla excel") ────────────────────────────────────
 
 
-@router.get("/daily")
+@router.get("/daily", response_model=list[AccessDailyRowOut])
 def daily(
     since: str | None = Query(default=None, description="YYYY-MM-DD; >= since"),
     fingerprint_id: int | None = Query(default=None, ge=0, le=127),
-) -> list[dict]:
+):
     return [r.to_dict() for r in ac.daily_report(since=since, fingerprint_id=fingerprint_id)]
 
 

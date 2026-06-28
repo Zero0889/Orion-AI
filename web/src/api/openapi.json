@@ -1,6 +1,191 @@
 {
   "components": {
     "schemas": {
+      "AccessDailyRowOut": {
+        "properties": {
+          "entrada": {
+            "title": "Entrada",
+            "type": "string"
+          },
+          "eventos_dia": {
+            "title": "Eventos Dia",
+            "type": "integer"
+          },
+          "fecha": {
+            "title": "Fecha",
+            "type": "string"
+          },
+          "fingerprint_id": {
+            "title": "Fingerprint Id",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "salida": {
+            "title": "Salida",
+            "type": "string"
+          },
+          "tiempo_legible": {
+            "title": "Tiempo Legible",
+            "type": "string"
+          },
+          "tiempo_minutos": {
+            "title": "Tiempo Minutos",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "fingerprint_id",
+          "name",
+          "fecha",
+          "entrada",
+          "salida",
+          "tiempo_minutos",
+          "tiempo_legible",
+          "eventos_dia"
+        ],
+        "title": "AccessDailyRowOut",
+        "type": "object"
+      },
+      "AccessEventOut": {
+        "properties": {
+          "confidence": {
+            "title": "Confidence",
+            "type": "integer"
+          },
+          "esp_id": {
+            "title": "Esp Id",
+            "type": "string"
+          },
+          "event_type": {
+            "enum": [
+              "GRANTED",
+              "DENIED",
+              "ENROLLED"
+            ],
+            "title": "Event Type",
+            "type": "string"
+          },
+          "fingerprint_id": {
+            "title": "Fingerprint Id",
+            "type": "integer"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "timestamp": {
+            "title": "Timestamp",
+            "type": "string"
+          },
+          "user_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "User Name"
+          }
+        },
+        "required": [
+          "id",
+          "fingerprint_id",
+          "event_type",
+          "esp_id",
+          "confidence",
+          "timestamp",
+          "user_name"
+        ],
+        "title": "AccessEventOut",
+        "type": "object"
+      },
+      "AccessEventsCountOut": {
+        "properties": {
+          "count": {
+            "title": "Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "count"
+        ],
+        "title": "AccessEventsCountOut",
+        "type": "object"
+      },
+      "AccessEventsPageOut": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AccessEventOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "limit": {
+            "title": "Limit",
+            "type": "integer"
+          },
+          "offset": {
+            "title": "Offset",
+            "type": "integer"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "total",
+          "limit",
+          "offset"
+        ],
+        "title": "AccessEventsPageOut",
+        "type": "object"
+      },
+      "AccessUserOut": {
+        "properties": {
+          "active": {
+            "title": "Active",
+            "type": "boolean"
+          },
+          "created": {
+            "title": "Created",
+            "type": "string"
+          },
+          "fingerprint_id": {
+            "title": "Fingerprint Id",
+            "type": "integer"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "phone": {
+            "title": "Phone",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "fingerprint_id",
+          "name",
+          "phone",
+          "active",
+          "created"
+        ],
+        "title": "AccessUserOut",
+        "type": "object"
+      },
       "AgentChatBody": {
         "properties": {
           "history": {
@@ -1367,8 +1552,7 @@
               "application/json": {
                 "schema": {
                   "items": {
-                    "additionalProperties": true,
-                    "type": "object"
+                    "$ref": "#/components/schemas/AccessDailyRowOut"
                   },
                   "title": "Response Daily Api Access Daily Get",
                   "type": "array"
@@ -1413,9 +1597,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Post Event Api Access Event Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/AccessEventOut"
                 }
               }
             },
@@ -1523,9 +1705,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Get Events Api Access Events Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/AccessEventsPageOut"
                 }
               }
             },
@@ -1556,9 +1736,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Events Count Api Access Events Count Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/AccessEventsCountOut"
                 }
               }
             },
@@ -1675,8 +1853,7 @@
               "application/json": {
                 "schema": {
                   "items": {
-                    "additionalProperties": true,
-                    "type": "object"
+                    "$ref": "#/components/schemas/AccessUserOut"
                   },
                   "title": "Response List Users Api Access Users Get",
                   "type": "array"
@@ -1708,9 +1885,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Create User Api Access Users Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/AccessUserOut"
                 }
               }
             },
@@ -1795,9 +1970,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Patch User Api Access Users  User Id  Patch",
-                  "type": "object"
+                  "$ref": "#/components/schemas/AccessUserOut"
                 }
               }
             },

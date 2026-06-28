@@ -1923,6 +1923,76 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
   schemas: {
+    /** AccessDailyRowOut */
+    AccessDailyRowOut: {
+      /** Entrada */
+      entrada: string;
+      /** Eventos Dia */
+      eventos_dia: number;
+      /** Fecha */
+      fecha: string;
+      /** Fingerprint Id */
+      fingerprint_id: number;
+      /** Name */
+      name: string;
+      /** Salida */
+      salida: string;
+      /** Tiempo Legible */
+      tiempo_legible: string;
+      /** Tiempo Minutos */
+      tiempo_minutos: number;
+    };
+    /** AccessEventOut */
+    AccessEventOut: {
+      /** Confidence */
+      confidence: number;
+      /** Esp Id */
+      esp_id: string;
+      /**
+       * Event Type
+       * @enum {string}
+       */
+      event_type: "GRANTED" | "DENIED" | "ENROLLED";
+      /** Fingerprint Id */
+      fingerprint_id: number;
+      /** Id */
+      id: string;
+      /** Timestamp */
+      timestamp: string;
+      /** User Name */
+      user_name: string | null;
+    };
+    /** AccessEventsCountOut */
+    AccessEventsCountOut: {
+      /** Count */
+      count: number;
+    };
+    /** AccessEventsPageOut */
+    AccessEventsPageOut: {
+      /** Items */
+      items: components["schemas"]["AccessEventOut"][];
+      /** Limit */
+      limit: number;
+      /** Offset */
+      offset: number;
+      /** Total */
+      total: number;
+    };
+    /** AccessUserOut */
+    AccessUserOut: {
+      /** Active */
+      active: boolean;
+      /** Created */
+      created: string;
+      /** Fingerprint Id */
+      fingerprint_id: number;
+      /** Id */
+      id: string;
+      /** Name */
+      name: string;
+      /** Phone */
+      phone: string;
+    };
     /** AgentChatBody */
     AgentChatBody: {
       /** History */
@@ -2459,9 +2529,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          "application/json": {
-            [key: string]: unknown;
-          }[];
+          "application/json": components["schemas"]["AccessDailyRowOut"][];
         };
       };
       /** @description Validation Error */
@@ -2494,9 +2562,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          "application/json": {
-            [key: string]: unknown;
-          };
+          "application/json": components["schemas"]["AccessEventOut"];
         };
       };
       /** @description Validation Error */
@@ -2532,9 +2598,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          "application/json": {
-            [key: string]: unknown;
-          };
+          "application/json": components["schemas"]["AccessEventsPageOut"];
         };
       };
       /** @description Validation Error */
@@ -2563,9 +2627,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          "application/json": {
-            [key: string]: unknown;
-          };
+          "application/json": components["schemas"]["AccessEventsCountOut"];
         };
       };
     };
@@ -2647,9 +2709,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          "application/json": {
-            [key: string]: unknown;
-          }[];
+          "application/json": components["schemas"]["AccessUserOut"][];
         };
       };
     };
@@ -2673,9 +2733,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          "application/json": {
-            [key: string]: unknown;
-          };
+          "application/json": components["schemas"]["AccessUserOut"];
         };
       };
       /** @description Validation Error */
@@ -2739,9 +2797,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          "application/json": {
-            [key: string]: unknown;
-          };
+          "application/json": components["schemas"]["AccessUserOut"];
         };
       };
       /** @description Validation Error */
