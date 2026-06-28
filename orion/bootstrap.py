@@ -66,11 +66,53 @@ except Exception as _e:
     log.warning("No pude extender PATH con tools/: %s", _e)
 
 
+def _check_port_free(host: str, port: int) -> bool:
+    """``True`` si nadie está escuchando ``port`` en ``host``.
+
+    Probamos haciendo ``bind()`` a un socket. Si tira ``EADDRINUSE``, hay
+    otro Orion (o algo) ocupando el puerto — devolvemos ``False``. El
+    socket se cierra inmediatamente, no deja huella.
+
+    Si el host es ``0.0.0.0`` (default), chequeamos ``127.0.0.1``: si el
+    loopback está ocupado, también lo está el ``0.0.0.0`` (overlap).
+    """
+    import socket
+
+    probe_host = "127.0.0.1" if host in ("0.0.0.0", "::") else host
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    try:
+        s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        s.bind((probe_host, port))
+        return True
+    except OSError:
+        return False
+    finally:
+        s.close()
+
+
 def _build_uvicorn_server(bus):
     """Devuelve un ``uvicorn.Server`` listo para servir el backend Orion."""
     import uvicorn
 
     from orion.server.app import DEFAULT_HOST, DEFAULT_PORT, build_app
+
+    # Refuse to start if another Orion is already bound to the port.
+    # Sin este check, dos instancias compiten por el bot de Telegram con
+    # ``getUpdates`` y Telegram tira ``409 Conflict`` cada 5 segundos.
+    # Mejor abortar acá con un mensaje claro.
+    if not _check_port_free(DEFAULT_HOST, DEFAULT_PORT):
+        msg = (
+            f"\n❌  Puerto {DEFAULT_PORT} ya está en uso.\n"
+            f"    Probablemente hay otra instancia de Orion corriendo (o un\n"
+            f"    proceso python.exe huérfano de una sesión anterior).\n\n"
+            f"    Soluciones:\n"
+            f"      · Cerrá la otra terminal de Orion (Ctrl+C).\n"
+            f"      · O matá todos los python: taskkill /F /IM python.exe\n"
+            f"      · Después volvé a correr orion.bat.\n"
+        )
+        log.error("Puerto %d ocupado — abortando arranque", DEFAULT_PORT)
+        print(msg, file=sys.stderr)
+        raise SystemExit(1)
 
     app = build_app(bus)
     config = uvicorn.Config(
