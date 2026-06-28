@@ -303,17 +303,12 @@ lint + build` pueden estar verdes con bugs sutiles de runtime (stale
 closures, state que no se preserva al cambiar de vista, hook order, props
 mal pasados).
 
-### 🟡 Pendientes que NECESITAN acción del usuario
-1. **Validación visual de los 4 god-files post-split + los 8 paneles
-   migrados a TanStack Query + Eye/CommandPalette en su nueva
-   ubicación.** Hacer en el primer `npm run dev` post-pull. Si algo
-   rompe: screenshot + qué panel + qué interacción.
-2. **Decidir si borrar `backup-pre-filter-repo` del remoto.** Quedó como
-   safety net post-rewrite del history. Cuando estés seguro de que
-   nada se rompió: `git push origin --delete backup-pre-filter-repo`.
-3. **Migrar interfaces manuales en `web/src/api/rest.ts` a `Schemas["..."]`**
-   (auto-generados desde OpenAPI por Fase 3D). Hacelo oportunístico cuando
-   toques un panel — no vale la pena un PR dedicado.
+### 🟡 Pendientes acumulados
+Ver lista consolidada en **§15 Pendientes acumulados (próximas sesiones)**
+al final del documento. Incluye los pendientes históricos (validación
+visual, `backup-pre-filter-repo`, migrar interfaces a `Schemas`) + los
+nuevos de Fases 5/6/7 (flashar ESP32, fases 2/3 del supergrupo, push de
+commits acumulados, decisión sobre `_design_brief/`).
 
 ---
 
@@ -329,85 +324,129 @@ O.R.I.O.N/
 │
 ├── orion/                        # ← Paquete principal (Fase 2). Entry: `python -m orion`.
 │   ├── __init__.py
-│   ├── __main__.py               # was main.py. 1245 LOC, candidato a split en Fase 3 (R3).
-│   ├── actions/                  # Tools que Gemini puede invocar.
-│   │   ├── live_stubs.py         # Stubs Live-only (agent_task, shutdown, quick_note, save_memory).
-│   │   ├── notifications/store.py # SQLite-backed (Fase 3B).
-│   │   ├── iot/control.py        # iot_control() — entry point IoT.
-│   │   └── *.py                  # Cada uno tiene @tool(...) sobre su entrypoint.
+│   ├── __main__.py               # was main.py. 24 LOC thin entry (Fase 3 R3).
+│   ├── bootstrap.py              # main() + uvicorn build + _check_port_free (Fase 6).
+│   ├── runtime.py                # OrionLive(LiveSessionMixin, AudioMixin).
+│   ├── audio.py + live_session.py + _helpers.py  # Mixins de runtime (Fase 3 R3).
+│   ├── actions/live_stubs.py     # Stubs Live-only (agent_task, shutdown, quick_note, save_memory).
+│   ├── adapters/                 # Tools de cada dominio (Fase 3 R5).
+│   │   ├── system/               # 16 archivos — host PC (files, processes, screen, dev tooling, etc.).
+│   │   ├── google/
+│   │   │   ├── classroom.py      # google-auth directo. token.json en tools/classroom/.
+│   │   │   ├── notebooklm_research.py
+│   │   │   ├── google_drive.py
+│   │   │   └── notifications/
+│   │   │       ├── gmail.py      # google-auth directo (Fase 7). token.json en tools/gmail/.
+│   │   │       ├── classroom.py  # Idem patrón.
+│   │   │       └── poller.py     # Loop genérico; tiene adapters Gmail+Classroom.
+│   │   ├── web/                  # 5 (browser, search, youtube, flights, weather).
+│   │   ├── iot/                  # devices/scenes/sensors/transports + sheets_sync.py (usa gog).
+│   │   │   ├── access_control.py # Fase 5: tablas users + events + VIEW daily.
+│   │   │   └── ...
+│   │   └── messaging/
+│   │       └── telegram.py       # TelegramClient + TelegramConfig + TelegramGroupConfig (Fase 6).
 │   ├── agent/                    # Planner + executor + task queue + orchestra.
-│   ├── cli/
-│   │   └── debug.py              # was run_debug.py. Wrappers logging stdout/stderr.
-│   ├── config/                   # Schema loaders + helpers de OS (sin .json — esos en root config/).
-│   │   ├── __init__.py           # BASE_DIR, MEMORY_PATH, SQLITE_DB_PATH, DATA_DIR. BASE_DIR usa 3 .parent.
+│   ├── cli/debug.py              # was run_debug.py.
+│   ├── config/                   # Schema loaders + helpers (sin .json — esos en root config/).
+│   │   ├── __init__.py           # BASE_DIR, MEMORY_PATH, SQLITE_DB_PATH, DATA_DIR, CONFIG_DIR.
 │   │   └── theme*.py
 │   ├── core/
 │   │   ├── tool_registry.py      # @tool, @live_only_tool, auto_discover_tools (Fase 3A).
-│   │   ├── tools_bootstrap.py    # ~170 LOC — auto_discover_tools("orion.actions").
+│   │   ├── tools_bootstrap.py    # ~170 LOC — auto_discover_tools("orion.adapters").
 │   │   ├── logger.py             # `_SecretFilter` enmascara keys (Fase 1).
-│   │   ├── llm/*.py              # Provider abstraction (gemini, openai-compat).
+│   │   ├── correlation.py        # ContextVar corr_id (Fase 3).
+│   │   ├── client_context.py     # set_last_client(ClientInfo) — usado por telegram_bridge.
+│   │   ├── llm/*.py              # Provider abstraction (gemini, openai-compat, ollama, ollama_cloud).
+│   │   ├── chat_brain.py         # is_live_brain() + invocación del cerebro configurable.
 │   │   └── mcp_*.py              # MCP client + recipes.
-│   ├── domain/
-│   │   └── memory/               # was memory/*.py
-│   │       ├── quick_notes.py    # SQLite (Fase 3B). API: list/add/update/delete/count.
-│   │       ├── conversations.py  # SQLite + ConversationSession.
-│   │       └── memory_manager.py # SQLite. API: load/save/update/format_for_prompt.
+│   ├── domain/memory/            # quick_notes / conversations / memory_manager — todos SQLite (Fase 3B).
 │   ├── plugins/                  # Plugin system (base + example_plugin).
 │   ├── server/
-│   │   ├── app.py                # FastAPI app builder. CORS limitado a localhost+Tailscale.
+│   │   ├── app.py                # FastAPI app builder + middleware install.
+│   │   ├── bootstrap.py
 │   │   ├── event_bus.py          # OrionEventBus (in-proc + WS broadcast).
-│   │   ├── sharing.py            # Middleware: 127/8 + Tailscale 100.64/10.
+│   │   ├── sharing.py            # Middleware IP filter + bypass autenticado (Fase 5).
+│   │   ├── access_auth.py        # Shared-secret + is_authed_request (Fase 5).
+│   │   ├── telegram_bridge.py    # Long-poll inbound + outbound a chat/topics (Fase 6).
+│   │   ├── ws.py                 # WS drain loop + heartbeat.
+│   │   ├── telemetry.py          # Telemetry broadcaster.
 │   │   └── routes/               # /api/* endpoints.
-│   ├── storage/                  # SQLite layer (Fase 3B).
-│   │   └── sqlite_db.py          # get_connection() singleton + override_db_path_for_tests().
+│   │       ├── access.py         # Fase 5: CRUD users + POST event + reports + export.
+│   │       ├── telegram.py       # Fase 6: status + manage del bridge.
+│   │       ├── notifications.py  # poller + mark-read + autorización Classroom.
+│   │       └── *.py              # Resto (mcp, agent, skills, iot, memory, ...).
+│   ├── storage/sqlite_db.py      # get_connection() singleton (Fase 3B).
 │   └── utils/cache.py            # ttl_cache decorator.
 │
-├── config/                       # Solo DATA: .json (api_keys, mcp_servers, etc.). Sin código.
-│   ├── *.example.json            # Templates (gitignored los reales).
+├── arduino/                      # Sketches ESP32 (Arduino IDE).
+│   ├── dht_bh1750_sensores/      # IoT sensores DHT22 + BH1750.
+│   ├── access_control_fingerprint/  # Fase 5: huella AS608 → POST /api/access/event.
+│   ├── focos_lm35/, gps_neo6m_bridge/, wifi_scanner/  # Otros.
+│   └── *.ino
+│
+├── config/                       # Solo DATA: .json. Sin código (Fase 2).
+│   ├── *.example.json            # Templates versionados.
 │   ├── api_keys.json             # Secreto — gitignored.
-│   └── credentials.json          # Secreto — gitignored.
+│   ├── credentials.json          # Secreto — gitignored.
+│   ├── telegram.json             # bot_token + chat_id + group{chat_id,topics} — gitignored.
+│   └── access.json               # shared_secret para ESP32 — gitignored.
 │
 ├── data/                         # State runtime (gitignored).
-│   ├── orion.sqlite              # Todas las tablas de Fase 3B.
-│   ├── iot_sensor_log.csv        # was memory/. Sensor datalog.
+│   ├── orion.sqlite              # Todas las tablas (Fase 3B + Fase 5).
+│   ├── iot_sensor_log.csv        # Sensor datalog.
 │   └── conversations.json        # Legacy pre-SQLite, queda como export.
 │
 ├── scripts/
 │   ├── dump_openapi.py           # → web/src/api/openapi.json (Fase 3D).
-│   └── audit_mobile.py           # Playwright audit del mobile (412x915).
+│   └── audit_mobile.py           # Playwright audit del mobile 412×915 (Fase 6).
+│
+├── tools/                        # Binarios auxiliares + tokens OAuth (gitignored).
+│   ├── gog/                      # CLI gog (auto-instalado por core.cli_installer).
+│   ├── classroom/                # client_secret.json + token.json (google-auth).
+│   └── gmail/                    # token.json (google-auth, Fase 7).
 │
 ├── tests/
-│   ├── conftest.py               # Fixture autouse: SQLite tmp + mock sounddevice + extend SAFE_ROOTS.
-│   ├── test_security_hardening.py    # 22 tests (Fase 1).
-│   ├── test_logger_secret_filter.py  # 9 tests (Fase 1).
-│   ├── test_notification_store_sqlite.py  # 15 tests (Fase 3B).
-│   └── test_*.py                 # 333 total al cierre de Fase 3B.
+│   ├── conftest.py               # Fixture autouse: SQLite tmp + mock sounddevice + extend SAFE_ROOTS + access_control reset (Fase 5).
+│   ├── test_security_hardening.py        # 22 tests (Fase 1).
+│   ├── test_logger_secret_filter.py      # 9 tests (Fase 1).
+│   ├── test_notification_store_sqlite.py # 15 tests (Fase 3B).
+│   ├── test_access_event_auth.py         # 8 tests del bypass autenticado (Fase 5).
+│   ├── test_telegram_topic_routing.py    # 15 tests del routing por topic (Fase 6).
+│   └── test_*.py                 # 405 total al cierre de Fase 7.
 │
 └── web/
     ├── package.json              # scripts: dev, build, lint, format, typecheck, test/test:run, gen:api, gen:api:check.
     ├── eslint.config.js          # ESLint flat config v9.
     ├── .prettierrc.json          # printWidth 100, single line endings (lf), trailing commas (all).
     ├── .prettierignore           # Excluye openapi.json (generado).
+    ├── public/
+    │   ├── manifest.webmanifest  # PWA mobile (Fase 6).
+    │   └── sw.js                 # Service worker básico.
     ├── scripts/check-api-types-fresh.mjs  # CI drift detection (Fase 3D).
     └── src/
         ├── api/
-        │   ├── rest.ts           # Cliente HTTP. Expone `Schemas`, `ApiPaths`.
+        │   ├── rest.ts           # Cliente HTTP. Expone `Schemas`, `ApiPaths`. Incluye `access*` helpers.
         │   ├── ws.ts             # WS client (auto-reconnect).
         │   ├── openapi.json      # Generado — NO editar a mano.
-        │   └── generated.ts      # 4538 LOC de tipos TS — NO editar.
+        │   └── generated.ts      # 4538+ LOC de tipos TS — NO editar.
         ├── query/
-        │   ├── client.ts         # QueryClient singleton — montado por main.tsx + importado por el bridge WS.
-        │   └── keys.ts           # QUERY_KEYS central — usado por hooks de paneles y por el bridge.
-        ├── components/           # Piezas reutilizables del shell (Sidebar, TopBar, Toaster, paneles). MCPPanel/, DeviceFormModal/, IoTPanel/, AgentsPanel/ son carpetas con index.tsx + subarchivos. Cada carpeta puede incluir `*.test.ts(x)` y `__snapshots__/`.
-        ├── widgets/              # Features cohesivas auto-contenidas (vs. components/).
-        │   ├── eye/              # Ojo de Orion: BackgroundEye + EyeCore + hooks + pulse store interno.
-        │   └── command-palette/  # Cmd+K palette + useCommandPalette store inline.
-        ├── stores/orion.ts       # Zustand store. Dedup de chat (post-fix `8664938`). Bridge WS→invalidateQueries en applyEvent.
+        │   ├── client.ts         # QueryClient singleton.
+        │   └── keys.ts           # QUERY_KEYS central. Incluye `access.{users,events,daily,all}` (Fase 5).
+        ├── components/           # Piezas del shell. MCPPanel/, DeviceFormModal/, IoTPanel/, AgentsPanel/, AccessPanel/ son carpetas con index.tsx + subarchivos.
+        │   └── AccessPanel/      # Fase 5: index.tsx + DailyReportTab + EventsTab + UsersTab.
+        ├── widgets/
+        │   ├── eye/              # BackgroundEye + EyeCore + hooks + pulse store.
+        │   └── command-palette/  # Cmd+K + useCommandPalette store.
+        ├── stores/orion.ts       # Zustand. Bridge WS→invalidateQueries en applyEvent (incluye access.event y access.user_changed).
+        ├── hooks/
+        │   ├── useIsMobile.ts    # Hook responsive (Fase 6).
+        │   └── useOrionSocket.ts
+        ├── audio/audioPlayer.ts  # Audio mobile (Fase 6).
         ├── test/
-        │   ├── setup.ts          # Vitest setup global — registra matchers de jest-dom + cleanup() de RTL.
-        │   └── renderWithQuery.tsx  # Helper RTL para componentes que usan useQuery (QueryClient fresco por test).
-        ├── types.ts              # ChatMessage, ConnectionStatus, etc.
-        └── App.tsx
+        │   ├── setup.ts          # Vitest setup global.
+        │   └── renderWithQuery.tsx
+        ├── types.ts
+        └── App.tsx               # Routea AccessPanel cuando view==="access".
 ```
 
 ---
@@ -418,11 +457,11 @@ El push a `main` dispara `.github/workflows/ci.yml` con 7 jobs:
 
 | Job | Cuándo se enoja |
 |---|---|
-| **Python (3.11 / ubuntu-latest)** | ruff lint/format, mypy strict en módulos críticos, pytest 333 tests |
+| **Python (3.11 / ubuntu-latest)** | ruff lint/format, mypy strict en módulos críticos, pytest 405 tests |
 | **Python (3.12 / ubuntu-latest)** | idem en Python 3.12 |
 | **Python (3.11 / windows-latest)** | idem cross-platform (captura bugs de `os.replace` cross-volume, etc.) |
 | **Python (3.12 / windows-latest)** | idem |
-| **Web (Node 20)** | tsc, eslint `--max-warnings=0`, prettier `--check`, vitest (47 tests), vite build |
+| **Web (Node 20)** | tsc, eslint `--max-warnings=0`, prettier `--check`, vitest (71 tests), vite build |
 | **Web (Node 22)** | idem |
 | **Gitleaks** | escanea diff por API keys, OAuth tokens, JWTs |
 | **API types fresh** | `gen:api:check` — falla si backend cambió un schema y nadie regeneró `generated.ts` |
@@ -493,6 +532,12 @@ gh run view --job <job-id> --log-failed   # detalle de un job en rojo
 | Hook prettier reformatea `notifications_store.json` cada commit | Runtime mutator + auto-fix | `.pre-commit-config.yaml` excluye archivos de state runtime |
 | Tools decoradas se "olvidan" tras `ToolRegistry._reset()` | Decoradores Python corren solo 1× por proceso | Cache `_DECORATED_TOOLS` + `_replay_decorated()` en `auto_discover_tools` |
 | Mensajes de chat aparecen dos veces | `main.py` emitía `write_log` además de `chat.stream(final=True)` | `persist_log_only` + dedup frontend con walk-backwards (fix `8664938`) |
+| Telegram tira `HTTP 409 Conflict: terminated by other getUpdates request` cada 5s | 2 instancias de Orion polleando el mismo bot | `_check_port_free` en `bootstrap.py` aborta el arranque si :8765 ocupado (Fase 6) |
+| `gog gmail search` falla con "OAuth client credentials missing" o "No auth for gmail" desde Orion pero funciona desde terminal | Bug ambiguo de propagación de env vars en subprocess en Windows con file-keyring backend de gog | Reescribir adapter en `google-auth` directo (`gmail.py` Fase 7). Mismo patrón sirve para Drive/Calendar si pasa lo mismo. |
+| ESP32 en LAN recibe 403 al postear a `/api/access/event` | `SharingMiddleware` solo permite loopback + Tailscale | Header `X-Orion-Access-Token` con el secret de `config/access.json` hace bypass autenticado (Fase 5). |
+| Drawer mobile no recibe clicks; backdrop intercepta todo | Stacking context: `<aside z-40>` adentro de wrapper `z-10`, backdrop `z-30` sibling del wrapper → backdrop arriba del aside | Sidebar mobile sale del wrapper como sibling fixed; `renderSidebarContents()` reutilizable (Fase 6). |
+| Texto del SectionHeader se rompe letra-por-letra en mobile | Título flex con acción a la derecha → solo ~100px para el title | Stack vertical (`flex-col sm:flex-row`) + padding reducido en mobile (Fase 6). |
+| Tests SQLite del access_control fallan con "no such table: access_events" | `_initialized = True` cacheado entre tests porque la fixture autouse reapunta el DB path pero no resetea el flag | `_reset_for_tests()` en `access_control.py` + registrado en `conftest.py::_isolated_sqlite_db` (Fase 5). |
 
 ---
 
@@ -501,8 +546,13 @@ gh run view --job <job-id> --log-failed   # detalle de un job en rojo
 - Quiere usar Orion desde **celular/reloj/tablet** eventualmente, no solo PC. Por eso R1 y R2 (sacar `exec()` y `shell=True` con input LLM) fueron innegociables.
 - Acepta el trade-off "opción A" cuando la "opción B surgical" no vale el costo (ej: commitear format baseline mezclado con lógica en vez de hacer la cirugía git de separarlos).
 - Quiere **honestidad sobre alcance**: prefiere "esto es trabajo de otra sesión" antes que apurar refactors riesgosos.
-- Pide validación visual para cambios de UI (Fase 3C necesita `npm run dev` + browser).
+- Pide validación visual para cambios de UI. `npm run dev` + browser real, los checks de tsc/lint/build pueden estar verdes con bugs sutiles de runtime.
 - Las **transcripciones árabes/persas** en la voz son cosa de Gemini Live STT (no del código), no perder tiempo intentando arreglarlas en el código.
+- **Caso de uso STEM:** Orion es asistente personal **+ sistema de seguridad doméstica** (huella ESP32 + Telegram). Para informes técnicos enfocarse en el ángulo de seguridad porque tiene métricas medibles (latencia ESP32→Telegram, tasa AS608, etc.). El resto del sistema queda como "plataforma donde se monta el caso".
+- **Multi-recipient en Telegram:** preferencia validada por **supergrupo con topics** sobre lista global de chat_ids. Más flexible (agregar/sacar gente del grupo sin código) y permite separar tipos de notif (Acceso, Estado, Comandos, Chat) en topics distintos.
+- **Privacidad:** **el `client_secret` de Desktop apps de Google es semi-público por diseño** (va embebido en binarios distribuidos). El user lo entendió y aceptó pegarlo en chat para configurarlo. El verdadero secreto es el refresh token, que vive en disco (`tools/<service>/token.json`).
+- **Empaquetado:** decisión deliberada de NO mantener Tauri/PyInstaller. Si en algún futuro hay que recuperarlo, está en el git history pre-`4146ac3`.
+- **`orion.bat` NO debe tener credenciales hardcoded.** Si algún día el bypass de google-auth (Fase 7) no alcanza y hay que volver a env vars, usar `config/<x>.env` gitignored — no editar `orion.bat`.
 
 ---
 
@@ -512,25 +562,41 @@ Comandos para verificar que todo está sano:
 
 ```bash
 # Backend
-python -m pytest -q --no-header                # esperar 333+ passing
+python -m pytest -q --no-header                # esperar 405 passing
 python -m ruff check .                         # All checks passed
 python -m ruff format --check .                # already formatted
-python -m mypy --follow-imports=silent core/logger.py core/tool_registry.py core/llm/base.py server/app.py server/event_bus.py server/sharing.py server/telemetry.py
+python -m mypy --follow-imports=silent orion/core/logger.py orion/core/tool_registry.py orion/core/llm/base.py orion/server/app.py orion/server/event_bus.py orion/server/sharing.py orion/server/telemetry.py
 
 # Frontend
 cd web
 npm run typecheck                              # ok
 npm run lint                                   # 0 errors
 npm run format:check                           # All matched files use Prettier code style!
-npm run test:run                               # 47 tests passing en 6 archivos
+npm run test:run                               # 71 tests passing en 9 archivos
 npm run gen:api:check                          # API types están al día
-npm run build                                  # built in ~3s
+npm run build                                  # built in ~10s
 
 # CI
 gh run list --limit 3                          # último commit en verde
 ```
 
-Si todo verde: el refactor mayor del audit está **completo** (Fases 1, 2, 3A, 3B, 3D, 4 cerradas). Las próximas sesiones se ocupan de features nuevas o lo que el user pida. Si CI rojo: ver §4.
+Si todo verde: el refactor mayor del audit está **completo** (Fases 1, 2,
+3A, 3B, 3D, 4) + **Fase 5** (acceso por huella) + **Fase 6** (Telegram
+topics + bootstrap port-check + mobile UX) + **Fase 7** (Gmail vía
+google-auth). Las próximas sesiones se ocupan de features nuevas o lo
+que el user pida. Si CI rojo: ver §4.
+
+### Checklist rápido al abrir la próxima sesión
+
+1. `git log --oneline -10` — ver últimos commits para contexto.
+2. `git status -s` — ver si hay cambios sin commitear (puede haber un
+   `_design_brief/` untracked desde hace tiempo).
+3. Si hay commits sin push: confirmar con user si quiere `git push origin main`.
+4. Si el user pide algo nuevo:
+   - Si toca **Gmail/Google**: usar el patrón `google-auth` directo (Fase 7), NO `gog`.
+   - Si toca **un dispositivo nuevo (LAN)**: usar el patrón `shared-secret` (Fase 5).
+   - Si toca **mobile**: re-correr `scripts/audit_mobile.py` después de los cambios.
+   - Si toca **Telegram**: respetar el routing por topic (no hardcodear `default_chat_id`).
 
 ---
 
@@ -560,3 +626,385 @@ Cuando todas las "secciones" leen/escriben el mismo conjunto de useState
 **Anti-patrón:** romper Patrón B en sub-componentes por sección requiere
 prop-drilling de 15+ props por hijo o un Context. Ambas opciones son
 complejidad accidental que no paga.
+
+---
+
+## 10. Fase 5 — Sistema de control de acceso por huella (Junio 2026)
+
+Subsistema completo de **biometría doméstica**: ESP32 con sensor AS608 lee
+huellas → POST a Orion → SQLite guarda evento → Telegram notifica al
+topic correcto del supergrupo. Cubre el caso de uso "asistente personal
++ seguridad" que el user quiere para presentación STEM.
+
+### Pipeline end-to-end
+
+```
+┌─────────────────┐    HTTP POST   ┌──────────────────────────────┐
+│  ESP32 + AS608  │ ─────────────► │ POST /api/access/event        │
+│  (LAN, no       │   header:      │  · SharingMiddleware bypass   │
+│   Tailscale)    │   X-Orion-     │    si header válido           │
+│                 │   Access-Token │  · Pydantic body validation   │
+└─────────────────┘                └──────────┬───────────────────┘
+                                              │
+                       ┌──────────────────────┴────────────────────┐
+                       │                                            │
+                ┌──────▼───────┐                          ┌────────▼──────┐
+                │ SQLite:      │                          │ Telegram      │
+                │  access_     │                          │  bridge       │
+                │   users      │                          │  · resolve_   │
+                │  access_     │                          │    topic(     │
+                │   events     │                          │     "access") │
+                │  VIEW        │                          │  · message_   │
+                │   access_    │                          │    thread_id  │
+                │   daily      │                          │  · fallback a │
+                └──────┬───────┘                          │    default_   │
+                       │                                  │    chat_id    │
+                       ▼                                  └───────────────┘
+              ┌────────────────┐
+              │ event_bus      │
+              │  publish       │
+              │  "access.event"│
+              └────────┬───────┘
+                       │
+                  WS → frontend
+                       │
+              ┌────────▼───────┐
+              │ AccessPanel:   │
+              │  invalidación  │
+              │  TanStack      │
+              │  Query keys    │
+              └────────────────┘
+```
+
+### Backend — commit `637bbea feat(access)`
+
+**Adapter:** `orion/adapters/iot/access_control.py`
+- Tablas SQLite (WAL, mismo singleton de Fase 3B):
+  - `access_users (id, fingerprint_id UNIQUE, name, phone, active, created)`
+  - `access_events (id, fingerprint_id, event_type, esp_id, confidence, timestamp)`
+  - `VIEW access_daily` — agrupa GRANTED por usuario+fecha, calcula `entrada`
+    (MIN timestamp), `salida` (MAX timestamp), `tiempo_minutos` (delta).
+    Inferencia: primer GRANTED del día = entrada, último = salida. NO usamos
+    columna `tipo` explícita — más robusto que pedirle estado al ESP32.
+- API pública: `add_user`, `update_user`, `delete_user`, `list_users`,
+  `record_event`, `list_events`, `count_events`, `daily_report`.
+- DTOs frozen + `to_dict()` para serializar a JSON.
+- `_reset_for_tests()` registrado en `conftest.py` para resetear el flag
+  `_initialized` entre tests (igual patrón que los demás stores SQLite).
+
+**Routes:** `orion/server/routes/access.py`
+- CRUD `/api/access/users` — Pydantic models, errores tipados.
+- `POST /api/access/event` — endpoint del ESP32. Llama a `record_event`,
+  publica `access.event` al bus, dispara `_maybe_notify_telegram(ev)`.
+- `GET /api/access/events` — listado paginado con filtros (`fingerprint_id`,
+  `since`, `event_type`).
+- `GET /api/access/daily?since=YYYY-MM-DD` — reporte agrupado.
+- `GET /api/access/export.{csv,xlsx}` — descarga del reporte diario.
+- `_maybe_notify_telegram(ev)` rutea:
+  1. Si `cfg.resolve_topic("access")` devuelve `(chat_id, thread_id)` → topic.
+  2. Sino fallback a `cfg.default_chat_id` (chat privado).
+
+**Shared-secret auth:** `orion/server/access_auth.py`
+- `config/access.json` (gitignored) contiene `{"shared_secret": "<32 bytes url-safe>"}`.
+- Helper `is_authed_request(scope)` chequea: POST + path en `AUTHED_PATHS` +
+  header `X-Orion-Access-Token` matches secret (comparación
+  `hmac.compare_digest` para constant-time).
+- `orion/server/sharing.py::SharingMiddleware` hace bypass al filtro de IP
+  **solo** si `is_authed_request` devuelve True. Resto del backend sigue
+  protegido por loopback + Tailscale.
+- 8 tests en `tests/test_access_event_auth.py` cubren matriz completa
+  (loopback OK, LAN sin/con/bad header, GET no bypassea, etc.).
+
+### Frontend — commit `637bbea` (mismo)
+
+**Panel:** `web/src/components/AccessPanel/`
+- `index.tsx` — shell con 3 tabs + 3 queries TanStack + invalidación WS.
+- `DailyReportTab.tsx` — la "tabla excel" (mobile cards, desktop table).
+- `EventsTab.tsx` — registros crudos paginados.
+- `UsersTab.tsx` — CRUD con `UserFormModal` (validación slot 0-127).
+- Exporta hooks compartidos: `useCreateUser`, `useUpdateUser`, `useDeleteUser`.
+
+**Bridge WS:** `web/src/stores/orion.ts::applyEvent` mapea
+`access.event` y `access.user_changed` → `invalidateQueries(QUERY_KEYS.access.all)`.
+
+**Sidebar entry:** `web/src/components/Sidebar.tsx` agregó
+`{ id: "access", label: "Acceso", icon: "shield" }` en la sección
+"Sistema". `App.tsx` lo routea con `<AccessPanel />` lazy-loaded.
+
+**API helpers:** `web/src/api/rest.ts::api.access*` (createUser, updateUser,
+deleteUser, listEvents, daily) + tipos en `web/src/api/generated.ts`.
+
+### Hardware — `arduino/access_control_fingerprint/`
+
+Sketch ESP32 (Arduino IDE) que:
+- Lee huella vía `Adafruit_Fingerprint` por Serial2.
+- POST JSON a `ORION_URL` con header `X-Orion-Access-Token`.
+- LEDs verde/rojo + buzzer + relé.
+- Reconexión WiFi automática + debounce de 1.5s.
+
+El sketch tiene placeholders `WIFI_SSID`, `WIFI_PASS`, `ORION_URL`,
+`ACCESS_TOKEN` que el user reemplaza antes de flashear.
+
+### Tests
+
+- `tests/test_access_event_auth.py` — 8 tests del bypass autenticado.
+- `tests/test_telegram_topic_routing.py` — 15 tests del routing por topic
+  (`resolve_topic`, `send_message(message_thread_id=...)`, integración con
+  `_maybe_notify_telegram`).
+- Total backend: **405 tests passing** (333 históricos + 23 nuevos
+  access/telegram + 49 acumulados de sesiones intermedias).
+
+---
+
+## 11. Fase 6 — Telegram supergroup + topics + bootstrap fixes (Junio 2026)
+
+### Telegram supergroup + topics — included en commit `637bbea`
+
+**Antes:** todas las notifs caían al chat privado del user (`default_chat_id`).
+
+**Ahora:** soporte para supergrupos con **forum topics** habilitados:
+- `config/telegram.json` extendido con bloque opcional `group`:
+  ```json
+  {
+    "group": {
+      "chat_id": "-1004474820134",
+      "topics": {
+        "access": 4,
+        "commands": 2,
+        "status": 5,
+        "chat": 11
+      }
+    }
+  }
+  ```
+- `TelegramConfig.resolve_topic("access")` devuelve `(chat_id, thread_id)`
+  si está mapeado, `None` si no.
+- `TelegramClient.send_message(..., message_thread_id=N)` propaga al payload.
+- `_maybe_notify_telegram` en `routes/access.py` rutea al topic; si no hay
+  group/topic configurado, fallback al `default_chat_id` (back-compat).
+
+**Setup en Telegram (manual por el user):** crear supergrupo →
+habilitar Topics en settings → crear topics → agregar bot como admin →
+mandar `/start@<bot>` en cada topic → el bridge loguea
+`chat_id=X thread_id=Y text=...` que permite mapear nombre→thread_id
+manualmente y escribir a config.
+
+**Bridge update:** `orion/server/telegram_bridge.py::_handle_inbound` ahora
+acepta `thread_id` y lo loguea junto al `chat_id`. `TelegramUpdate`
+dataclass agregó campo `message_thread_id: int | None = None`.
+
+### Bootstrap port-check — commit `513724a feat(bootstrap)`
+
+**Síntoma original:** si el user arranca `orion.bat` 2 veces (o queda un
+proceso huérfano), Telegram tira `HTTP 409 Conflict: terminated by
+other getUpdates request` cada 5s en bucle. Spam horrible en los logs.
+
+**Fix:** `_check_port_free(host, port)` en `orion/bootstrap.py`. Antes
+de instanciar uvicorn, intenta `bind()` a 127.0.0.1:8765 con
+`SO_REUSEADDR`. Si falla con `OSError`, imprime mensaje claro:
+```
+❌  Puerto 8765 ya está en uso.
+    Probablemente hay otra instancia de Orion corriendo (o un
+    proceso python.exe huérfano de una sesión anterior).
+    Soluciones:
+      · Cerrá la otra terminal de Orion (Ctrl+C).
+      · O matá todos los python: taskkill /F /IM python.exe
+      · Después volvé a correr orion.bat.
+```
+Y `SystemExit(1)`. Previene horas de debugging por instancia duplicada.
+
+### Mobile UX audit — commit `0121f27 feat(mobile)`
+
+Audit completo del viewport 412×915 (Pixel 7) con `scripts/audit_mobile.py`
+(Playwright). 14 paneles auditados, 5 bugs reales encontrados + fixados:
+
+| Bug | Fix |
+|---|---|
+| Backdrop del drawer mobile interceptaba clicks del sidebar | Sidebar sale del wrapper como sibling `<aside fixed z-40>`. Backdrop arriba como sibling. |
+| SectionHeader rompía texto letra-por-letra (1-2 chars/línea) por título flex con acción a la derecha | Stack vertical en mobile (`flex-col` → `sm:flex-row`). |
+| MemoryPanel composer (key + value + Guardar) en una row → "Guardar" empujado fuera del viewport | Mobile stacked: key full-width arriba, value + button lado a lado abajo. |
+| HistoryPanel detail panel asomaba al lado derecho sin selección | Grid 1-columna en mobile; lista oculta cuando hay activo, detail con botón "Volver". |
+| DiagnosticsPanel poll-rate buttons (100/200/500/1000) desbordaban | `flex-wrap` + header del log stack. |
+| MCPPanel tabs cortados + badge "INACTIVO" pisando "Restart" | Tabs `overflow-x-auto whitespace-nowrap`. ServerCard mobile 2 filas (info, acciones). |
+| SettingsPanel sub-nav 7 tabs → scroll-x molesto | `flex-wrap` (3+3+1). |
+
+**Hook útil de automatización:** `window.__orion.setView(view)` expuesto
+desde `main.tsx` — Playwright lo usa para cambiar de panel sin pelearse
+con drawers y pointer-events. Útil también para debugging E2E.
+
+`scripts/audit_mobile.py` queda en el repo para re-correr el audit en
+futuros cambios al frontend mobile.
+
+---
+
+## 12. Fase 7 — Gmail vía google-auth (bypass de gog CLI) (Junio 2026)
+
+Commit `1ed5ad9 refactor(notifications/gmail): usar google-auth directo, bypassear gog CLI`
+
+### El bug que motivó el cambio
+
+`orion/adapters/google/notifications/gmail.py` envolvía
+`gog gmail search` por subprocess. En algunas instalaciones Windows el
+subprocess heredaba env vars de forma inconsistente:
+
+- Padre Python tenía `GOG_KEYRING_PASSWORD=...` (via `orion.bat set` o
+  similar). Verificado vía log.
+- `subprocess.run(cmd, env=env)` con env explícito conteniendo
+  `GOG_KEYRING_PASSWORD`.
+- gog corría pero devolvía `OAuth client credentials missing` (o
+  `No auth for gmail`) consistentemente.
+- El **mismo binario** ejecutado desde una terminal interactiva con las
+  mismas env vars funcionaba perfecto.
+
+Causa real nunca quedó clara. Hipótesis descartadas: APPDATA wrong
+(diagnostic confirmó OK), threading (test desde thread funciona),
+keyring locked (otros tests confirmaron unlocked), OneDrive lock
+(keyring NO está en OneDrive). Posiblemente bug interno de gog v0.22 o
+Windows env propagation con file keyring backend.
+
+### La solución
+
+Reescribir `gmail.py` con el mismo patrón que `classroom.py` (que SÍ
+funciona): usar `google-auth` + `googleapiclient.discovery` directamente.
+Cero subprocess, cero gog para Gmail.
+
+**Files involucrados:**
+- `orion/adapters/google/notifications/gmail.py` reescrito:
+  - `_TOKEN_PATH = BASE_DIR / "tools" / "gmail" / "token.json"`.
+  - `_load_creds()` lee el token, refresca via `Request()`, persiste.
+  - `_is_revocation_error()` distingue `invalid_grant`/`revoked` (borra
+    token) vs glitches transient (preserva).
+  - `GmailAdapter.fetch()` llama Gmail API v1 vía `build("gmail","v1",
+    credentials=creds)`. List threads → get metadata por thread →
+    construye `NotificationItem`.
+  - `is_configured()` devuelve `_TOKEN_PATH.exists()`.
+- `tools/gmail/token.json` — formato google-auth:
+  ```json
+  {
+    "token": null,
+    "refresh_token": "...",
+    "token_uri": "https://oauth2.googleapis.com/token",
+    "client_id": "...",
+    "client_secret": "...",
+    "scopes": ["https://www.googleapis.com/auth/gmail.modify", ...],
+    "universe_domain": "googleapis.com"
+  }
+  ```
+  Generado UNA vez con un script que lee el refresh token exportado de
+  gog (`gog auth tokens export <email>`) + el `client_secret` del JSON
+  descargado de GCP. Después de la primera vez google-auth se auto-mantiene.
+- `tools/gmail/` agregado al `.gitignore`.
+
+### Beneficios
+
+- **Sin keyring file backend** ni env vars de password.
+- **Sin subprocess** = sin problemas de propagación de env.
+- **Refresh automático**: cuando access token expira, `creds.refresh(Request())`
+  llama al token endpoint y persiste el nuevo access token.
+- **Idéntico patrón** a Classroom — consistencia, menos APIs distintas
+  que entender.
+- El error "transient" del notif_poller desapareció. Panel Gmail OK.
+
+### Migrar Drive o Calendar al mismo patrón (futuro)
+
+Si en algún momento Drive o Calendar tienen el mismo problema con gog,
+copiar el shape de `gmail.py`:
+1. Crear `tools/<service>/token.json` con scopes correctos.
+2. Adaptar `fetch()` para llamar la API del servicio (`build("drive","v3",...)`).
+3. Mantener el patrón de `_load_creds()` + `_is_revocation_error()`.
+
+---
+
+## 13. Convenciones nuevas (post Fase 7)
+
+### Agregar un adapter Google nuevo (Gmail, Classroom, Drive, …)
+
+**Patrón establecido** (gmail.py + classroom.py):
+1. Token JSON en `tools/<service>/token.json` (gitignored vía
+   `tools/<service>/` en `.gitignore`).
+2. Formato google-auth (refresh_token + client_id + client_secret +
+   token_uri + scopes).
+3. Adapter usa `google.oauth2.credentials.Credentials.from_authorized_user_file`.
+4. Auto-refresh via `creds.refresh(Request())` + persist atómico con `.tmp`.
+5. `_is_revocation_error()` distingue muerte real (`invalid_grant`) vs
+   transient (red, 5xx) — solo borra token en muerte real.
+6. **NO usar gog para servicios Google nuevos.** Gog queda para flujos
+   de admin (autorizar cuenta inicial vía panel "Integraciones") y para
+   features que no migramos todavía (sheets_sync, etc.).
+
+### Agregar un endpoint que debe aceptar requests desde la LAN (ESP32, otros sensores)
+
+**Patrón establecido** (`access_auth.py`):
+1. Generar shared secret: `python -c "import secrets; print(secrets.token_urlsafe(32))"`.
+2. Guardarlo en `config/<service>.json` (gitignored).
+3. Agregar el path a `AUTHED_PATHS` en `access_auth.py` (o crear módulo
+   análogo si el patrón se expande).
+4. El device manda header `X-Orion-Access-Token: <secret>` en cada POST.
+5. `SharingMiddleware` ya hace el bypass — no tocar.
+6. Tests de matriz: loopback OK / LAN sin header 403 / LAN bad header
+   403 / LAN good header 201 / GET con header bueno 403 / POST otro
+   path con header bueno 403.
+
+---
+
+## 14. Errores conocidos sin acción (no son bugs, son red)
+
+| Síntoma | Por qué pasa | Acción |
+|---|---|---|
+| `[telegram.bridge] WARNING: getUpdates falló: _ssl.c:989: handshake timed out — reintentando en 5s` | Latencia/packet loss transient al hacer SSL handshake contra api.telegram.org. La retry logic del bridge lo maneja solo (5s backoff). | Ignorar si pasa esporádicamente. Si es crónico, chequear red. |
+| `[notif_poller] WARNING: classroom falló (auth_required): Classroom sin token` | OAuth client de Google fue borrado o nunca se autorizó. | Re-crear OAuth client + click "Autorizar Classroom" en panel Notificaciones. Ver `docs/SETUP_GOOGLE_OAUTH.md`. |
+| `[orion.classroom] WARNING: refresh transient falló (NO borro token): deleted_client` | Idem arriba — OAuth client deleted en GCP. NO borra el token local — esperando que el user re-cree el client. | Re-crear OAuth client. El refresh va a empezar a andar de nuevo. |
+
+---
+
+## 15. Pendientes acumulados (próximas sesiones)
+
+### Acción del user (hardware / external)
+- **Flashar el ESP32** con el sketch `arduino/access_control_fingerprint/`.
+  Editar `WIFI_SSID`, `WIFI_PASS`, `ORION_URL` (IP de la PC en LAN o
+  Tailscale), `ACCESS_TOKEN` (copiar de `config/access.json`). Después
+  enrolar usuarios desde el panel Acceso → Usuarios.
+- **`git push origin main`** cuando quieras sincronizar. Hay ~6 commits
+  locales acumulados desde la última vez que pusheaste.
+- **Decidir si `_design_brief/` va al repo o se gitignorea.** Untracked,
+  ~0.4 MB de assets de diseño. Si va al repo: `git add _design_brief/`.
+  Si no: agregar a `.gitignore`.
+- **Decidir si borrar `backup-pre-filter-repo` del remoto** (sigue
+  pendiente desde Fase 1).
+
+### Features pendientes
+- **Fase 2 del supergrupo Telegram** — slash commands en el topic
+  Comandos. Decidir cuáles: `/status` (resumen general), `/usuarios`
+  (lista enrolada), `/pausar N` (desactivar slot), `/abrir` (activar
+  relé del ESP32 remotamente), `/log hoy`. Auth a nivel de quién
+  manda el mensaje (solo el `chat_id` del user puede ejecutar comandos
+  sensibles).
+- **Fase 3 del supergrupo Telegram** — chat libre con LLM en el topic
+  Chat. Bridge entre `chat_brain` y Telegram. Cada mensaje del topic
+  Chat se inyecta al brain como input del user; la respuesta vuelve al
+  topic. Permitiría usar Orion desde el celu sin abrir el navegador.
+- **Resúmenes diarios + alertas IoT al topic Estado.** Job nocturno que
+  postea "Hoy entraron 4 personas, último acceso 20:13. Temperatura
+  promedio 22°C". Cron + adapter de resumen.
+
+### Mejoras de plataforma
+- **Migrar otros adapters Google a google-auth si fallan con gog** (Drive,
+  Calendar). Solo si revientan; `gmail.py` ya es el patrón a copiar.
+- **Migrar interfaces manuales en `web/src/api/rest.ts` a `Schemas["..."]`**
+  (auto-generados desde OpenAPI por Fase 3D). Oportunístico cuando
+  toques un panel — no vale la pena un PR dedicado.
+- **Tests de los `index.tsx` top-level** (NotificationsPanel, IoTPanel,
+  AgentsPanel, MCPPanel, AccessPanel) — requieren mockear hooks custom
+  + `useOrionStore` + `useQuery`.
+- **Validación visual de mobile** después de cualquier cambio al frontend.
+  Re-correr `scripts/audit_mobile.py` + revisar screenshots en
+  `%TEMP%\orion-audit\`.
+- **Validación visual de god-files post-split** (MCPPanel, IoTPanel,
+  AgentsPanel, DeviceFormModal, AccessPanel). `tsc + lint + build` pueden
+  estar verdes con bugs sutiles de runtime (stale closures, state que no
+  se preserva al cambiar de vista, hook order, props mal pasados).
+
+### Limpieza histórica
+- **Borrar `backup-pre-filter-repo` del remoto.** Quedó como safety net
+  post-rewrite del history (Fase 1). Cuando estés seguro de que nada se
+  rompió: `git push origin --delete backup-pre-filter-repo`.
