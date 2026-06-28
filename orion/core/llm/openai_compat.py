@@ -40,7 +40,9 @@ _DEFAULT_ENDPOINTS = {
     "openai": "https://api.openai.com/v1",
     "mistral": "https://api.mistral.ai/v1",
     "ollama": "http://localhost:11434/v1",  # local — sin auth
-    "ollama_cloud": "https://ollama.com/v1",  # cloud (Turbo) — requiere key
+    # ollama_cloud ahora usa OllamaCloudProvider con /api/chat nativo —
+    # ver orion.core.llm.ollama_cloud_provider. Si por config alguien
+    # pasa base_url con /v1 al final, el provider lo strippea solo.
     "deepseek": "https://api.deepseek.com/v1",  # DeepSeek V3 / R1
 }
 

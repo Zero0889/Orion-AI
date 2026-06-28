@@ -212,7 +212,7 @@ def set_provider_key(provider: str, key: str) -> None:
 
 _INSTANCES: dict[str, LLMProvider] = {}
 
-_OPENAI_COMPAT = {"openrouter", "groq", "openai", "mistral", "ollama", "ollama_cloud", "deepseek"}
+_OPENAI_COMPAT = {"openrouter", "groq", "openai", "mistral", "ollama", "deepseek"}
 
 
 def get_provider(name: str) -> LLMProvider:
@@ -224,13 +224,20 @@ def get_provider(name: str) -> LLMProvider:
         from orion.core.llm.gemini_provider import GeminiProvider
 
         _INSTANCES[name] = GeminiProvider()
+    elif name == "ollama_cloud":
+        # Provider dedicado para la API nativa de Ollama Cloud
+        # (/api/chat). El OpenAI-compat layer no está oficialmente
+        # documentado para el servicio gestionado, así que vamos
+        # directo al endpoint nativo.
+        from orion.core.llm.ollama_cloud_provider import OllamaCloudProvider
+
+        _INSTANCES[name] = OllamaCloudProvider()
     elif name in _OPENAI_COMPAT:
         from orion.core.llm.openai_compat import OpenAICompatProvider
 
         _INSTANCES[name] = OpenAICompatProvider(name)
     else:
-        raise KeyError(
-            f"Provider '{name}' desconocido. Conocidos: gemini, {', '.join(sorted(_OPENAI_COMPAT))}"
-        )
+        known = sorted(_OPENAI_COMPAT | {"gemini", "ollama_cloud"})
+        raise KeyError(f"Provider '{name}' desconocido. Conocidos: {', '.join(known)}")
 
     return _INSTANCES[name]

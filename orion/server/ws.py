@@ -151,9 +151,25 @@ def register_ws(app: FastAPI, bus: Any) -> None:
     @app.websocket("/ws")
     async def ws_endpoint(ws: WebSocket) -> None:
         await ws.accept()
+        # Captura device + client_id desde el querystring del handshake:
+        #   ws://host/ws?device=mobile&client_id=ab12cd34
+        # El frontend (ws.ts) los detecta por UA + matchMedia y persiste
+        # client_id en localStorage. Si el cliente no manda nada (legacy),
+        # quedan en "unknown" / "" y el prompt no inyecta nada.
+        from orion.core.client_context import ClientInfo, normalize_device
+
+        qp = ws.query_params
+        ws.state.client_info = ClientInfo(
+            device=normalize_device(qp.get("device")),
+            client_id=(qp.get("client_id") or "").strip()[:64],
+        )
         async with clients_lock:
             clients.add(ws)
-        log.info("WS cliente conectado (total=%d)", len(clients))
+        log.info(
+            "WS cliente conectado (total=%d, device=%s)",
+            len(clients),
+            ws.state.client_info.device,
+        )
 
         # Saludo inicial con el estado actual para que el cliente pinte sin
         # esperar al siguiente evento.
@@ -175,7 +191,7 @@ def register_ws(app: FastAPI, bus: Any) -> None:
         try:
             while True:
                 msg = await ws.receive_json()
-                await _handle_client_message(bus, msg)
+                await _handle_client_message(bus, msg, ws)
         except WebSocketDisconnect:
             pass
         except Exception as e:
@@ -189,9 +205,15 @@ def register_ws(app: FastAPI, bus: Any) -> None:
 # ============================================================================
 #  Manejo de mensajes entrantes (cliente → bus)
 # ============================================================================
-async def _handle_client_message(bus: Any, msg: dict) -> None:
+async def _handle_client_message(bus: Any, msg: dict, ws: WebSocket | None = None) -> None:
     """Procesa un mensaje recibido por el WS. Los comandos se aplican una
-    sola vez (no se duplican por número de clientes)."""
+    sola vez (no se duplican por número de clientes).
+
+    ``ws`` se usa para identificar **qué cliente** mandó el mensaje y
+    propagar su ``ClientInfo`` (device, client_id) al prompt builder.
+    Si ``ws`` es ``None`` (llamadas internas/tests), simplemente no se
+    propaga contexto y el prompt usa el default.
+    """
     if not isinstance(msg, dict):
         return
     msg_type = msg.get("type")
@@ -200,6 +222,22 @@ async def _handle_client_message(bus: Any, msg: dict) -> None:
     if msg_type == "text":
         text = (payload.get("text") or "").strip()
         if text:
+            # Marcamos quién está hablando antes de submit, para que el
+            # prompt builder pueda leerlo (no propagamos via arg porque
+            # cruza loops y rompe la API actual del bus).
+            if ws is not None:
+                client_info = getattr(ws.state, "client_info", None)
+                if client_info is not None:
+                    from orion.core.client_context import set_last_client
+
+                    set_last_client(client_info)
+                    log.info(
+                        "WS text recibido desde device=%s client_id=%s",
+                        client_info.device,
+                        client_info.client_id or "(none)",
+                    )
+                else:
+                    log.info("WS text recibido sin client_info (cliente legacy)")
             bus.submit_user_text(text)
 
     elif msg_type == "interrupt":

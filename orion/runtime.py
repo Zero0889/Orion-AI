@@ -65,6 +65,12 @@ class OrionLive(LiveSessionMixin, AudioMixin):
         self._state_lock = threading.Lock()
         self._pensando_since: float | None = None
         self._last_activity_ts: float = time.time()
+        # Último device del que Gemini Live escuchó. Sirve para enviar el
+        # hint "el usuario cambió a tal dispositivo" solo cuando hay
+        # transición real — Live no recarga el system_instruction a mitad
+        # de sesión, así que el hint per-turn es el único camino para que
+        # adapte el tono cuando el usuario se mueve PC ↔ móvil ↔ tablet.
+        self._last_announced_device: str | None = None
 
         # ── Plugins ──
         self._plugin_registry = PluginRegistry()
@@ -140,14 +146,44 @@ class OrionLive(LiveSessionMixin, AudioMixin):
     def _on_text_command(self, text: str):
         """Recibe texto desde la UI (input manual o eventos como archivo cargado).
         Captura locales para evitar race conditions con la reconexión.
+
+        Inyecta el ``device hint`` al turno cuando el dispositivo activo
+        cambió. El system_instruction de Live es one-shot — si el usuario
+        empezó hablando desde PC y después escribe desde el móvil, sin
+        este preamble Live nunca se entera y responde como si siguiera en
+        PC. El hint se manda solo en la transición; los turnos siguientes
+        del mismo device van sin overhead.
         """
         loop = self._loop
         session = self.session
         if not loop or not session:
             return
+
+        # Device-aware preamble (solo cambios de dispositivo).
+        payload_text = text
+        try:
+            from orion.core.client_context import build_device_hint, get_last_client
+
+            client = get_last_client()
+            current_device = client.device if client else None
+            if current_device and current_device != self._last_announced_device:
+                hint = build_device_hint(client)
+                if hint:
+                    payload_text = f"{hint}\n{text}"
+                    log.info(
+                        "Live: device cambió %r → %r, inyectando hint en este turno",
+                        self._last_announced_device,
+                        current_device,
+                    )
+                self._last_announced_device = current_device
+        except Exception as e:
+            log.debug("device hint skipped: %s", e)
+
         try:
             asyncio.run_coroutine_threadsafe(
-                session.send_client_content(turns={"parts": [{"text": text}]}, turn_complete=True),
+                session.send_client_content(
+                    turns={"parts": [{"text": payload_text}]}, turn_complete=True
+                ),
                 loop,
             )
         except Exception as e:

@@ -89,6 +89,19 @@ class LiveSessionMixin:
             parts.append(mem_str)
         parts.append(sys_prompt)
 
+        # Device hint: si la última conexión declaró su tipo de dispositivo
+        # (móvil, reloj, tablet, etc.), agregamos un nudge corto al tono.
+        # Vacío para clientes legacy o "unknown" — no sesgamos sin datos.
+        # Nota: el Live config se arma una vez por sesión. Si el usuario
+        # cambia de dispositivo, el nuevo hint aplica en la próxima
+        # reconexión (acceptable trade-off para evitar reconfigurar la
+        # sesión Live a mitad de turno).
+        from orion.core.client_context import build_device_hint
+
+        device_hint = build_device_hint()
+        if device_hint:
+            parts.append("\n" + device_hint)
+
         # Catálogo de skills — Gemini Live necesita saber qué hay instalado
         # para decidir cuándo invocar use_skill. Sin este bloque, ve la tool
         # genérica pero no los skill_ids disponibles.

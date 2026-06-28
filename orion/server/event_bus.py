@@ -120,6 +120,12 @@ class OrionEventBus:
         self._chat_brain_tool_registry: object | None = None
         self._chat_brain_plugin_registry: object | None = None
 
+        # Hooks de fan-out adicionales (Telegram, futuras integraciones).
+        # Cada hook recibe (event_type, payload) sincrónicamente desde el
+        # mismo thread que llamó publish. Si un hook tira excepción, se
+        # captura para no romper el broadcast a los demás suscriptores.
+        self._publish_hooks: list[Callable[[str, dict], None]] = []
+
     # ── Configuración (Fase 1) ───────────────────────────────────────────
     def attach_server_loop(self, loop: asyncio.AbstractEventLoop) -> None:
         """Llamado por FastAPI al arrancar uvicorn. Crea la outbound queue
@@ -264,18 +270,40 @@ class OrionEventBus:
 
     # ── Superficie nueva (modo web) ──────────────────────────────────────
     def publish(self, event_type: str, payload: dict | None = None) -> None:
-        """Encola un evento para fan-out a todos los clientes WS.
+        """Encola un evento para fan-out a todos los clientes WS y dispara
+        cualquier hook registrado vía :meth:`register_publish_hook`.
 
         Seguro desde cualquier hilo. Si todavía no hay loop de servidor
         (Fase 0: el bus está creado pero uvicorn no corre), simplemente
-        descarta el evento — pasarán a notificarse cuando el servidor
-        arranque."""
-        if self._outbound_queue is None or self._server_loop is None:
-            return  # Fase 0: nadie escucha aún
-        msg = {"type": event_type, "payload": payload or {}}
-        # El loop puede estar cerrándose en shutdown.
-        with contextlib.suppress(RuntimeError):
-            self._server_loop.call_soon_threadsafe(self._enqueue_outbound, msg)
+        descarta el evento WS — pasarán a notificarse cuando el servidor
+        arranque. Los hooks SÍ se llaman aunque el WS no esté arriba (sirve
+        para tests + integraciones que no dependen del transport WS)."""
+        clean_payload = payload or {}
+        if self._outbound_queue is not None and self._server_loop is not None:
+            msg = {"type": event_type, "payload": clean_payload}
+            # El loop puede estar cerrándose en shutdown.
+            with contextlib.suppress(RuntimeError):
+                self._server_loop.call_soon_threadsafe(self._enqueue_outbound, msg)
+        # Hooks: una integración rota no debe romper a las demás ni al WS.
+        for hook in list(self._publish_hooks):
+            try:
+                hook(event_type, clean_payload)
+            except Exception:
+                log.exception("publish hook %s crasheó", getattr(hook, "__name__", "?"))
+
+    def register_publish_hook(self, hook: Callable[[str, dict], None]) -> None:
+        """Registra un callback que recibe ``(event_type, payload)`` por
+        cada :meth:`publish`. Usado por integraciones (Telegram, etc.) que
+        necesitan ver el flujo de eventos sin estar conectadas por WS.
+
+        Idempotente: registrar el mismo hook dos veces lo deja una sola.
+        """
+        if hook not in self._publish_hooks:
+            self._publish_hooks.append(hook)
+
+    def unregister_publish_hook(self, hook: Callable[[str, dict], None]) -> None:
+        with contextlib.suppress(ValueError):
+            self._publish_hooks.remove(hook)
 
     def _enqueue_outbound(self, msg: dict) -> None:
         """Inserta en _outbound_queue con política drop-oldest."""

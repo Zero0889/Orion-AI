@@ -268,25 +268,21 @@ _PROVIDER_CATALOG: dict[str, dict] = {
         ],
     },
     "ollama_cloud": {
-        "label": "Ollama Cloud (Turbo)",
-        "free": False,
-        "auth": "key de ollama.com",
+        "label": "Ollama Cloud (free tier)",
+        "free": True,
+        "auth": "key de ollama.com/settings/keys",
         "models": [
-            # GPT-OSS
-            {"id": "gpt-oss:20b-cloud", "label": "GPT-OSS 20B (cloud, ligero)"},
+            # ── Free tier (los 4 que mostraste en la UI) ──
+            {"id": "glm-5.2:cloud", "label": "GLM 5.2 (cloud · free)"},
+            {"id": "kimi-k2.7-code:cloud", "label": "Kimi K2.7 Code (cloud · free)"},
+            {"id": "minimax-m3:cloud", "label": "MiniMax M3 (cloud · free)"},
+            {"id": "nemotron-3-super:cloud", "label": "Nemotron 3 Super (cloud · free)"},
+            # ── Otros modelos cloud típicos (si tu cuenta los incluye) ──
             {"id": "gpt-oss:120b-cloud", "label": "GPT-OSS 120B (cloud)"},
-            # DeepSeek razonador
+            {"id": "gpt-oss:20b-cloud", "label": "GPT-OSS 20B (cloud, ligero)"},
             {"id": "deepseek-r1:cloud", "label": "DeepSeek R1 (cloud, razonador)"},
-            {"id": "deepseek-r1:671b-cloud", "label": "DeepSeek R1 671B (cloud)"},
-            # DeepSeek chat
-            {"id": "deepseek-v3.2:cloud", "label": "DeepSeek V3.2 (cloud, más reciente)"},
-            {"id": "deepseek-v3.2:671b-cloud", "label": "DeepSeek V3.2 671B (cloud)"},
-            {"id": "deepseek-v3.1:cloud", "label": "DeepSeek V3.1 (cloud)"},
-            {"id": "deepseek-v3.1:671b-cloud", "label": "DeepSeek V3.1 671B (cloud)"},
-            # Qwen
+            {"id": "deepseek-v3.2:cloud", "label": "DeepSeek V3.2 (cloud, chat)"},
             {"id": "qwen3-coder:480b-cloud", "label": "Qwen 3 Coder 480B (cloud)"},
-            {"id": "qwen3:235b-cloud", "label": "Qwen 3 235B (cloud)"},
-            # Kimi (si tu plan lo incluye)
             {"id": "kimi-k2:1t-cloud", "label": "Kimi K2 1T (cloud)"},
         ],
     },

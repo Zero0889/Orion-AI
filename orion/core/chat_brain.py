@@ -52,7 +52,7 @@ DEFAULT_MODEL_PER_PROVIDER: dict[str, str] = {
     "gemini": "gemini-2.5-flash",
     "deepseek": "deepseek-chat",
     "ollama": "llama3.1:8b",
-    "ollama_cloud": "llama3.1:8b",
+    "ollama_cloud": "glm-5.2:cloud",
     "openrouter": "deepseek/deepseek-chat-v3.1:free",
     "groq": "llama-3.3-70b-versatile",
     "openai": "gpt-4o-mini",
@@ -227,6 +227,15 @@ def run_text_turn(
 
     # 4) Mensajes: system + historial + nuevo turno
     sys_prompt = system_prompt or _load_system_prompt()
+    # Device hint per-turn: a diferencia del Live (config one-shot), acá
+    # podemos consultar `get_last_client()` en cada turno y ajustar el
+    # tono al dispositivo desde donde llegó este mensaje. Si el cliente
+    # no declaró device, queda vacío.
+    from orion.core.client_context import build_device_hint
+
+    device_hint = build_device_hint()
+    if device_hint:
+        sys_prompt = f"{sys_prompt}\n\n{device_hint}"
     history = _load_history_for_provider(bus, max_turns=MAX_HISTORY_TURNS)
     turns: list[dict] = [{"role": "system", "content": sys_prompt}]
     turns.extend(history)

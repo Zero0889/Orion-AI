@@ -21,6 +21,25 @@ from orion.core.logger import get_logger
 
 log = get_logger("orion.audio")
 
+# ── Rate-limiting para errores de modelo ──────────────────────────────
+# Previene que el mismo error del modelo inunde el log y la UI cuando
+# session_resumption lo repite en cada turno consecutivo.
+_last_model_error: tuple[str, float] = ("", 0.0)
+_MODEL_ERROR_COOLDOWN = 30.0  # segundos antes de re-loggear el mismo error
+
+
+def _should_log_model_error(txt: str) -> bool:
+    global _last_model_error
+    import time
+
+    now = time.time()
+    prev_txt, prev_ts = _last_model_error
+    if txt == prev_txt and (now - prev_ts) < _MODEL_ERROR_COOLDOWN:
+        return False
+    _last_model_error = (txt, now)
+    return True
+
+
 # ── Audio constants ────────────────────────────────────────────────────
 CHANNELS = 1
 SEND_SAMPLE_RATE = 16000
@@ -134,8 +153,27 @@ class AudioMixin:
                                     if txt and txt.lower().startswith(
                                         ("error", "cannot", "i can't")
                                     ):
+                                        if not _should_log_model_error(txt):
+                                            continue
                                         log.warning("Modelo respondió error: %s", txt[:120])
-                                        self.ui.write_log(f"ORION: {txt}")
+                                        # Si el modelo reporta que no puede leer una imagen,
+                                        # limpiamos el current_file para evitar que el modelo
+                                        # se quede atascado reintentando en cada turno.
+                                        if (
+                                            "does not support image" in txt.lower()
+                                            or "cannot read" in txt.lower()
+                                        ):
+                                            with contextlib.suppress(Exception):
+                                                self.ui.current_file = None
+                                            self.ui.write_log(
+                                                "SISTEMA: No puedo leer imágenes directamente "
+                                                "con el modelo de voz actual. Si necesitas "
+                                                "procesar una imagen, usa el botón de adjuntar "
+                                                "y pídemelo de nuevo."
+                                            )
+                                            self.ui.publish("file.cleared", {})
+                                        else:
+                                            self.ui.write_log(f"ORION: {txt}")
 
                         if sc.output_transcription and sc.output_transcription.text:
                             txt = _clean_transcript(sc.output_transcription.text)
@@ -238,6 +276,8 @@ class AudioMixin:
         )
         stream.start()
 
+        import base64
+
         try:
             while True:
                 try:
@@ -251,9 +291,51 @@ class AudioMixin:
                     ):
                         self.set_speaking(False)
                         self._turn_done_event.clear()
+                        # Marcador para que el cliente remoto sepa que
+                        # puede flush-ear su buffer y dar por terminado el
+                        # turno (no se pierde audio, sólo le decimos "ya
+                        # no viene más por ahora").
+                        with contextlib.suppress(Exception):
+                            self.ui.publish("audio.end", {})
                     continue
                 self.set_speaking(True)
-                await asyncio.to_thread(stream.write, chunk)
+                # ── Stream del audio a clientes remotos (móvil/tablet) ──
+                # Publicamos cada chunk PCM como base64 sobre el WS. Los
+                # clientes remotos lo reciben y reproducen con Web Audio
+                # API. PCM 16-bit mono @ 24 kHz ≈ 48 kB/s; base64 lo hace
+                # ~64 kB/s — suficientemente liviano para Tailscale local.
+                try:
+                    self.ui.publish(
+                        "audio.chunk",
+                        {
+                            "pcm_b64": base64.b64encode(chunk).decode("ascii"),
+                            "sr": RECEIVE_SAMPLE_RATE,
+                            "ch": CHANNELS,
+                        },
+                    )
+                except Exception as e:
+                    log.debug("publish audio.chunk falló: %s", e)
+
+                # ── Mute local cuando el cliente activo NO es la PC ──
+                # Si el último cliente que mandó texto es móvil/tablet/
+                # reloj, no queremos que también suene en los parlantes
+                # de la PC (sino se escucha en dos lados al mismo tiempo).
+                # `get_last_client()` puede devolver None (ningún cliente
+                # declaró device aún) → tratamos None como "no remoto",
+                # así el comportamiento por defecto sigue siendo el de
+                # toda la vida: voz en la PC.
+                play_local = True
+                try:
+                    from orion.core.client_context import get_last_client
+
+                    last = get_last_client()
+                    if last is not None and last.device in ("mobile", "tablet", "watch"):
+                        play_local = False
+                except Exception:
+                    pass
+
+                if play_local:
+                    await asyncio.to_thread(stream.write, chunk)
         except sd.PortAudioError as e:
             log.error("Error de audio en reproducción: %s", e)
             raise
