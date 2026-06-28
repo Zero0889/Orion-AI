@@ -25,7 +25,14 @@ from __future__ import annotations
 import threading
 import time
 from collections import deque
+from datetime import datetime
 from typing import Any
+
+
+def _now_local() -> datetime:
+    """Datetime con timezone local — fácil de mockear en tests."""
+    return datetime.now().astimezone()
+
 
 from orion.adapters.messaging.telegram import (
     LONG_POLL_TIMEOUT_S,
@@ -85,6 +92,8 @@ class TelegramBridge:
         self._client: TelegramClient | None = None
         self._stop = threading.Event()
         self._poll_thread: threading.Thread | None = None
+        self._summary_thread: threading.Thread | None = None
+        self._summary_last_run_day: str | None = None  # YYYY-MM-DD
         self._last_update_id: int = 0
         # Cola de (chat_id, thread_id) esperando respuesta del brain. FIFO
         # porque mensajes llegan ordenados; el thread_id se preserva para
@@ -145,7 +154,27 @@ class TelegramBridge:
             name="TelegramBridge",
         )
         self._poll_thread.start()
+        # Arrancar también el scheduler del resumen diario (idempotente:
+        # si ya hay un thread vivo, no duplica).
+        self._start_summary_scheduler()
         log.info("Telegram bridge iniciado")
+
+    def _start_summary_scheduler(self) -> None:
+        """Arranca el thread que postea el resumen diario al topic Estado.
+        No-op si el config no tiene topic ``status`` mapeado."""
+        if self._summary_thread is not None and self._summary_thread.is_alive():
+            return
+        cfg = self._cfg
+        if cfg is None or cfg.group is None or "status" not in cfg.group.topics:
+            log.debug("Sin topic status configurado — scheduler de resumen NO arranca")
+            return
+        self._summary_thread = threading.Thread(
+            target=self._summary_loop,
+            daemon=True,
+            name="TelegramSummary",
+        )
+        self._summary_thread.start()
+        log.info("Scheduler de resumen diario iniciado")
 
     def _stop_polling(self) -> None:
         self._stop.set()
@@ -192,6 +221,50 @@ class TelegramBridge:
                     u.message_thread_id,
                     u.from_user_id,
                 )
+
+    # ── Scheduler del resumen diario ─────────────────────────────────────
+
+    def _summary_loop(self) -> None:
+        """Despierta cada minuto. Si llegó la hora configurada Y aún no
+        posteamos el resumen de hoy, lo posteamos al topic Estado.
+
+        Hora de envío: ``cfg.daily_summary_hour`` (default 21, ver
+        ``TelegramConfig``). Comparación a nivel de DÍA local — un solo
+        envío por día aunque el thread despierte varias veces.
+        """
+        from orion.server.status_summary import build_daily_summary
+
+        while not self._stop.is_set():
+            try:
+                cfg = self._cfg
+                if cfg is None or cfg.group is None or "status" not in cfg.group.topics:
+                    # Config se modificó y el topic dejó de existir → exit
+                    return
+                now = _now_local()
+                target_hour = cfg.daily_summary_hour
+                today = now.strftime("%Y-%m-%d")
+                if now.hour >= target_hour and self._summary_last_run_day != today:
+                    log.info("Disparando resumen diario para %s", today)
+                    try:
+                        text = build_daily_summary(day=today)
+                        chat_id = cfg.group.chat_id
+                        thread_id = cfg.group.topics["status"]
+                        try:
+                            chat_target: int | str = int(chat_id)
+                        except ValueError:
+                            chat_target = chat_id
+                        self._send_async(chat_target, text, thread_id=thread_id)
+                        self._summary_last_run_day = today
+                    except Exception:
+                        log.exception("build/send resumen falló — reintento mañana")
+                        # Marcamos como hecho de todos modos: si falló, no
+                        # queremos spam de reintentos hasta el día siguiente.
+                        self._summary_last_run_day = today
+            except Exception:
+                log.exception("summary_loop ciclo crasheó — sigo igual")
+            # Dormir 60s o salir si el stop event se activa
+            if self._stop.wait(60.0):
+                return
 
     # ── Inbound: TG → bus ────────────────────────────────────────────────
 

@@ -388,6 +388,64 @@ def test_chat_stream_empty_buffer_does_nothing(cfg_with_topics):
     assert not bridge._client.send_message.called
 
 
+# ── Scheduler de resumen diario ────────────────────────────────────────
+
+
+def test_summary_scheduler_skips_when_no_status_topic(cfg_no_group):
+    """Sin topic status configurado, el scheduler NO arranca."""
+    bridge = _make_bridge(cfg_no_group)
+    bridge._start_summary_scheduler()
+    assert bridge._summary_thread is None
+
+
+def test_summary_scheduler_starts_when_topic_present(cfg_with_topics):
+    """Con topic status mapeado, arranca el thread daemon."""
+    # cfg_with_topics tiene access/commands/chat pero NO status, así que
+    # arreglamos para el test
+    cfg = TelegramConfig(
+        bot_token="t",
+        default_chat_id=str(AUTHED_USER),
+        forward_notifications=True,
+        enabled=True,
+        group=TelegramGroupConfig(
+            chat_id=str(GROUP_CHAT),
+            topics={"access": 4, "status": 89},
+        ),
+    )
+    bridge = _make_bridge(cfg)
+    bridge._stop = __import__("threading").Event()
+    bridge._stop.set()  # para que el loop salga rápido
+    bridge._start_summary_scheduler()
+    assert bridge._summary_thread is not None
+    # El thread debió terminar rápido por el _stop.set()
+    bridge._summary_thread.join(timeout=2.0)
+    assert not bridge._summary_thread.is_alive()
+
+
+def test_summary_scheduler_idempotent(cfg_with_topics):
+    """Llamar _start_summary_scheduler dos veces NO duplica el thread."""
+    cfg = TelegramConfig(
+        bot_token="t",
+        default_chat_id=str(AUTHED_USER),
+        forward_notifications=True,
+        enabled=True,
+        group=TelegramGroupConfig(
+            chat_id=str(GROUP_CHAT),
+            topics={"status": 89},
+        ),
+    )
+    bridge = _make_bridge(cfg)
+    # No setamos stop — el thread vive
+    bridge._start_summary_scheduler()
+    first_thread = bridge._summary_thread
+    assert first_thread is not None
+    bridge._start_summary_scheduler()  # segunda vez
+    assert bridge._summary_thread is first_thread  # mismo thread
+    # Limpiar — matar el thread
+    bridge._stop.set()
+    first_thread.join(timeout=2.0)
+
+
 def test_chat_stream_interleaved_turns(cfg_with_topics):
     """Dos turnos overlapping (en paralelo): cada uno mantiene su buffer
     propio por turn_id."""

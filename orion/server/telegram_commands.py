@@ -258,6 +258,12 @@ def _cmd_help(_ctx: CommandContext) -> str:
     return "\n".join(lines)
 
 
+def _cmd_resumen(_ctx: CommandContext) -> str:
+    from orion.server.status_summary import build_daily_summary
+
+    return build_daily_summary()
+
+
 # ── Registración (orden importa para `/help`) ────────────────────────────
 
 
@@ -298,6 +304,13 @@ def register_builtin_commands() -> None:
             name="log",
             handler=_cmd_log,
             description="Últimos 10 eventos. `/log hoy` filtra al día actual.",
+        )
+    )
+    register(
+        CommandSpec(
+            name="resumen",
+            handler=_cmd_resumen,
+            description="Resumen del día — acceso + sensores IoT.",
         )
     )
     register(

@@ -240,6 +240,10 @@ class TelegramConfig:
     forward_notifications: bool
     enabled: bool
     group: TelegramGroupConfig | None = None
+    daily_summary_hour: int = 21
+    """Hora (0-23, local timezone) a la que el scheduler postea el resumen
+    diario al topic ``status``. Solo se evalúa si el group tiene topic
+    ``status`` mapeado."""
 
     @property
     def is_configured(self) -> bool:
@@ -294,12 +298,18 @@ def load_telegram_config() -> TelegramConfig:
         raw = json.loads(TELEGRAM_CONFIG_PATH.read_text(encoding="utf-8"))
     except (FileNotFoundError, json.JSONDecodeError, OSError):
         return _EMPTY_CONFIG
+    summary_hour_raw = raw.get("daily_summary_hour", 21)
+    try:
+        summary_hour = max(0, min(23, int(summary_hour_raw)))
+    except (TypeError, ValueError):
+        summary_hour = 21
     return TelegramConfig(
         bot_token=str(raw.get("bot_token", "")).strip(),
         default_chat_id=str(raw.get("default_chat_id", "")).strip(),
         forward_notifications=bool(raw.get("forward_notifications", True)),
         enabled=bool(raw.get("enabled", False)),
         group=_parse_group(raw.get("group")),
+        daily_summary_hour=summary_hour,
     )
 
 
@@ -310,6 +320,7 @@ def save_telegram_config(cfg: TelegramConfig) -> None:
         "default_chat_id": cfg.default_chat_id,
         "forward_notifications": cfg.forward_notifications,
         "enabled": cfg.enabled,
+        "daily_summary_hour": cfg.daily_summary_hour,
     }
     if cfg.group is not None:
         payload["group"] = {
