@@ -182,7 +182,7 @@ export function BrainSection() {
                 <option key={p.id} value={p.id}>
                   {p.label}
                   {p.free ? " · free tier" : ""}
-                  {p.available ? " ✓" : ""}
+                  {p.available ? "" : " — requiere configuración"}
                 </option>
               ))}
             </select>
