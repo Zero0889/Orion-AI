@@ -1146,3 +1146,111 @@ copiar el shape de `gmail.py`:
 - **Borrar `backup-pre-filter-repo` del remoto.** Quedó como safety net
   post-rewrite del history (Fase 1). Cuando estés seguro de que nada se
   rompió: `git push origin --delete backup-pre-filter-repo`.
+
+---
+
+## 16. Sesión Junio 2026 — LICENSE MIT + README shareable + paper STEM IEEE
+
+Sesión enfocada en preparar O.R.I.O.N para presentación STEM
+universitaria y para compartir el repo públicamente.
+
+### 16.1 Licencia: cambio de CC BY-NC 4.0 → MIT (commit `1afd521`)
+
+Razón: el user pidió poder distribuir el proyecto como open source de
+verdad (no solo "código visible"). CC BY-NC bloquea uso comercial y
+crea fricción legal en cualquier derivado. MIT es la licencia más
+reconocida en proyectos académicos y compatible con todas las deps del
+proyecto (FastAPI, React, SQLite, etc.).
+
+Archivos tocados:
+- `LICENSE` (nuevo) — texto canónico MIT, `Copyright (c) 2026 Zahir Padilla`.
+- `readme.md` — badge actualizado a MIT verde, tagline reescrita
+  ("local-first, open source, sin datos en cloud"), sección "¿Qué es
+  Orion?" reescrita con los cinco principios de diseño (local-first,
+  soberanía de datos, open source verificable, extensible, hardware
+  propio), sección "Licencia" reescrita explicando las libertades MIT.
+
+GitHub ahora reconoce el chip "MIT License" en la página principal del
+repo y en la barra lateral derecha.
+
+### 16.2 Paper STEM formato IEEE (local, gitignored)
+
+Se inició la redacción del paper académico para presentación STEM
+universitaria. Vive en `paper/` localmente y está en `.gitignore` para
+no contaminar el repo público con drafts con marcadores `[TODO]` y
+`[DATOS]`. Cuando esté listo para publicar, se untrackea.
+
+**Archivos en `paper/`:**
+- `outline.md` — estructura completa de 11 secciones + cronograma.
+- `draft.md` — draft IEEE de ~8,200 palabras con secciones I-V
+  completamente redactadas en español académico impersonal.
+
+**Encuadre adoptado** tras iteración con el user:
+- **Antes considerado**: "soberanía de datos + biometría" (caso acotado).
+- **Antes considerado**: "asistente multimodal" (compite vs Gemini/Siri).
+- **Adoptado**: **"asistente LLM agéntico local"** — la contribución es
+  que el LLM **actúa** (no solo conversa) sobre el SO, archivos, IoT,
+  hardware. La agencia abierta y auditable como diferenciador frente a
+  asistentes propietarios.
+
+**Estado por sección:**
+
+| Sección | Estado | Bloqueante |
+|---|---|---|
+| Resumen, I (Introducción), II (Trabajos relacionados), III (Marco teórico), IV (Arquitectura con J ciclo de vida end-to-end), V (Implementación) | ✅ Completas | — |
+| VI (Evaluación experimental — 3 ejes: benchmark de tareas, extensibilidad, biométrico) | ⏳ Pendiente | Datos del despliegue ESP32 |
+| VII (Discusión), VIII (Limitaciones), IX (Conclusión) | ⏳ Pendiente | Sección VI |
+| Apéndice, Reconocimiento, Referencias (19 IEEE), Biografía | Esqueleto o listo | Biografía requiere foto del user |
+
+**Título final** (14 palabras, formato IEEE estándar):
+*"O.R.I.O.N: Un Asistente Personal Agéntico Local Basado en Modelos de
+Lenguaje a Gran Escala"*
+
+**Decisiones de framing académico tomadas:**
+- JARVIS eliminado del paper — reemplazado por formulación académica
+  citando Stasko (*Communications of the ACM*, 2024, *"Beyond
+  chatbots"*) como referencia [17] del campo.
+- Voz impersonal ("se propone", "el sistema implementa") consistente.
+- Citas formato IEEE `[N]` con lista alfabética por autor.
+- Tabla I (comparación con Alexa/Siri/HA/Mycroft/LangChain) y Tabla II
+  (catálogo de 25 herramientas por dominio).
+- 19 referencias bibliográficas en formato IEEE canónico.
+
+**Plantilla destino**: `Formato presentacion documentos IEEE ES (1).doc`
+(la del user, está en su carpeta Downloads). El draft.md se pega en
+esa plantilla aplicando los estilos preconfigurados (Title, Author,
+Abstract, Heading 1, etc.) — Word aplica las dos columnas y Times New
+Roman 10pt automáticamente.
+
+### 16.3 Obsidian: implementado y descartado en la misma sesión
+
+Se exploró integrar Obsidian como demo de "soberanía de datos
+verificable" (notas en `.md` planos auditables). Se implementó:
+- `orion/adapters/system/obsidian.py` con 3 tools (@tool decorated):
+  `obsidian_save_note`, `obsidian_search_notes`, `obsidian_list_notes`.
+- 20 tests passing (`tests/test_obsidian_adapter.py`).
+- `config/obsidian.example.json` + `.gitignore` para `config/obsidian.json`.
+- Integración end-to-end probada: nota real escrita en vault del user
+  en `C:\Users\zahir\OneDrive\Documentos\OrionVault`.
+
+**Decisión final**: el user prefiere usar **n8n** como plataforma de
+visualización/automatización. Toda la integración Obsidian fue
+borrada al final de la sesión:
+- `rm orion/adapters/system/obsidian.py`
+- `rm tests/test_obsidian_adapter.py`
+- `rm config/obsidian.example.json`
+- `rm config/obsidian.json`
+- `.gitignore` revertido (sacada la línea `config/obsidian.json`).
+
+Si en algún futuro se quiere volver a la integración Obsidian, el
+patrón está en la historia de esta conversación. No hay deuda en el
+repo.
+
+### 16.4 Próximos pasos pendientes
+
+- **Flashar ESP32** con sketch `arduino/access_control_fingerprint/` —
+  esto desbloquea las secciones VI-IX del paper.
+- **`paper/analyze_logs.py`** — script para parsear `logs/orion.log`
+  por `corr_id` y calcular métricas (latencia, tasas) automáticamente.
+- **`paper/benchmark.md`** — diseño de las 30-50 tareas para sección VI-A.
+- **Decidir si seguir con n8n** y eventualmente integrar.

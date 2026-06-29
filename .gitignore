@@ -46,6 +46,12 @@ tools/
 AUDIT*.md
 NOTES*.md
 
+# ── Trabajo académico en curso (paper STEM IEEE) ────────────────────────────
+# Los drafts del paper viven en /paper localmente. Tienen marcadores [TODO]
+# y [DATOS] mientras se redacta y se recolectan métricas del despliegue del
+# ESP32. Untrack del repo hasta que esté listo para publicar.
+paper/
+
 # ── Estado runtime (flags, locks, pids) ─────────────────────────────────────
 config/*.flag
 *.pid
