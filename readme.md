@@ -4,9 +4,9 @@
 
 ### Operador de Redes Inteligentes y Optimización Neural
 
-**Asistente de IA personal multimodal — voz en tiempo real, visión, control del sistema. Local, web-only, sin suscripciones.**
+**Asistente de IA personal multimodal, local-first y open source — voz en tiempo real, visión, control del sistema, IoT y biometría. Sin suscripciones, sin cuentas, sin datos en cloud.**
 
-[![License: CC BY-NC 4.0](https://img.shields.io/badge/license-CC%20BY--NC%204.0-blue.svg)](https://creativecommons.org/licenses/by-nc/4.0/)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.11%20%7C%203.12-blue.svg)](https://www.python.org/)
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey.svg)]()
 [![Stack](https://img.shields.io/badge/stack-FastAPI%20%7C%20React-success.svg)]()
@@ -34,11 +34,34 @@
 
 ## 🧠 ¿Qué es Orion?
 
-Orion es un asistente de IA personal avanzado que conecta tu sistema operativo
-con la intención humana. A través de diálogo natural, analiza tu pantalla,
-procesa documentos cargados y ejecuta flujos de trabajo complejos sobre una
-interfaz web adaptativa servida en local. No es solo un asistente — es una
-extensión de tu vida digital.
+Orion es un asistente de IA personal multimodal **local-first**: corre íntegro
+en tu propia máquina, persiste tus datos en SQLite local y publica todo su
+código bajo licencia MIT para que **cualquiera pueda auditar, modificar y
+verificar qué hace el sistema**. A diferencia de Alexa, Siri o Google Home —
+cajas negras que centralizan tus datos en la nube — Orion mantiene la
+soberanía de los datos del lado del usuario.
+
+A través de diálogo natural, analiza tu pantalla, procesa documentos
+cargados y ejecuta flujos de trabajo complejos sobre una interfaz web
+adaptativa servida en local. Integra control del sistema operativo, IoT
+(ESP32/Arduino), control de acceso biométrico (huella AS608) y un puente
+con Telegram organizado por topics. Todo bajo tu control, en tu hardware.
+
+### Principios de diseño
+
+- **Local-first**: SQLite, IoT, control de PC, acceso biométrico y memoria
+  funcionan sin conexión a internet. La voz (Gemini Live) y las
+  integraciones Google (Gmail/Classroom/Drive) son **opt-in** y opcionales.
+- **Soberanía de datos**: nada se persiste en cloud por defecto. Toda la
+  data — conversaciones, notas, sensores, eventos de acceso — vive en
+  `data/orion.sqlite` en tu disco.
+- **Open source verificable**: licencia MIT, código auditable, sin
+  binarios opacos. Si no confiás en lo que decimos, leelo.
+- **Extensible**: agregar una tool nueva al LLM = **un archivo** con
+  decorador `@tool`. Auto-discovery. Integración con MCP (Model Context
+  Protocol) para skills/agents externos.
+- **Hardware propio**: ESP32 + AS608 para biometría, Arduino para IoT.
+  Cero dependencia de devices propietarios (Echo, HomePod, Nest).
 
 ---
 
@@ -246,10 +269,24 @@ cd web && npm run build
 
 ---
 
-## ⚠️ Licencia
+## 📄 Licencia
 
-Uso personal y no comercial.
-Bajo licencia **[Creative Commons BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/)**.
+Orion se distribuye bajo licencia **[MIT](LICENSE)**.
+
+Esto significa que tenés libertad total para:
+
+- **Usar** Orion para cualquier propósito (personal, académico, comercial).
+- **Modificar** el código y adaptarlo a tus necesidades.
+- **Redistribuir** copias originales o modificadas.
+- **Sublicenciar** o integrarlo en otros proyectos.
+
+La única condición es **mantener el aviso de copyright y el texto de la
+licencia** en las copias o porciones sustanciales del software.
+
+El código es **auditable y verificable**: cualquier afirmación que hagamos
+sobre el comportamiento del sistema (por ejemplo, "tus datos no salen de
+tu máquina") puede ser comprobada leyendo el código fuente. Esa es la
+diferencia esencial frente a asistentes propietarios.
 
 ---
 
