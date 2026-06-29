@@ -1254,3 +1254,121 @@ repo.
   por `corr_id` y calcular métricas (latencia, tasas) automáticamente.
 - **`paper/benchmark.md`** — diseño de las 30-50 tareas para sección VI-A.
 - **Decidir si seguir con n8n** y eventualmente integrar.
+
+---
+
+## 17. Sesión Junio 2026 — Settings panel completo + limpieza Brain
+
+Continuación de la misma sesión que la §16. Foco en completar el panel
+de Ajustes y depurar el catálogo de proveedores LLM.
+
+### 17.1 Settings: tabs Voz, Datos, Acerca de implementadas
+
+Antes las tres tabs eran placeholders ("Próximamente podrás editarlos
+desde aquí"). Ahora son funcionales:
+
+**Backend** (`orion/server/routes/settings.py`):
+- `GET /api/settings/voice` → `voice_name` + `language_code` actuales
+  + catálogos (5 voces Gemini Live: Aoede, Charon, Fenrir, Kore, Puck;
+  13 idiomas BCP-47).
+- `PATCH /api/settings/voice` → Pydantic `Literal` para la voz,
+  persiste en `config/voice.json` y publica `settings.voice` en el bus.
+- `GET /api/settings/data` → estadísticas reales del SQLite: ruta del
+  archivo, tamaño en bytes, conteos por las 7 tablas principales
+  (`quick_notes`, `memory_entries`, `conversations`,
+  `conversation_messages`, `notifications`, `access_users`,
+  `access_events`).
+
+**`orion/live_session.py`:**
+- `voice_name="Charon"` y `language_code="es-US"` hardcoded reemplazados
+  por `_resolve_voice_name()` y `_resolve_language_code()` que leen
+  `config/voice.json` con fallback a los defaults legacy. Cambio aplica
+  al iniciar la próxima sesión Live (no hot-reload).
+
+**`orion/config/__init__.py`:**
+- Nueva constante `VOICE_CONFIG_PATH = CONFIG_DIR / "voice.json"`.
+- El archivo `config/voice.json` NO está en `.gitignore` porque no
+  contiene secretos (solo preferencias UX). Se crea al primer PATCH;
+  si no existe, los defaults aplican.
+
+**Frontend** (`web/src/components/SettingsPanel.tsx`):
+- `VoiceSection`: dropdown de voz con descripción del timbre + dropdown
+  de idioma, botones Guardar/Descartar con estado *dirty*, toast de
+  confirmación, nota explicando que el cambio aplica en la próxima
+  sesión Live. `staleTime: Infinity` porque la única fuente de cambio
+  es la mutation que ya hace `setQueryData`.
+- `DataSection`: tarjeta resumen (tamaño humano + total registros),
+  tabla con los 7 conteos, paths con botón Copiar, instrucciones de
+  respaldo y migración (`ORION_DATA_HOME`). `staleTime: 60s` + botón
+  "Actualizar" manual (antes tenía `refetchInterval: 5_000` — overkill
+  removido).
+- `AboutSection` (reemplaza el placeholder estático): identidad con
+  versión dinámica desde `package.json`, badges MIT/Local-first/v0.2.0,
+  stack tecnológico como badges, 4 principios de diseño en grid 2x2,
+  3 links externos (código fuente, licencia MIT, README).
+
+### 17.2 Brain dropdown: cleanup UX
+
+**Indicador de disponibilidad clarificado** (commit `060e6a6`):
+- Antes: `Gemini · free tier ✓` (✓ críptico) / `OpenAI` (sin marca).
+- Ahora: `Gemini · free tier` (limpio) / `OpenAI — requiere configuración`.
+- Inversión semántica: en vez de marcar los disponibles, advertir los
+  que necesitan acción. Menos ruido visual en los proveedores que el
+  usuario va a seleccionar la mayoría del tiempo.
+
+**Catálogo depurado** (commit `c6596ac`):
+- `OpenRouter` y `Mistral` cloud removidos de `_PROVIDER_CATALOG` en
+  `orion/server/routes/agent.py`. El usuario confirmó que no los va a
+  usar — limpiar el dropdown reduce carga cognitiva.
+- `DEFAULT_MODEL_PER_PROVIDER` en `orion/core/chat_brain.py`: removidos
+  openrouter/mistral, **agregado `anthropic` con `claude-haiku-4-5`
+  como default** (antes el dropdown caía a `""` al seleccionar Claude
+  — bug latente).
+- `orion/core/llm/openai_compat.py` NO se tocó: los URL maps de
+  openrouter/mistral siguen ahí. Si en el futuro alguien tiene
+  `OPENROUTER_API_KEY` en env y quiere usarlo programáticamente, la
+  capa de transporte sigue funcionando. Solo se removieron de la UI.
+- `tests/test_brain_routes.py` actualizado con asserts negativos
+  explícitos (`assert "openrouter" not in ids`).
+
+**Catálogo final visible al usuario** (7 providers):
+- Gemini · free tier
+- Groq · free tier
+- OpenAI — requiere configuración
+- Claude (Anthropic) — requiere configuración
+- Ollama (local) · free tier
+- Ollama Cloud · free tier
+- DeepSeek
+
+### 17.3 Paper draft actualizado en paralelo
+
+- `paper/draft.md` recibió 3 menciones nuevas de **Groq** (Resumen,
+  Fig. 1, IV.B) para que el listado de proveedores coincida con el
+  catálogo real expuesto al usuario. Sin cambios en menciones de
+  Mistral (siguen siendo válidas como modelo open-weights vía Ollama).
+- El paper sigue gitignored. `paper/draft.md` queda en 8,234 palabras.
+
+### 17.4 Commits empujados en esta tanda
+
+| Commit | Resumen |
+|---|---|
+| `9d3bb21` | feat(settings): paneles Voz y Datos en Ajustes |
+| `67b8c5b` | feat(settings): completar tab Acerca de + optimizar latencia |
+| `060e6a6` | refactor(brain): clarificar indicador de disponibilidad |
+| `c6596ac` | refactor(brain): quitar OpenRouter y Mistral del catálogo |
+
+Verificaciones que pasaron en cada commit: 478 tests backend, 78 tests
+frontend, tsc, eslint, prettier, gen:api:check, build, gitleaks.
+
+### 17.5 Configuración pendiente del usuario (no del código)
+
+OpenAI y Claude están en el catálogo pero **no configurados** — el
+usuario tiene que pegar sus API keys desde el panel Cerebro la próxima
+vez que quiera usarlos:
+1. `https://platform.openai.com/api-keys` → key `sk-...`.
+2. `https://console.anthropic.com/settings/keys` → key `sk-ant-...`.
+3. Las keys se persisten en `config/providers.json` (gitignored).
+
+Los providers que ya están listos out-of-the-box (porque ya tienen key
+configurada o no la requieren): Gemini, Groq, Ollama local, Ollama
+Cloud, DeepSeek.
