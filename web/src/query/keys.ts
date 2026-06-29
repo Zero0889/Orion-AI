@@ -21,6 +21,8 @@ export const QUERY_KEYS = {
   conversations: ["conversations"] as const,
   conversation: (id: string) => ["conversations", id] as const,
   settingsTheme: ["settings", "theme"] as const,
+  settingsVoice: ["settings", "voice"] as const,
+  settingsData: ["settings", "data"] as const,
   notifications: ["notifications"] as const,
   notificationsList: (unread: boolean) => ["notifications", "list", { unread }] as const,
   notificationsStatus: ["notifications", "status"] as const,

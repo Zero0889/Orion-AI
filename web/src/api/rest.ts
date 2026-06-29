@@ -94,6 +94,10 @@ export const api = {
     request<SharingState & { ok: true }>("POST", "/api/settings/sharing", {
       enabled,
     }),
+  getVoiceSettings: () => request<VoiceSettings>("GET", "/api/settings/voice"),
+  setVoiceSettings: (body: { voice_name: string; language_code: string }) =>
+    request<VoiceSettings & { ok: true }>("PATCH", "/api/settings/voice", body),
+  getDataStats: () => request<DataStats>("GET", "/api/settings/data"),
 
   // Brain (LLM provider del chat principal). El switch se aplica en caliente.
   getBrain: () => request<BrainState>("GET", "/api/settings/brain"),
@@ -609,6 +613,20 @@ export interface SharingState {
   enabled: boolean;
   tailscale_ip: string | null;
   port: number;
+}
+
+export interface VoiceSettings {
+  voice_name: string;
+  language_code: string;
+  available_voices: string[];
+  available_languages: string[];
+}
+
+export interface DataStats {
+  db_path: string;
+  db_size_bytes: number;
+  data_dir: string;
+  tables: { table: string; label: string; count: number }[];
 }
 
 export interface TelegramState {

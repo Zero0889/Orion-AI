@@ -48,6 +48,31 @@ class LiveSessionMixin:
     # viven en ``core/tools_bootstrap.py`` (ToolDeclaration.timeout).
     _DEFAULT_TOOL_TIMEOUT = 60
 
+    # ── Voz: leer config del usuario al armar la sesión Live ─────────────
+    # Los defaults reflejan los valores legacy hardcoded antes de
+    # introducir el panel Ajustes → Voz. Si el archivo de config no existe
+    # o está corrupto, caemos a estos sin ruido.
+    _VOICE_DEFAULT_NAME = "Charon"
+    _VOICE_DEFAULT_LANGUAGE = "es-US"
+
+    def _load_voice_settings(self) -> dict:
+        import json
+
+        from orion.config import VOICE_CONFIG_PATH
+
+        if not VOICE_CONFIG_PATH.exists():
+            return {}
+        try:
+            return json.loads(VOICE_CONFIG_PATH.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            return {}
+
+    def _resolve_voice_name(self) -> str:
+        return self._load_voice_settings().get("voice_name") or self._VOICE_DEFAULT_NAME
+
+    def _resolve_language_code(self) -> str:
+        return self._load_voice_settings().get("language_code") or self._VOICE_DEFAULT_LANGUAGE
+
     # ── Configuración de la sesión ───────────────────────────────────────
     def _build_config(self) -> types.LiveConnectConfig:
         from datetime import datetime
@@ -131,13 +156,16 @@ class LiveSessionMixin:
             session_resumption=types.SessionResumptionConfig(),
             speech_config=types.SpeechConfig(
                 voice_config=types.VoiceConfig(
-                    prebuilt_voice_config=types.PrebuiltVoiceConfig(voice_name="Charon")
+                    prebuilt_voice_config=types.PrebuiltVoiceConfig(
+                        voice_name=self._resolve_voice_name()
+                    )
                 ),
                 # CRÍTICO: sin language_code el TTS usa prosodia inglesa por
-                # default y lee español rápido y artificial. Setearlo a es-US
+                # default y lee español rápido y artificial. El default es-US
                 # fuerza al modelo a ajustar el ritmo, las pausas y la
-                # entonación al castellano latinoamericano.
-                language_code="es-US",
+                # entonación al castellano latinoamericano. El usuario puede
+                # cambiarlo desde el panel Ajustes → Voz.
+                language_code=self._resolve_language_code(),
             ),
         )
 

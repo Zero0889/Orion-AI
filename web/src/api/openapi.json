@@ -1495,6 +1495,33 @@
         ],
         "title": "ValidationError",
         "type": "object"
+      },
+      "VoiceConfigBody": {
+        "properties": {
+          "language_code": {
+            "maxLength": 10,
+            "minLength": 2,
+            "title": "Language Code",
+            "type": "string"
+          },
+          "voice_name": {
+            "enum": [
+              "Aoede",
+              "Charon",
+              "Fenrir",
+              "Kore",
+              "Puck"
+            ],
+            "title": "Voice Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "voice_name",
+          "language_code"
+        ],
+        "title": "VoiceConfigBody",
+        "type": "object"
       }
     }
   },
@@ -5131,6 +5158,30 @@
         ]
       }
     },
+    "/api/settings/data": {
+      "get": {
+        "description": "Devuelve estadísticas reales de la persistencia local: ruta del DB,\ntamaño en disco y conteos por tabla. Pensado para que el panel\n\"Datos\" del usuario muestre qué tiene almacenado sin necesidad de\nabrir herramientas externas.",
+        "operationId": "get_data_stats_api_settings_data_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Get Data Stats Api Settings Data Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Data Stats",
+        "tags": [
+          "settings"
+        ]
+      }
+    },
     "/api/settings/sharing": {
       "get": {
         "description": "Devuelve el estado del toggle 'Compartir vía Tailscale' + la IP\nTailscale detectada (si está) para mostrarla en la UI.",
@@ -5366,6 +5417,71 @@
           }
         },
         "summary": "Patch Theme",
+        "tags": [
+          "settings"
+        ]
+      }
+    },
+    "/api/settings/voice": {
+      "get": {
+        "description": "Devuelve la configuración actual de voz + los catálogos de opciones\nválidas para que el frontend arme dropdowns sin hardcodear listas.\n\nLos cambios solo aplican al iniciar una nueva sesión Live (el motor\nrecibe la SpeechConfig al abrir el canal con Gemini).",
+        "operationId": "get_voice_settings_api_settings_voice_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Get Voice Settings Api Settings Voice Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Voice Settings",
+        "tags": [
+          "settings"
+        ]
+      },
+      "patch": {
+        "operationId": "patch_voice_settings_api_settings_voice_patch",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VoiceConfigBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Patch Voice Settings Api Settings Voice Patch",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Patch Voice Settings",
         "tags": [
           "settings"
         ]

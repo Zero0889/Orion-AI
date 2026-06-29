@@ -13,13 +13,20 @@ frontend para repintar en caliente).
 
 from __future__ import annotations
 
+import contextlib
+import json
 import os
+from typing import Literal
 
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from orion.config import (
     API_CONFIG_PATH,
+    CONFIG_DIR,
+    DATA_DIR,
+    SQLITE_DB_PATH,
+    VOICE_CONFIG_PATH,
 )
 from orion.config import (
     load_config as load_api_config,
@@ -35,9 +42,164 @@ from orion.config.theme_tokens import (
     load_theme_name,
     save_theme_name,
 )
-import contextlib
 
 router = APIRouter()
+
+
+# ── Voice config ────────────────────────────────────────────────────────
+#
+# Las voces preconstruidas que Gemini Live expone en su API. Se mantienen
+# como Literal para que Pydantic rechace cualquier valor que el modelo
+# subyacente no acepte.
+PREBUILT_VOICES: tuple[str, ...] = ("Aoede", "Charon", "Fenrir", "Kore", "Puck")
+DEFAULT_VOICE_NAME: str = "Charon"
+DEFAULT_LANGUAGE_CODE: str = "es-US"
+SUPPORTED_LANGUAGES: tuple[str, ...] = (
+    "es-US",
+    "es-ES",
+    "es-MX",
+    "en-US",
+    "en-GB",
+    "en-AU",
+    "fr-FR",
+    "de-DE",
+    "it-IT",
+    "pt-BR",
+    "ja-JP",
+    "ko-KR",
+    "zh-CN",
+)
+
+
+def _load_voice_config() -> dict:
+    """Carga el archivo de config de voz, devolviendo defaults si no existe."""
+    if not VOICE_CONFIG_PATH.exists():
+        return {
+            "voice_name": DEFAULT_VOICE_NAME,
+            "language_code": DEFAULT_LANGUAGE_CODE,
+        }
+    try:
+        data = json.loads(VOICE_CONFIG_PATH.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return {
+            "voice_name": DEFAULT_VOICE_NAME,
+            "language_code": DEFAULT_LANGUAGE_CODE,
+        }
+    return {
+        "voice_name": data.get("voice_name") or DEFAULT_VOICE_NAME,
+        "language_code": data.get("language_code") or DEFAULT_LANGUAGE_CODE,
+    }
+
+
+def _save_voice_config(cfg: dict) -> None:
+    CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+    VOICE_CONFIG_PATH.write_text(
+        json.dumps(cfg, indent=2, ensure_ascii=False),
+        encoding="utf-8",
+    )
+
+
+class VoiceConfigBody(BaseModel):
+    voice_name: Literal["Aoede", "Charon", "Fenrir", "Kore", "Puck"]
+    language_code: str = Field(..., min_length=2, max_length=10)
+
+
+@router.get("/voice")
+def get_voice_settings() -> dict:
+    """Devuelve la configuración actual de voz + los catálogos de opciones
+    válidas para que el frontend arme dropdowns sin hardcodear listas.
+
+    Los cambios solo aplican al iniciar una nueva sesión Live (el motor
+    recibe la SpeechConfig al abrir el canal con Gemini).
+    """
+    cfg = _load_voice_config()
+    return {
+        "voice_name": cfg["voice_name"],
+        "language_code": cfg["language_code"],
+        "available_voices": list(PREBUILT_VOICES),
+        "available_languages": list(SUPPORTED_LANGUAGES),
+    }
+
+
+@router.patch("/voice")
+def patch_voice_settings(body: VoiceConfigBody, request: Request) -> dict:
+    if body.language_code not in SUPPORTED_LANGUAGES:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"Idioma '{body.language_code}' no soportado. "
+                f"Opciones válidas: {', '.join(SUPPORTED_LANGUAGES)}"
+            ),
+        )
+    cfg = {
+        "voice_name": body.voice_name,
+        "language_code": body.language_code,
+    }
+    _save_voice_config(cfg)
+    bus = getattr(request.app.state, "bus", None)
+    if bus is not None:
+        with contextlib.suppress(Exception):
+            bus.publish("settings.voice", cfg)
+    return {
+        "ok": True,
+        **cfg,
+        "available_voices": list(PREBUILT_VOICES),
+        "available_languages": list(SUPPORTED_LANGUAGES),
+    }
+
+
+# ── Data stats ──────────────────────────────────────────────────────────
+
+
+def _count_rows(conn, table: str) -> int:
+    """Cuenta filas defensivamente: si la tabla todavía no existe (porque
+    el subsistema correspondiente nunca se usó), devuelve 0 en lugar de
+    propagar la excepción."""
+    try:
+        cur = conn.execute(f"SELECT COUNT(*) FROM {table}")
+        row = cur.fetchone()
+        return int(row[0]) if row else 0
+    except Exception:
+        return 0
+
+
+@router.get("/data")
+def get_data_stats() -> dict:
+    """Devuelve estadísticas reales de la persistencia local: ruta del DB,
+    tamaño en disco y conteos por tabla. Pensado para que el panel
+    "Datos" del usuario muestre qué tiene almacenado sin necesidad de
+    abrir herramientas externas.
+    """
+    from orion.storage import get_connection
+
+    db_size_bytes = 0
+    if SQLITE_DB_PATH.exists():
+        try:
+            db_size_bytes = SQLITE_DB_PATH.stat().st_size
+        except OSError:
+            db_size_bytes = 0
+
+    conn = get_connection()
+    tables = {
+        "quick_notes": "Notas rápidas",
+        "memory_entries": "Memoria semántica",
+        "conversations": "Conversaciones",
+        "conversation_messages": "Mensajes de chat",
+        "notifications": "Notificaciones",
+        "access_users": "Usuarios biométricos",
+        "access_events": "Eventos de acceso",
+    }
+    counts = [
+        {"table": tname, "label": label, "count": _count_rows(conn, tname)}
+        for tname, label in tables.items()
+    ]
+
+    return {
+        "db_path": str(SQLITE_DB_PATH),
+        "db_size_bytes": db_size_bytes,
+        "data_dir": str(DATA_DIR),
+        "tables": counts,
+    }
 
 
 class ThemePatch(BaseModel):

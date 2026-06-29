@@ -100,6 +100,7 @@ API_CONFIG_PATH = CONFIG_DIR / "api_keys.json"
 BROWSER_CONFIG_PATH = CONFIG_DIR / "browser.json"
 HOTKEYS_CONFIG_PATH = CONFIG_DIR / "hotkeys.json"
 IOT_CONFIG_PATH = CONFIG_DIR / "iot_config.json"
+VOICE_CONFIG_PATH = CONFIG_DIR / "voice.json"
 MEMORY_PATH = DATA_DIR / "long_term.json"  # Legacy — backend ya usa SQLite (Fase 3B).
 PROMPT_PATH = CORE_DIR / "prompt.txt"
 SQLITE_DB_PATH = DATA_DIR / "orion.sqlite"  # Fase 3B: state migrado a SQLite

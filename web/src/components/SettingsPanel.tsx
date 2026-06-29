@@ -6,16 +6,18 @@
  * available theme as a card with a live swatch.
  */
 
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 
 import {
   api,
+  type DataStats,
   type NotebookLMStatus,
   type SharingState,
   type TelegramConfigPatch,
   type TelegramState,
   type ThemeInfo,
+  type VoiceSettings,
 } from "@/api/rest";
 import { BrainSection } from "@/components/BrainSection";
 import { GogAccountsCard } from "@/components/GogAccountsCard";
@@ -155,24 +157,9 @@ export function SettingsPanel() {
 
           {tab === "integrations" && <Integrations />}
 
-          {tab === "voice" && (
-            <Section title="Voz">
-              <Surface level={2} className="p-4 text-sm text-text-dim leading-relaxed">
-                Los ajustes de voz (TTS, idioma, sensibilidad del micrófono) se gestionan
-                directamente en el backend de Orion. Próximamente podrás editarlos desde aquí.
-              </Surface>
-            </Section>
-          )}
+          {tab === "voice" && <VoiceSection />}
 
-          {tab === "data" && (
-            <Section title="Datos locales">
-              <Surface level={2} className="p-4 text-sm text-text-dim leading-relaxed">
-                Las notas, memoria e historial se almacenan en{" "}
-                <code className="text-acc font-mono">memory/</code> dentro del proyecto. Para
-                exportarlos o moverlos, copia esa carpeta.
-              </Surface>
-            </Section>
-          )}
+          {tab === "data" && <DataSection />}
 
           {tab === "about" && (
             <Section title="Acerca de Orion">
@@ -1351,5 +1338,293 @@ function SessionBadge({
       />
       <span className={textClass}>{label}</span>
     </span>
+  );
+}
+
+// ── Voz ──────────────────────────────────────────────────────────────────
+//
+// Lee `/api/settings/voice` y deja al usuario elegir voz preconstruida de
+// Gemini Live + código de idioma. Los cambios se aplican al iniciar la
+// próxima sesión Live (el motor recibe la SpeechConfig al abrir el canal).
+
+const VOICE_LABEL: Record<string, { tone: string; note: string }> = {
+  Aoede: { tone: "Suave · femenina", note: "Ritmo ligero, prosodia musical." },
+  Charon: { tone: "Profunda · masculina", note: "Default. Cálida y pausada." },
+  Fenrir: { tone: "Informativa · masculina", note: "Tono neutro, didáctico." },
+  Kore: { tone: "Firme · femenina", note: "Claridad alta, registro asertivo." },
+  Puck: { tone: "Enérgica · masculina", note: "Ritmo rápido, expresivo." },
+};
+
+const LANGUAGE_LABEL: Record<string, string> = {
+  "es-US": "Español (Latinoamérica)",
+  "es-ES": "Español (España)",
+  "es-MX": "Español (México)",
+  "en-US": "Inglés (EE. UU.)",
+  "en-GB": "Inglés (Reino Unido)",
+  "en-AU": "Inglés (Australia)",
+  "fr-FR": "Francés (Francia)",
+  "de-DE": "Alemán (Alemania)",
+  "it-IT": "Italiano (Italia)",
+  "pt-BR": "Portugués (Brasil)",
+  "ja-JP": "Japonés",
+  "ko-KR": "Coreano",
+  "zh-CN": "Chino (mandarín)",
+};
+
+function VoiceSection() {
+  const queryClient = useQueryClient();
+  const { data, error } = useQuery<VoiceSettings>({
+    queryKey: QUERY_KEYS.settingsVoice,
+    queryFn: () => api.getVoiceSettings(),
+  });
+
+  const [voice, setVoice] = useState<string | null>(null);
+  const [lang, setLang] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (data) {
+      setVoice((prev) => prev ?? data.voice_name);
+      setLang((prev) => prev ?? data.language_code);
+    }
+  }, [data]);
+
+  const mutation = useMutation({
+    mutationFn: (body: { voice_name: string; language_code: string }) => api.setVoiceSettings(body),
+    onSuccess: (res) => {
+      queryClient.setQueryData(QUERY_KEYS.settingsVoice, res);
+      toast.success("Voz actualizada — se aplicará en la próxima sesión Live.");
+    },
+    onError: (e) => {
+      toast.error(String(e));
+    },
+  });
+
+  if (error && !data) {
+    return (
+      <Section title="Voz">
+        <Surface level={2} className="p-4 text-sm text-text-dim">
+          No pude leer la configuración de voz: {String(error)}
+        </Surface>
+      </Section>
+    );
+  }
+
+  if (!data || !voice || !lang) {
+    return (
+      <Section title="Voz">
+        <Surface level={2} className="p-4 text-sm text-text-dim">
+          Cargando…
+        </Surface>
+      </Section>
+    );
+  }
+
+  const dirty = voice !== data.voice_name || lang !== data.language_code;
+  const meta = VOICE_LABEL[voice];
+
+  return (
+    <Section title="Voz">
+      <div className="space-y-4">
+        <Surface level={2} className="p-4 space-y-4">
+          <div>
+            <label className="text-[11px] uppercase tracking-[0.22em] text-text-dim mb-1.5 block">
+              Voz del asistente
+            </label>
+            <select
+              value={voice}
+              onChange={(e) => setVoice(e.target.value)}
+              className="w-full bg-bg-2 border border-border rounded-lg px-3 py-2 text-sm text-text focus:outline-none focus:ring-1 focus:ring-pri"
+            >
+              {data.available_voices.map((v) => (
+                <option key={v} value={v}>
+                  {v} — {VOICE_LABEL[v]?.tone ?? ""}
+                </option>
+              ))}
+            </select>
+            {meta && <p className="mt-2 text-xs text-text-dim leading-relaxed">{meta.note}</p>}
+          </div>
+
+          <div>
+            <label className="text-[11px] uppercase tracking-[0.22em] text-text-dim mb-1.5 block">
+              Idioma y región
+            </label>
+            <select
+              value={lang}
+              onChange={(e) => setLang(e.target.value)}
+              className="w-full bg-bg-2 border border-border rounded-lg px-3 py-2 text-sm text-text focus:outline-none focus:ring-1 focus:ring-pri"
+            >
+              {data.available_languages.map((l) => (
+                <option key={l} value={l}>
+                  {LANGUAGE_LABEL[l] ?? l} ({l})
+                </option>
+              ))}
+            </select>
+            <p className="mt-2 text-xs text-text-dim leading-relaxed">
+              Define la prosodia del TTS de Gemini Live. Sin este parámetro el modelo lee cualquier
+              idioma con cadencia inglesa.
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2 pt-1">
+            <Button
+              variant="primary"
+              size="md"
+              disabled={!dirty || mutation.isPending}
+              onClick={() => mutation.mutate({ voice_name: voice, language_code: lang })}
+            >
+              {mutation.isPending ? "Guardando…" : "Guardar cambios"}
+            </Button>
+            {dirty && (
+              <Button
+                variant="ghost"
+                size="md"
+                onClick={() => {
+                  setVoice(data.voice_name);
+                  setLang(data.language_code);
+                }}
+              >
+                Descartar
+              </Button>
+            )}
+          </div>
+        </Surface>
+
+        <Surface level={1} className="p-3.5 text-xs text-text-dim leading-relaxed">
+          <span className="text-text font-medium">¿Cuándo se aplican los cambios?</span> La próxima
+          vez que abras una sesión de voz. Si tenés una conversación activa, los cambios entran al
+          cerrarla y reabrirla.
+        </Surface>
+      </div>
+    </Section>
+  );
+}
+
+// ── Datos locales ────────────────────────────────────────────────────────
+//
+// Muestra el estado real de la persistencia SQLite del usuario: ruta del
+// archivo, tamaño en disco y conteos por tabla. Útil para que el usuario
+// sepa qué tiene almacenado sin necesidad de abrir herramientas externas.
+
+function humanSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  if (bytes < 1024 * 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(2)} MB`;
+  return `${(bytes / 1024 / 1024 / 1024).toFixed(2)} GB`;
+}
+
+function DataSection() {
+  const { data, error } = useQuery<DataStats>({
+    queryKey: QUERY_KEYS.settingsData,
+    queryFn: () => api.getDataStats(),
+    refetchInterval: 5_000,
+  });
+
+  function copyPath(path: string) {
+    navigator.clipboard?.writeText(path);
+    toast.success("Ruta copiada al portapapeles");
+  }
+
+  if (error && !data) {
+    return (
+      <Section title="Datos locales">
+        <Surface level={2} className="p-4 text-sm text-text-dim">
+          No pude leer las estadísticas del almacenamiento: {String(error)}
+        </Surface>
+      </Section>
+    );
+  }
+
+  if (!data) {
+    return (
+      <Section title="Datos locales">
+        <Surface level={2} className="p-4 text-sm text-text-dim">
+          Cargando…
+        </Surface>
+      </Section>
+    );
+  }
+
+  const total = data.tables.reduce((acc, t) => acc + t.count, 0);
+
+  return (
+    <Section title="Datos locales">
+      <div className="space-y-4">
+        <Surface level={2} className="p-4 space-y-3">
+          <div className="grid grid-cols-2 gap-3 text-sm">
+            <div>
+              <div className="text-[10px] uppercase tracking-[0.22em] text-text-dim mb-0.5">
+                Base de datos
+              </div>
+              <div className="text-text font-semibold text-base">
+                {humanSize(data.db_size_bytes)}
+              </div>
+            </div>
+            <div>
+              <div className="text-[10px] uppercase tracking-[0.22em] text-text-dim mb-0.5">
+                Registros totales
+              </div>
+              <div className="text-text font-semibold text-base">{total.toLocaleString()}</div>
+            </div>
+          </div>
+        </Surface>
+
+        <Surface level={2} className="p-0 overflow-hidden">
+          <div className="px-4 py-2.5 border-b border-border bg-bg-2">
+            <div className="text-[10px] uppercase tracking-[0.22em] text-text-dim">
+              Conteos por tabla
+            </div>
+          </div>
+          <table className="w-full text-sm">
+            <tbody>
+              {data.tables.map((t) => (
+                <tr key={t.table} className="border-b border-border last:border-0">
+                  <td className="px-4 py-2.5 text-text">{t.label}</td>
+                  <td className="px-4 py-2.5 text-right font-mono text-text-dim">
+                    {t.count.toLocaleString()}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </Surface>
+
+        <Surface level={2} className="p-4 space-y-2.5">
+          <div>
+            <div className="text-[10px] uppercase tracking-[0.22em] text-text-dim mb-1">
+              Ruta del archivo SQLite
+            </div>
+            <div className="flex items-center gap-2">
+              <code className="flex-1 text-xs font-mono text-text-dim break-all bg-bg-2 px-2 py-1.5 rounded">
+                {data.db_path}
+              </code>
+              <Button variant="ghost" size="sm" onClick={() => copyPath(data.db_path)}>
+                Copiar
+              </Button>
+            </div>
+          </div>
+          <div>
+            <div className="text-[10px] uppercase tracking-[0.22em] text-text-dim mb-1">
+              Carpeta de datos
+            </div>
+            <div className="flex items-center gap-2">
+              <code className="flex-1 text-xs font-mono text-text-dim break-all bg-bg-2 px-2 py-1.5 rounded">
+                {data.data_dir}
+              </code>
+              <Button variant="ghost" size="sm" onClick={() => copyPath(data.data_dir)}>
+                Copiar
+              </Button>
+            </div>
+          </div>
+        </Surface>
+
+        <Surface level={1} className="p-3.5 text-xs text-text-dim leading-relaxed">
+          <span className="text-text font-medium">¿Cómo respaldar tus datos?</span> Copiá el archivo{" "}
+          <code className="font-mono text-acc">orion.sqlite</code> a otro disco. Es autocontenido —
+          todas las conversaciones, notas, memoria, notificaciones y eventos biométricos viven
+          adentro. Para mudar Orion a otra PC, copiá toda la carpeta de datos y configurá la
+          variable <code className="font-mono">ORION_DATA_HOME</code> apuntando ahí.
+        </Surface>
+      </div>
+    </Section>
   );
 }

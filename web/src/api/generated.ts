@@ -1666,6 +1666,29 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/settings/data": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Data Stats
+     * @description Devuelve estadísticas reales de la persistencia local: ruta del DB,
+     *     tamaño en disco y conteos por tabla. Pensado para que el panel
+     *     "Datos" del usuario muestre qué tiene almacenado sin necesidad de
+     *     abrir herramientas externas.
+     */
+    get: operations["get_data_stats_api_settings_data_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/settings/sharing": {
     parameters: {
       query?: never;
@@ -1752,6 +1775,31 @@ export interface paths {
     head?: never;
     /** Patch Theme */
     patch: operations["patch_theme_api_settings_theme_patch"];
+    trace?: never;
+  };
+  "/api/settings/voice": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Voice Settings
+     * @description Devuelve la configuración actual de voz + los catálogos de opciones
+     *     válidas para que el frontend arme dropdowns sin hardcodear listas.
+     *
+     *     Los cambios solo aplican al iniciar una nueva sesión Live (el motor
+     *     recibe la SpeechConfig al abrir el canal con Gemini).
+     */
+    get: operations["get_voice_settings_api_settings_voice_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    /** Patch Voice Settings */
+    patch: operations["patch_voice_settings_api_settings_voice_patch"];
     trace?: never;
   };
   "/api/skills/": {
@@ -2500,6 +2548,16 @@ export interface components {
       msg: string;
       /** Error Type */
       type: string;
+    };
+    /** VoiceConfigBody */
+    VoiceConfigBody: {
+      /** Language Code */
+      language_code: string;
+      /**
+       * Voice Name
+       * @enum {string}
+       */
+      voice_name: "Aoede" | "Charon" | "Fenrir" | "Kore" | "Puck";
     };
   };
   responses: never;
@@ -5322,6 +5380,28 @@ export interface operations {
       };
     };
   };
+  get_data_stats_api_settings_data_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            [key: string]: unknown;
+          };
+        };
+      };
+    };
+  };
   get_sharing_endpoint_api_settings_sharing_get: {
     parameters: {
       query?: never;
@@ -5503,6 +5583,63 @@ export interface operations {
     requestBody: {
       content: {
         "application/json": components["schemas"]["ThemePatch"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            [key: string]: unknown;
+          };
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  get_voice_settings_api_settings_voice_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            [key: string]: unknown;
+          };
+        };
+      };
+    };
+  };
+  patch_voice_settings_api_settings_voice_patch: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["VoiceConfigBody"];
       };
     };
     responses: {
