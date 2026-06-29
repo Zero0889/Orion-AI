@@ -9,6 +9,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 
+import pkg from "../../package.json";
+
 import {
   api,
   type DataStats,
@@ -161,30 +163,7 @@ export function SettingsPanel() {
 
           {tab === "data" && <DataSection />}
 
-          {tab === "about" && (
-            <Section title="Acerca de Orion">
-              <Surface level={2} className="p-5">
-                <div className="flex items-center gap-3 mb-3">
-                  <div className="h-10 w-10 rounded-xl bg-pri/15 grid place-items-center">
-                    <Icon name="orbit" size={20} className="text-pri" />
-                  </div>
-                  <div>
-                    <div className="text-[10px] uppercase tracking-[0.22em] text-pri/80">
-                      Sistema
-                    </div>
-                    <div className="text-base font-semibold tracking-tight text-text">
-                      O.R.I.O.N
-                    </div>
-                  </div>
-                </div>
-                <p className="text-sm text-text-dim leading-relaxed">
-                  Operador de Redes Inteligentes y Optimización Neural. Tu sistema operativo
-                  asistido por IA — voz, agentes, IoT, telemetría y memoria persistente en un solo
-                  espacio local.
-                </p>
-              </Surface>
-            </Section>
-          )}
+          {tab === "about" && <AboutSection />}
         </div>
       </div>
     </div>
@@ -1373,9 +1352,13 @@ const LANGUAGE_LABEL: Record<string, string> = {
 
 function VoiceSection() {
   const queryClient = useQueryClient();
+  // staleTime infinito porque la config solo cambia cuando el propio panel
+  // la edita (la mutation hace setQueryData). No hay otra fuente que la
+  // mute.
   const { data, error } = useQuery<VoiceSettings>({
     queryKey: QUERY_KEYS.settingsVoice,
     queryFn: () => api.getVoiceSettings(),
+    staleTime: Infinity,
   });
 
   const [voice, setVoice] = useState<string | null>(null);
@@ -1513,10 +1496,13 @@ function humanSize(bytes: number): string {
 }
 
 function DataSection() {
-  const { data, error } = useQuery<DataStats>({
+  // staleTime largo: los conteos cambian con eventos del bus (note.changed,
+  // notification.received, etc.) que ya invalidan la query desde el bridge
+  // WS. Refetch automático cada N segundos solo gasta CPU sin payoff.
+  const { data, error, refetch, isFetching } = useQuery<DataStats>({
     queryKey: QUERY_KEYS.settingsData,
     queryFn: () => api.getDataStats(),
-    refetchInterval: 5_000,
+    staleTime: 60_000,
   });
 
   function copyPath(path: string) {
@@ -1565,6 +1551,11 @@ function DataSection() {
               </div>
               <div className="text-text font-semibold text-base">{total.toLocaleString()}</div>
             </div>
+          </div>
+          <div className="pt-1 flex items-center justify-end">
+            <Button variant="ghost" size="sm" loading={isFetching} onClick={() => refetch()}>
+              Actualizar
+            </Button>
           </div>
         </Surface>
 
@@ -1623,6 +1614,153 @@ function DataSection() {
           todas las conversaciones, notas, memoria, notificaciones y eventos biométricos viven
           adentro. Para mudar Orion a otra PC, copiá toda la carpeta de datos y configurá la
           variable <code className="font-mono">ORION_DATA_HOME</code> apuntando ahí.
+        </Surface>
+      </div>
+    </Section>
+  );
+}
+
+// ── Acerca de ────────────────────────────────────────────────────────────
+//
+// Identidad del producto + información de versión, licencia y links a los
+// recursos del proyecto. La versión se importa de package.json para que
+// se actualice sola al bumpear; los demás datos son estáticos.
+
+const REPO_URL = "https://github.com/Zero0889/Orion-AI";
+const LICENSE_URL = `${REPO_URL}/blob/main/LICENSE`;
+const README_URL = `${REPO_URL}/blob/main/readme.md`;
+
+const STACK_BADGES: { label: string; tone: "info" | "warn" | "success" }[] = [
+  { label: "Python 3.11+", tone: "info" },
+  { label: "FastAPI", tone: "info" },
+  { label: "React 18", tone: "info" },
+  { label: "TypeScript", tone: "info" },
+  { label: "SQLite WAL", tone: "info" },
+  { label: "Gemini Live", tone: "success" },
+  { label: "Ollama", tone: "success" },
+  { label: "ESP32", tone: "warn" },
+  { label: "MCP", tone: "success" },
+];
+
+const PRINCIPLES: { title: string; body: string }[] = [
+  {
+    title: "Local-first",
+    body: "Datos, configuración y memoria viven en tu disco. La nube es opcional y opt-in.",
+  },
+  {
+    title: "Open source verificable",
+    body: "Licencia MIT. Cualquiera puede auditar, modificar y redistribuir el código.",
+  },
+  {
+    title: "Agéntico",
+    body: "El modelo no solo conversa — invoca herramientas que ejecutan acciones reales.",
+  },
+  {
+    title: "Extensible",
+    body: "Agregar una capacidad nueva es decorar una función con @tool. Sin tocar el core.",
+  },
+];
+
+function AboutSection() {
+  return (
+    <Section title="Acerca de Orion">
+      <div className="space-y-4">
+        {/* Identidad */}
+        <Surface level={2} className="p-5">
+          <div className="flex items-start gap-4">
+            <div className="h-14 w-14 rounded-2xl bg-pri/15 grid place-items-center shrink-0">
+              <Icon name="orbit" size={28} className="text-pri" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="text-[10px] uppercase tracking-[0.22em] text-pri/80 mb-1">
+                Asistente personal
+              </div>
+              <div className="text-xl font-semibold tracking-tight text-text mb-1">O.R.I.O.N</div>
+              <div className="flex flex-wrap items-center gap-2 mb-3">
+                <Badge tone="info">v{pkg.version}</Badge>
+                <Badge tone="success">MIT</Badge>
+                <Badge tone="warn" dot>
+                  Local-first
+                </Badge>
+              </div>
+              <p className="text-sm text-text-dim leading-relaxed">
+                Operador de Redes Inteligentes y Optimización Neural. Un asistente personal
+                agéntico, multimodal y de código abierto que corre íntegro en tu equipo y actúa
+                sobre tu sistema operativo, archivos, dispositivos IoT y memoria personal.
+              </p>
+            </div>
+          </div>
+        </Surface>
+
+        {/* Stack tecnológico */}
+        <Surface level={2} className="p-4">
+          <div className="text-[10px] uppercase tracking-[0.22em] text-text-dim mb-2.5">
+            Stack tecnológico
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {STACK_BADGES.map((b) => (
+              <Badge key={b.label} tone={b.tone}>
+                {b.label}
+              </Badge>
+            ))}
+          </div>
+        </Surface>
+
+        {/* Principios de diseño */}
+        <Surface level={2} className="p-4">
+          <div className="text-[10px] uppercase tracking-[0.22em] text-text-dim mb-3">
+            Principios de diseño
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {PRINCIPLES.map((p) => (
+              <div key={p.title}>
+                <div className="text-sm font-medium text-text mb-0.5">{p.title}</div>
+                <div className="text-xs text-text-dim leading-relaxed">{p.body}</div>
+              </div>
+            ))}
+          </div>
+        </Surface>
+
+        {/* Recursos */}
+        <Surface level={2} className="p-4">
+          <div className="text-[10px] uppercase tracking-[0.22em] text-text-dim mb-2.5">
+            Recursos del proyecto
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <a
+              href={REPO_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 px-3 h-9 rounded-lg bg-bg-2 border border-border text-sm text-text hover:bg-elevated hover:border-pri/30 transition-all"
+            >
+              <Icon name="github" size={15} className="text-text-dim" />
+              Código fuente
+            </a>
+            <a
+              href={LICENSE_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 px-3 h-9 rounded-lg bg-bg-2 border border-border text-sm text-text hover:bg-elevated hover:border-pri/30 transition-all"
+            >
+              <Icon name="shield" size={15} className="text-text-dim" />
+              Licencia MIT
+            </a>
+            <a
+              href={README_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 px-3 h-9 rounded-lg bg-bg-2 border border-border text-sm text-text hover:bg-elevated hover:border-pri/30 transition-all"
+            >
+              <Icon name="info" size={15} className="text-text-dim" />
+              Documentación
+            </a>
+          </div>
+        </Surface>
+
+        {/* Footer */}
+        <Surface level={1} className="p-3.5 text-xs text-text-dim leading-relaxed text-center">
+          Hecho con cuidado para quien quiera un asistente personal{" "}
+          <span className="text-text font-medium">soberano, transparente y propio</span>.
         </Surface>
       </div>
     </Section>
