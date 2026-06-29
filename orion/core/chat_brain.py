@@ -53,10 +53,9 @@ DEFAULT_MODEL_PER_PROVIDER: dict[str, str] = {
     "deepseek": "deepseek-chat",
     "ollama": "llama3.1:8b",
     "ollama_cloud": "glm-5.2:cloud",
-    "openrouter": "deepseek/deepseek-chat-v3.1:free",
     "groq": "llama-3.3-70b-versatile",
     "openai": "gpt-4o-mini",
-    "mistral": "mistral-small-latest",
+    "anthropic": "claude-haiku-4-5",
 }
 
 # Cuántos turnos previos se incluyen al armar el contexto. Cap por turnos

@@ -72,9 +72,13 @@ def test_get_brain_default_is_gemini(client):
     data = r.json()
     assert data["active"]["provider"] == "gemini"
     assert data["active"]["is_live"] is True
-    # El catálogo expone deepseek/ollama/etc.
+    # El catálogo expone los providers curados (gemini/groq/ollama/etc.).
+    # OpenRouter y Mistral fueron removidos del catálogo en una iteración
+    # posterior — no asumir su presencia.
     ids = {p["id"] for p in data["providers"]}
-    assert {"gemini", "deepseek", "ollama", "openrouter"}.issubset(ids)
+    assert {"gemini", "deepseek", "ollama", "groq", "openai", "anthropic"}.issubset(ids)
+    assert "openrouter" not in ids
+    assert "mistral" not in ids
     # Estructura ollama presente
     assert data["ollama"]["running"] is False
     assert data["ollama"]["base_url"] == "http://localhost:11434"

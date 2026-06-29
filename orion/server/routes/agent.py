@@ -205,18 +205,6 @@ _PROVIDER_CATALOG: dict[str, dict] = {
             {"id": "gemini-2.5-pro", "label": "Pro 2.5 (razonador)"},
         ],
     },
-    "openrouter": {
-        "label": "OpenRouter",
-        "free": True,
-        "auth": "OPENROUTER_API_KEY",
-        "models": [
-            {"id": "deepseek/deepseek-chat-v3.1:free", "label": "DeepSeek V3.1 (chat, gratis)"},
-            {"id": "deepseek/deepseek-r1:free", "label": "DeepSeek R1 (razonador, gratis)"},
-            {"id": "meta-llama/llama-3.3-70b-instruct:free", "label": "Llama 3.3 70B (gratis)"},
-            {"id": "google/gemini-2.0-flash-exp:free", "label": "Gemini 2.0 Flash (gratis)"},
-            {"id": "qwen/qwen-2.5-coder-32b-instruct:free", "label": "Qwen 2.5 Coder 32B (gratis)"},
-        ],
-    },
     "groq": {
         "label": "Groq",
         "free": True,
@@ -245,15 +233,6 @@ _PROVIDER_CATALOG: dict[str, dict] = {
             {"id": "claude-sonnet-4-6", "label": "Sonnet 4.6"},
             {"id": "claude-opus-4-7", "label": "Opus 4.7"},
             {"id": "claude-haiku-4-5", "label": "Haiku 4.5 (rápido y barato)"},
-        ],
-    },
-    "mistral": {
-        "label": "Mistral",
-        "free": True,
-        "auth": "MISTRAL_API_KEY",
-        "models": [
-            {"id": "mistral-small-latest", "label": "Mistral Small (free tier)"},
-            {"id": "codestral-latest", "label": "Codestral (coder)"},
         ],
     },
     "ollama": {
